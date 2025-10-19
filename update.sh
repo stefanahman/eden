@@ -1,0 +1,51 @@
+#!/bin/bash
+# Eden updater - Update from git and re-deploy packages
+set -e
+
+# Colors
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+log() {
+    echo -e "${GREEN}▸${NC} $1"
+}
+
+error() {
+    echo -e "${RED}✗${NC} $1" >&2
+    exit 1
+}
+
+# Get Eden directory
+EDEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$EDEN_DIR" || error "Failed to cd to Eden directory"
+
+# Check for uncommitted changes
+log "Checking repository status..."
+if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+    error "Uncommitted changes detected. Commit or stash before updating:
+    
+  git status
+  git add -A && git commit -m \"your message\"
+  
+  Or stash: git stash"
+fi
+
+# Detect OS
+OS=""
+case "$(uname -s)" in
+    Linux*) OS="arch" ;;
+    Darwin*) OS="mac" ;;
+    *) error "Unsupported OS" ;;
+esac
+
+# Pull updates
+log "Pulling latest changes..."
+git pull || error "git pull failed"
+
+# Re-deploy packages
+log "Re-deploying packages..."
+stow -R -t "$HOME" -d packages common "$OS" || error "Failed to re-stow packages"
+
+log "Eden updated successfully! ✓"
+
