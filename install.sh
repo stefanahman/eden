@@ -129,21 +129,15 @@ else
     error "Failed to stow $OS package"
 fi
 
-# Create local config directory
-log "Setting up local config directory..."
-mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/eden/local"
-verbose "✓ Created ${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/"
+# Create Eden config structure (not stowed, user-specific)
+log "Setting up Eden config directory..."
+EDEN_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/eden"
+mkdir -p "$EDEN_CONFIG/local"
+verbose "✓ Created $EDEN_CONFIG/local/"
 
 # Create empty branches file (users can add branch repo paths here)
-touch "${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
-verbose "✓ Created ${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
-
-# Copy gitconfig template if it doesn't exist
-GITCONFIG_LOCAL="${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/gitconfig"
-if [ ! -f "$GITCONFIG_LOCAL" ]; then
-    cp "${XDG_CONFIG_HOME:-$HOME/.config}/eden/templates/gitconfig.template" "$GITCONFIG_LOCAL"
-    verbose "✓ Created $GITCONFIG_LOCAL from template"
-fi
+touch "$EDEN_CONFIG/branches"
+verbose "✓ Created $EDEN_CONFIG/branches"
 
 # Install packages (optional)
 if $INSTALL_PACKAGES; then
@@ -184,7 +178,7 @@ log "Eden installed successfully! 🌳"
 echo ""
 echo "Next steps:"
 echo "  • Run './doctor.sh' to validate installation"
-echo "  • View templates: ls ~/.config/eden/templates/"
-echo "  • Create a branch repo for private configs (see templates/README.md)"
+echo "  • Create a branch repo for private configs (see README.md)"
+echo "  • Run 'make graft' after adding branch repos to sync configs"
 echo ""
 

@@ -81,10 +81,10 @@ else
     check_fail "Local config directory missing: ${XDG_CONFIG_HOME:-$HOME/.config}/eden/local"
 fi
 
-if [ -d "${XDG_CONFIG_HOME:-$HOME/.config}/eden/templates" ]; then
-    check_pass "Templates directory deployed"
+if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches" ]; then
+    check_pass "Branches file exists"
 else
-    check_warn "Templates not deployed (run ./install.sh)"
+    check_fail "Branches file missing: ${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
 fi
 
 # Check symlinks
