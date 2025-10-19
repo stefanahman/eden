@@ -138,6 +138,13 @@ verbose "✓ Created ${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/"
 touch "${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
 verbose "✓ Created ${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
 
+# Copy gitconfig template if it doesn't exist
+GITCONFIG_LOCAL="${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/gitconfig"
+if [ ! -f "$GITCONFIG_LOCAL" ]; then
+    cp "${XDG_CONFIG_HOME:-$HOME/.config}/eden/templates/gitconfig.template" "$GITCONFIG_LOCAL"
+    verbose "✓ Created $GITCONFIG_LOCAL from template"
+fi
+
 # Install packages (optional)
 if $INSTALL_PACKAGES; then
     log "Installing packages..."

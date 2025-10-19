@@ -1,20 +1,20 @@
-# Layer 3: Machine-specific git configuration template
-# Copy this to ~/.config/eden/local/gitconfig and customize
-# This file is NOT tracked in the public Eden repo
+# Local git configuration - MACHINE-SPECIFIC
+# Install.sh copies this to ~/.config/eden/local/gitconfig on first run
+# This file is NOT tracked in git and is machine-specific.
+# 
+# Purpose: Route to context-specific git configs based on directory.
+# Context-specific files (gitconfig.bardo, gitconfig.work, etc.) come from
+# your eden-branch repos.
 
-# Work context: override for work projects
-# Applies to any git repo under ~/work/ or ~/projects/work/
-[includeIf "gitdir:~/work/"]
-	path = ~/.config/eden/local/gitconfig.work
+# Add includeIf directives for each context:
+# 
+# [includeIf "gitdir:~/Development/bardo/"]
+# 	path = ~/.config/eden/local/gitconfig.bardo
+#
+# [includeIf "gitdir:~/Development/work-company/"]
+# 	path = ~/.config/eden/local/gitconfig.work
+#
+# [includeIf "gitdir:~/Development/client-acme/"]
+# 	path = ~/.config/eden/local/gitconfig.acme
 
-# Alternative work location
-[includeIf "gitdir:~/projects/work/"]
-	path = ~/.config/eden/local/gitconfig.work
-
-# Add more conditional includes as needed:
-# [includeIf "gitdir:~/clients/acme/"]
-#     path = ~/.config/eden/local/gitconfig.acme
-
-# Personal projects use defaults from layer 1 & 2
-# (no override needed - that's your base config)
-
+# Personal projects use the default config from Eden (no override needed)
