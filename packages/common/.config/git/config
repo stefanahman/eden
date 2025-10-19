@@ -1,0 +1,40 @@
+# Git configuration - shared across platforms
+# This is symlinked to ~/.config/git/config
+
+[user]
+	name = Stefan Åhman
+	email = stefan.ahman@gmail.com
+
+[core]
+	editor = vim
+	pager = less -FRX
+	autocrlf = input
+
+[init]
+	defaultBranch = main
+
+[pull]
+	rebase = false
+
+[push]
+	default = simple
+	autoSetupRemote = true
+
+[color]
+	ui = auto
+
+[alias]
+	s = status
+	co = checkout
+	br = branch
+	ci = commit
+	unstage = reset HEAD --
+
+# Include platform-specific config (credential helpers, signing, etc.)
+[include]
+	path = ~/.gitconfig.local
+
+# Include local machine overrides (optional)
+[include]
+	path = ~/.config/eden/local/gitconfig
+
