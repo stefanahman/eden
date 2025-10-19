@@ -1,0 +1,17 @@
+# Arch Linux platform-specific git configuration
+# Symlinked to ~/.gitconfig.local
+# Included by layer 1 (common git config)
+
+[credential]
+	# Use libsecret for credential storage on Linux
+	helper = /usr/lib/git-core/git-credential-libsecret
+
+[core]
+	# Arch-specific pager settings if needed
+	# (inherits from common, can override here)
+
+# Platform-specific aliases
+[alias]
+	# Example: Arch-specific workflow commands
+	arch-test = !echo "Running on Arch Linux"
+
