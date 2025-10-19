@@ -1,0 +1,17 @@
+# Documentation and metadata
+README.md
+LICENSE
+manifest.yaml
+
+# Scripts and build files
+Makefile
+.*\.sh$
+
+# Package lists
+Brewfile
+pacman.txt
+
+# Git artifacts
+\.git
+\.gitignore
+

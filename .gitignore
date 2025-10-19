@@ -1,0 +1,13 @@
+# Local overrides (per-machine, not tracked)
+.config/eden/local/
+
+# Secret patterns (never commit these)
+*.key
+*.secret
+*.token
+.env
+.env.*
+
+# OS artifacts
+.DS_Store
+
