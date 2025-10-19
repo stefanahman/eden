@@ -1,0 +1,137 @@
+#!/bin/bash
+# Eden graft - Graft branch configs into Eden
+# Auto-discovers configs from branch repos and grafts them into local configs
+set -e
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+log() {
+    echo -e "${GREEN}▸${NC} $1"
+}
+
+warn() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
+
+BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+
+# Check if branches file exists
+if [ ! -f "$BRANCHES_FILE" ]; then
+    warn "No branches file found at $BRANCHES_FILE"
+    echo "  Run ./install.sh first"
+    exit 1
+fi
+
+# =============================================================================
+# GRAFTER: Git Config
+# =============================================================================
+graft_gitconfig() {
+    local gitconfig_local="${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/gitconfig"
+    local added=0
+    local skipped=0
+    
+    # Check if gitconfig exists
+    if [ ! -f "$gitconfig_local" ]; then
+        warn "Local gitconfig not found at $gitconfig_local"
+        echo "  Run ./install.sh first"
+        return 1
+    fi
+    
+    log "Grafting git contexts..."
+    
+    # Read each branch repo path
+    while IFS= read -r branch_path || [ -n "$branch_path" ]; do
+        # Skip empty lines and comments
+        [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
+        
+        # Expand tilde
+        branch_path="${branch_path/#\~/$HOME}"
+        
+        if [ ! -d "$branch_path" ]; then
+            continue
+        fi
+        
+        # Look for gitconfig.* files in the branch
+        local config_dir="$branch_path/.config/eden/local"
+        if [ -d "$config_dir" ]; then
+            for config_file in "$config_dir"/gitconfig.*; do
+                [ -e "$config_file" ] || continue
+                
+                # Extract context name (e.g., "bardo" from "gitconfig.bardo")
+                local context=$(basename "$config_file" | sed 's/^gitconfig\.//')
+                
+                # Check if this context is already in gitconfig
+                if grep -q "gitconfig\.$context" "$gitconfig_local"; then
+                    echo "  ✓ $context (already grafted)"
+                    skipped=$((skipped + 1))
+                    continue
+                fi
+                
+                # Suggest directory based on context name
+                local suggested_dir="~/Development/$context/"
+                
+                # Add includeIf directive
+                cat >> "$gitconfig_local" << EOF
+
+# $context context
+[includeIf "gitdir:$suggested_dir"]
+	path = ~/.config/eden/local/gitconfig.$context
+EOF
+                
+                log "Grafted: $context → $suggested_dir"
+                added=$((added + 1))
+            done
+        fi
+    done < "$BRANCHES_FILE"
+    
+    # Report results
+    if [ $added -gt 0 ]; then
+        echo "  → Grafted $added new git context(s)"
+        [ $skipped -gt 0 ] && echo "  → Skipped $skipped already grafted"
+        echo ""
+        echo "  Review directory paths in: $gitconfig_local"
+    elif [ $skipped -gt 0 ]; then
+        echo "  → All $skipped git context(s) already grafted"
+    else
+        echo "  → No git contexts found in branches"
+    fi
+    
+    return 0
+}
+
+# =============================================================================
+# FUTURE GRAFTERS
+# =============================================================================
+# graft_zshrc() {
+#     log "Grafting zsh configs..."
+#     # Scan for .zshrc.d/* configs in branches
+#     # Source them in ~/.config/eden/local/zshrc
+# }
+#
+# graft_vim() {
+#     log "Grafting vim configs..."
+#     # Scan for .vim/config.d/* in branches
+# }
+
+# =============================================================================
+# MAIN
+# =============================================================================
+main() {
+    log "Grafting branch configs into Eden..."
+    echo ""
+    
+    # Run grafters
+    graft_gitconfig
+    
+    # Future grafters:
+    # graft_zshrc
+    # graft_vim
+    
+    echo ""
+    log "Graft complete! 🌳"
+}
+
+main "$@"

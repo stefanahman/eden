@@ -1,4 +1,4 @@
-.PHONY: help install update doctor status clean arch mac
+.PHONY: help install update doctor status clean arch mac graft
 
 # Detect OS for platform-specific targets
 UNAME := $(shell uname -s)
@@ -13,13 +13,14 @@ help:
 	@echo "Eden - Personal Environment Manager"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make install    Bootstrap Eden (symlinks only)"
-	@echo "  make update     Update Eden from git and re-deploy"
-	@echo "  make doctor     Validate Eden installation health"
-	@echo "  make status     Show Eden system overview (not yet implemented)"
-	@echo "  make clean      Remove all Eden symlinks from \$$HOME"
-	@echo "  make arch       Deploy common + arch packages only"
-	@echo "  make mac        Deploy common + mac packages only"
+	@echo "  make install        Bootstrap Eden (symlinks only)"
+	@echo "  make update         Update Eden from git and re-deploy"
+	@echo "  make doctor         Validate Eden installation health"
+	@echo "  make graft          Graft branch configs into local gitconfig"
+	@echo "  make status         Show Eden system overview (not yet implemented)"
+	@echo "  make clean          Remove all Eden symlinks from \$$HOME"
+	@echo "  make arch           Deploy common + arch packages only"
+	@echo "  make mac            Deploy common + mac packages only"
 	@echo ""
 	@echo "Install options:"
 	@echo "  ./install.sh --packages    Install with packages (brew/pacman)"
@@ -34,6 +35,9 @@ update:
 
 doctor:
 	@./doctor.sh
+
+graft:
+	@./graft.sh
 
 status:
 	@echo "Status command not yet implemented"
