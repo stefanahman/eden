@@ -13,13 +13,18 @@ help:
 	@echo "Eden - Personal Environment Manager"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make install    Bootstrap Eden on a fresh system"
+	@echo "  make install    Bootstrap Eden (symlinks only)"
 	@echo "  make update     Update Eden from git and re-deploy"
 	@echo "  make doctor     Validate Eden installation health"
 	@echo "  make status     Show Eden system overview (not yet implemented)"
 	@echo "  make clean      Remove all Eden symlinks from \$$HOME"
 	@echo "  make arch       Deploy common + arch packages only"
 	@echo "  make mac        Deploy common + mac packages only"
+	@echo ""
+	@echo "Install options:"
+	@echo "  ./install.sh --packages    Install with packages (brew/pacman)"
+	@echo "  ./install.sh --verbose     Show detailed output"
+	@echo "  ./install.sh --help        Show all options"
 
 install:
 	@./install.sh

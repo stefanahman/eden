@@ -1,14 +1,17 @@
-# Tools to Install
+# Tools Discovery Log
 # Track tools discovered during Eden development
-# Later: migrate these to Brewfile and pacman.txt
+# This file helps track what to add to Brewfile/pacman.txt
 
-## Core (required for Eden)
-stow        # GNU Stow - symlink farm manager
-git         # Already installed
+## ✓ Already in package lists:
+# - git, stow, tree
+# - ripgrep, fd, bat
+# - zsh, tmux, fzf, neovim
+# - btop, jq
 
-## Development utilities
-tree        # Directory visualization
+## To be added:
+# (Add tools here as you discover them, then migrate to package lists)
 
-## To be discovered...
-# Add tools here as you encounter "command not found" or need new functionality
+## Platform-specific:
+# macOS: (nothing yet)
+# Arch: (nothing yet)
 

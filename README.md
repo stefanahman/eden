@@ -10,6 +10,32 @@ Computing should feel continuous. Eden reduces the friction of switching between
 
 This is not a framework or a distribution. It is a working environment, shaped by daily use and refined over time.
 
+## Installation
+
+```bash
+# Clone Eden
+git clone <your-eden-repo> ~/eden
+cd ~/eden
+
+# Install (symlink configs only)
+./install.sh
+
+# Or install with packages
+./install.sh --packages
+
+# Validate installation
+./doctor.sh
+```
+
+Install packages manually anytime:
+```bash
+# macOS
+brew bundle
+
+# Arch Linux
+sudo pacman -S --needed $(cat pacman.txt)
+```
+
 ## Structure
 
 - **common**: Cross-platform configurations

@@ -1,13 +1,28 @@
 # Arch Linux packages
-# Install with: pacman -S --needed $(cat pacman.txt)
+# Install with: sudo pacman -S --needed $(cat pacman.txt)
 # Or with yay: yay -S --needed $(cat pacman.txt)
 
-# Core tools required for Eden
+# Core tools (required for Eden)
 git
 stow
 
+# Shell & terminal
+zsh
+tmux
+fzf
+
 # Development utilities
 tree
+ripgrep
+fd
+bat
 
-# To be added: tools discovered during use
+# Editor
+neovim
+
+# System tools
+btop
+jq
+
+# To be added: more tools as Eden grows
 

@@ -8,12 +8,35 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Verbose mode
+# Options
 VERBOSE=false
-if [[ "$1" == "--verbose" ]] || [[ "$1" == "-v" ]]; then
-    VERBOSE=true
-    STOW_VERBOSE="-v"
-fi
+INSTALL_PACKAGES=false
+STOW_VERBOSE=""
+
+# Parse arguments
+for arg in "$@"; do
+    case $arg in
+        --verbose|-v)
+            VERBOSE=true
+            STOW_VERBOSE="-v"
+            ;;
+        --packages|-p)
+            INSTALL_PACKAGES=true
+            ;;
+        --help|-h)
+            echo "Usage: ./install.sh [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --packages, -p    Install packages from Brewfile/pacman.txt"
+            echo "  --verbose, -v     Show detailed output"
+            echo "  --help, -h        Show this help message"
+            exit 0
+            ;;
+        *)
+            error "Unknown option: $arg. Use --help for usage."
+            ;;
+    esac
+done
 
 log() {
     echo -e "${GREEN}▸${NC} $1"
@@ -110,6 +133,32 @@ fi
 log "Setting up local config directory..."
 mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/eden/local"
 verbose "✓ Created ${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/"
+
+# Install packages (optional)
+if $INSTALL_PACKAGES; then
+    log "Installing packages..."
+    
+    if [ "$OS" = "mac" ]; then
+        if command -v brew >/dev/null 2>&1; then
+            verbose "Running brew bundle..."
+            brew bundle --file="$EDEN_DIR/Brewfile" || warn "Some packages failed to install"
+        else
+            error "Homebrew not found. Install from https://brew.sh/ first."
+        fi
+    elif [ "$OS" = "arch" ]; then
+        if command -v pacman >/dev/null 2>&1; then
+            verbose "Installing packages with pacman..."
+            # Read packages into array, skipping comments and empty lines
+            mapfile -t packages < <(grep -v '^#' "$EDEN_DIR/pacman.txt" | grep -v '^$' | tr -d ' ')
+            if [ ${#packages[@]} -gt 0 ]; then
+                sudo pacman -S --needed "${packages[@]}" || warn "Some packages failed to install"
+            fi
+        else
+            error "pacman not found. Are you on Arch Linux?"
+        fi
+    fi
+    verbose "✓ Package installation complete"
+fi
 
 # Check PATH (informational only)
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
