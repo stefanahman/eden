@@ -134,6 +134,10 @@ log "Setting up local config directory..."
 mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/eden/local"
 verbose "✓ Created ${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/"
 
+# Create empty branches file (users can add branch repo paths here)
+touch "${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+verbose "✓ Created ${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+
 # Install packages (optional)
 if $INSTALL_PACKAGES; then
     log "Installing packages..."
