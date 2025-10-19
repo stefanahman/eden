@@ -260,8 +260,7 @@ conditional_config:
 binaries:
   location: "packages/common/.local/bin/"
   purpose: "Executable scripts for personal workflows; improved incrementally over time."
-  initial_scripts:
-    - "omarchy-launch-chromium-bardo"  # Chromium launcher with dedicated profile
+  note: "For private/context-specific binaries, use Eden branch repos."
 
 bootstrap_behavior:
   installer: "./install.sh"
