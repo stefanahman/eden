@@ -1,0 +1,444 @@
+# manifest.yaml
+version: 1
+name: "Eden"
+description: >
+  Eden is a personal, cross-platform environment (Arch Linux and macOS) for
+  coherent, portable computing. It contains shared dotfiles, lightweight
+  OS-specific overlays, and small binaries/scripts. Eden favors clarity,
+  reproducibility, and zero leakage of secrets. Repository is public to share
+  philosophy and structure openly; secrets stay in 1Password.
+
+manifest_purpose:
+  audience: "AI agents and human implementers"
+  scope: "This manifest describes WHAT to build, not HOW to build it."
+  what_sections:
+    - "Architectural decisions and principles"
+    - "File structure and organization"
+    - "Desired outcomes and behaviors"
+    - "Constraints and compliance rules"
+  how_preferences:
+    description: "Brief implementation preferences where ambiguity exists."
+    examples:
+      - "Idempotency guidelines (re-run safety patterns)"
+      - "Error handling philosophy (fail fast)"
+      - "Verbosity modes (default + verbose flag)"
+      - "Naming conventions and patterns"
+  rationale: >
+    An agent should understand goals and constraints, then implement with
+    appropriate tools. A human should grasp intent without needing to parse code.
+
+license:
+  SPDX: MIT
+  year: 2025
+
+platforms:
+  - id: arch
+    description: "Arch Linux workstation environment (Hyprland/Omarchy friendly)."
+  - id: mac
+    description: "macOS workstation environment (yabai/skhd friendly)."
+
+principles:
+  core:
+    - "Simplicity over control"
+    - "Portability over perfection"
+    - "Transparency over automation"
+    - "No secrets in VCS; fetch at runtime via 1Password CLI"
+  opinionated: true
+  rationale: >
+    Eden makes specific choices that reflect personal preferences rather than
+    universal best practices. Configs, packages, and scripts are curated for
+    a particular workflow. This is a personal environment, not a framework.
+    Users forking Eden should expect to adjust configurations to their preferences.
+
+dependencies:
+  required:
+    - name: "git"
+      version: "any modern version"
+      rationale: "Version control operations and repository cloning."
+    - name: "GNU Stow"
+      version: ">= 2.3.0"
+      rationale: "Symlink farm manager for deploying packages into $HOME."
+  optional:
+    - name: "1Password CLI (op)"
+      rationale: "Runtime secret retrieval; required only if using secret_management features."
+
+secret_management:
+  provider: "1Password"
+  cli: "op"
+  requirement: "1Password CLI must be installed and authenticated for secret operations."
+  forbidden_patterns:
+    description: "Agent must NOT commit any files matching these patterns."
+    patterns:
+      - "*.key"
+      - "*.secret"
+      - "*.token"
+      - ".env"
+      - ".env.*"
+      - ".config/env.d/secrets.sh"
+  runtime_usage:
+    description: "Secrets are fetched at runtime, never stored in tracked files."
+    methods:
+      - "op read 'op://vault/item/field' - read single secret value"
+      - "op run --env-file=.env.template -- command - inject secrets as env vars"
+    integration_examples:
+      - context: "Shell configuration"
+        approach: "Source script that calls 'op read' for API keys or tokens."
+      - context: "Application configs"
+        approach: "Use op:// references in config files; app reads via op CLI."
+      - context: "Git credentials"
+        approach: "Credential helper that calls 'op read' for passwords."
+  local_secret_files:
+    guidance: >
+      If plaintext secret files must exist locally, they go in git-ignored locations
+      (like ${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/) and are regenerated
+      from 1Password during bootstrap or on-demand.
+
+tooling:
+  package_manager:
+    arch: "pacman"
+    mac: "homebrew"
+  stow:
+    enabled: true
+    rationale: "Symlink-based deployment of packages into $HOME."
+    deployment_strategy: "All tracked files are symlinked; .template files are copied once during install."
+  shells:
+    preferred: ["zsh", "bash"]
+
+xdg_compliance:
+  respect_overrides: true
+  guidance: >
+    All configuration should respect XDG_CONFIG_HOME, XDG_DATA_HOME, and other
+    XDG Base Directory variables if set. Default to standard locations when unset.
+
+repo_layout:
+  root_files:
+    - README.md        # conceptual; no tech instructions beyond purpose/intent
+    - LICENSE          # MIT text
+    - .gitignore       # ignore local overrides, state, secrets
+    - install.sh       # OS detector + symlink deployment + PATH hygiene
+    - update.sh        # git pull + re-apply symlinks
+    - doctor.sh        # validation and health check
+    - Brewfile         # macOS package list
+    - pacman.txt       # Arch Linux package list
+    - .stow-global-ignore
+    - Makefile         # convenience targets
+  package_lists:
+    brewfile:
+      purpose: "Package declarations for macOS via Homebrew."
+      format: "Brewfile format (brew bundle)"
+      scope: "Core packages required for Eden functionality; additional packages added over time."
+      note: "User installs manually with 'brew bundle' if desired."
+    pacman_txt:
+      purpose: "Package list for Arch Linux."
+      format: "One package name per line."
+      scope: "Core packages required for Eden functionality; additional packages added over time."
+      note: "User installs manually with pacman or yay."
+    philosophy: "Experiment freely per platform; migrate favorites when proven"
+    cross_platform_approach:
+      - scenario: "Try new tool on one platform"
+        action: "Add to that platform's package list and use for a period"
+        follow_up: "If loved, research equivalent for other platform and add there"
+      - scenario: "Platform-specific tools are expected"
+        examples: "yabai/skhd (macOS) vs Omarchy (Arch) solve same problem differently"
+    no_synchronization_required: "Lists will naturally diverge; this is expected and healthy"
+  packages_dir: "packages"
+  packages:
+    - id: common
+      target: "$HOME"
+      description: "OS-agnostic dotfiles and small binaries."
+      domains:
+        - "Git configuration (shared base)"
+        - "Shell configuration (zsh, bash)"
+        - "User binaries and scripts"
+        - "Terminal emulator configuration"
+    - id: arch
+      target: "$HOME"
+      description: "Arch Linux overlays; no defaults edited under ~/.local/share/omarchy."
+      domains:
+        - "Hyprland/Omarchy user-level config overrides"
+        - "Waybar or other UI layer configs"
+        - "Arch-specific git credential helpers"
+        - "Environment variable declarations"
+    - id: mac
+      target: "$HOME"
+      description: "macOS overlays; window management and input layers."
+      domains:
+        - "yabai window manager configuration"
+        - "skhd hotkey daemon configuration"
+        - "macOS-specific git credential helpers"
+        - "LaunchAgent definitions"
+
+layering_guidance:
+  purpose: "Decision framework for cross-platform developers: when to use which layer"
+  use_common_for:
+    - "Configs that work identically on both platforms"
+    - "Tool-agnostic patterns (git aliases, shell functions, editor settings)"
+    - "Binaries that are portable POSIX shell scripts"
+  use_platform_for:
+    - "OS-specific paths (Linux vs macOS filesystem conventions)"
+    - "Platform-specific credential helpers, keychains, signing tools"
+    - "Window manager configs (Hyprland/Omarchy vs yabai/skhd)"
+    - "Different tool versions requiring different syntax or features"
+  use_local_for:
+    - "Work vs personal email addresses in git config"
+    - "Company-specific proxy settings or VPN configurations"
+    - "Machine-specific SSH configs or API tokens"
+    - "Experimental settings not ready to commit"
+  rationale: >
+    Most configs live in common for maximum sharing. Platform packages handle
+    OS differences. Local overrides are for per-machine customization and secrets.
+
+local_config:
+  strategy: "single-version"
+  update_behavior: "Overwrite all tracked files; preserve local overrides via include directives."
+  override_strategy:
+    include_directive_pattern:
+      description: >
+        Preferred approach: tracked config files use include directives to source
+        optional local overrides. If local file doesn't exist, app ignores gracefully.
+      examples:
+        - config: "git"
+          tracked_file: "packages/common/.config/git/config"
+          includes: "${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/gitconfig"
+          note: "Git's [include] directive supports optional includes that fail gracefully."
+        - config: "zsh"
+          tracked_file: "packages/common/.config/zsh/.zshrc"
+          sources: "${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/zshrc.local"
+          note: "Shell can source optional file with [ -f ... ] && source pattern."
+    template_pattern:
+      description: >
+        Fallback for programs without include directive support. Ship template
+        files that install.sh copies once (not symlinks) for user customization.
+      discovery: "Find all files matching *.template in packages/ subdirectories."
+      naming_convention: "config.template copies to config (strip .template extension)"
+      examples:
+        - template: "packages/common/.config/program/config.template"
+          copies_to: "${XDG_CONFIG_HOME:-$HOME/.config}/program/config"
+          note: "Copied during install only if destination doesn't exist; user owns after."
+  namespacing:
+    eden_config_dir: "${XDG_CONFIG_HOME:-$HOME/.config}/eden/"
+    purpose: "Namespace all Eden-specific local overrides to avoid conflicts."
+    structure:
+      - "local/"      # user's machine-specific overrides (git-ignored)
+    rationale: >
+      Keep all Eden-managed local configuration namespaced under XDG-compliant
+      directory to avoid polluting user's home with loose override files.
+
+conditional_config:
+  approach: "Prefer include/source pattern over inline conditionals"
+  preferred_pattern:
+    description: "Base config in common/, platform-specific fragments in platform packages"
+    example:
+      - file: "packages/common/.config/zsh/.zshrc"
+        action: "Sources platform-specific fragment: ~/.config/zsh/platform.zsh"
+      - file: "packages/arch/.config/zsh/platform.zsh"
+        content: "Arch-specific PATH, aliases, environment variables"
+      - file: "packages/mac/.config/zsh/platform.zsh"
+        content: "macOS-specific PATH, Homebrew setup, etc."
+  acceptable_inline_conditionals:
+    when: "Minor differences that don't warrant separate files"
+    example: 'if [[ "$OSTYPE" == "darwin"* ]]; then export PATH="/opt/homebrew/bin:$PATH"; fi'
+    guideline: "Use sparingly; prefer clean separation via includes"
+  rationale: >
+    Include patterns keep configs readable and testable per-platform.
+    Inline conditionals are acceptable for trivial differences.
+
+binaries:
+  location: "packages/common/.local/bin/"
+  purpose: "Executable scripts for personal workflows; improved incrementally over time."
+  initial_scripts:
+    - "omarchy-launch-chromium-bardo"  # Chromium launcher with dedicated profile
+
+bootstrap_behavior:
+  installer: "./install.sh"
+  pre_flight_checks:
+    - "Verify git is installed and accessible."
+    - "Verify GNU Stow >= 2.3.0 is installed."
+    - "Detect OS: Linux (uname) -> arch, Darwin -> mac, else fail fast."
+  conflict_detection:
+    strategy: "Let stow handle conflicts naturally; it will fail if non-symlink files exist."
+    guidance: >
+      On first run, if stow fails due to existing files, print helpful message:
+      "Conflicts detected. Move or remove conflicting files, or use --adopt to
+      keep existing files and adjust Eden." Keep detection simple; stow does the work.
+  installation_sequence:
+    - "Symlink 'common' package to $HOME using stow."
+    - "Symlink OS-specific package ('arch' or 'mac') to $HOME using stow."
+    - "Find and copy all *.template files (strip extension) if destination doesn't exist."
+    - "Ensure $HOME/.local/bin is in PATH for zsh and bash shell configs."
+    - "Create ${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/ for user overrides."
+    - "Print success message and suggest running doctor.sh for validation."
+  stow_ordering:
+    rationale: "Common first, then OS-specific overlay. OS layer can override common if needed."
+    conflict_resolution: "Stow merges directories; OS-specific files take precedence (stowed second)."
+  error_handling: "Fail fast on any error; print clear diagnostic message."
+  idempotency:
+    principle: "Safe to run multiple times without side effects or errors."
+    guidelines:
+      - "Re-stowing existing correct symlinks is a no-op."
+      - "Template files are copied only if destination doesn't exist."
+      - "PATH modifications check for existing entries before adding."
+      - "Creating existing directories succeeds silently (mkdir -p behavior)."
+    rationale: "User can safely re-run install.sh for repairs or after git pull."
+  verbosity:
+    default: "Concise output; show only key steps and results."
+    verbose_mode: "Support --verbose or -v flag for detailed stow output and diagnostics."
+
+update_behavior:
+  updater: "./update.sh"
+  purpose: "Update Eden from git and re-apply symlinks."
+  pre_update_checks:
+    - "Check for local uncommitted changes in Eden repository."
+    - "If local changes exist, fail fast with message: 'Commit or stash local changes first.'"
+  update_sequence:
+    - "Run git pull to fetch latest changes."
+    - "Re-stow common and OS-specific packages (same as install)."
+    - "Find and copy any new *.template files if destinations don't exist."
+    - "Print success message."
+  strategy: "Overwrite all Eden-managed symlinks; preserve local override files and copied templates."
+  idempotency: "Safe to run multiple times; re-stowing is a no-op if already up to date."
+
+doctor_behavior:
+  validator: "./doctor.sh"
+  purpose: "Basic health check of Eden installation; expand checks over time."
+  initial_checks:
+    - "Verify dependencies (git, stow) are installed and meet version requirements."
+    - "Verify Eden git repository exists and is clean (no uncommitted changes)."
+    - "Check that ${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/ directory exists."
+    - "Check for common broken symlinks in config and bin directories."
+  platform_parity:
+    purpose: "Detect unintended file duplication, not enforce sameness"
+    checks:
+      - check: "Duplicate file paths between packages"
+        detail: "Same path in common and platform package may indicate error"
+        action: "Warn and list duplicates; user decides if intentional"
+        rationale: "If .zshrc exists in both common/ and arch/, only arch/ version gets stowed"
+      - check: "Package structure health"
+        detail: "Report file counts per package for awareness"
+        action: "Print: X files in common, Y in arch, Z in mac"
+        rationale: "Most configs should be in common; platforms are for exceptions"
+    not_enforced:
+      - "Both platforms having parallel structure (too rigid)"
+      - "Package lists matching (defeats experimentation)"
+  output: "Print status of each check with ✓/✗ indicators; exit 0 if healthy, 1 if issues found."
+  extensibility: "Start simple; add more sophisticated checks as Eden evolves."
+
+version_management:
+  git_history: "Primary rollback mechanism; use git to revert breaking changes"
+  stable_tags:
+    convention: "Tag working states for easy rollback and recovery"
+    format: "stable-YYYY-MM-DD or semantic versioning (v1, v2, etc.)"
+    example: "git tag -a stable-2025-01-15 -m 'Working state before tmux refactor'"
+    usage: "Tag before major changes or when system is in a known-good state"
+  recovery_workflow:
+    - "If update breaks system: git log --oneline to review recent changes"
+    - "Find last stable commit or tag: git tag -l"
+    - "Rollback: git checkout <tag-or-hash>"
+    - "Re-apply: make update to deploy rolled-back state"
+  rationale: >
+    Git provides natural versioning and time-travel. Tagging stable states
+    enables confident experimentation with easy recovery paths.
+
+stow_ignore:
+  file: ".stow-global-ignore"
+  purpose: "Prevent repository metadata and documentation from being symlinked into $HOME."
+  should_ignore:
+    - "README.md and other documentation"
+    - "LICENSE"
+    - "Makefile and shell scripts (install.sh, update.sh, doctor.sh)"
+    - "Package manager files (Brewfile, pacman.txt)"
+    - "Git repository metadata (.git, .gitignore)"
+    - "Eden manifest (manifest.yaml)"
+
+makefile_targets:
+  relationship: "Makefile provides convenience targets that invoke shell scripts."
+  purpose: "Simple, memorable commands (make install) that delegate to POSIX shell scripts."
+  targets:
+    - id: install
+      accomplishment: "Bootstrap Eden on a fresh system."
+      implementation: "Invokes ./install.sh"
+    - id: update
+      accomplishment: "Update Eden from git and re-apply symlinks."
+      implementation: "Invokes ./update.sh"
+    - id: doctor
+      accomplishment: "Validate Eden installation health."
+      implementation: "Invokes ./doctor.sh"
+    - id: status
+      accomplishment: "Show Eden system overview and health at a glance."
+      implementation: "Script that prints formatted report"
+      output_example: |
+        Eden Status
+        ===========
+        Platform:       macOS (Darwin)
+        Active packages: common, mac
+        Repository:     ✓ Clean (no uncommitted changes)
+        Last update:    2025-01-15 14:23
+        Symlinks:       ✓ 47 active, 0 broken
+        Dependencies:   ✓ git 2.43.0, stow 2.3.1
+        Local config:   ~/.config/eden/local/ exists
+        Secrets:        ✓ 1Password CLI authenticated
+    - id: clean
+      accomplishment: "Remove all Eden symlinks from $HOME."
+      implementation: "Runs stow -D for common and OS-specific packages"
+    - id: arch
+      accomplishment: "Deploy common + arch packages only."
+      implementation: "Runs stow for common and arch"
+    - id: mac
+      accomplishment: "Deploy common + mac packages only."
+      implementation: "Runs stow for common and mac"
+  rationale: >
+    Scripts contain the logic; Makefile is a thin convenience layer.
+    Users can run scripts directly or use make targets.
+
+documentation:
+  readme:
+    tone: "calm, purpose-driven, no emojis, no technical steps"
+    must_cover:
+      - "What Eden is (a personal environment)."
+      - "Why it exists (coherence, continuity, reflection)."
+      - "Cross-platform intent (Arch Linux and macOS; shared core + light OS layers)."
+      - "Growth and transparency (living repository, adapts over time)."
+    must_avoid:
+      - "Exact commands, flags, or file-level instructions."
+      - "Secrets or private values."
+  license_note: "MIT is recommended for openness and reuse."
+
+compliance_rules:
+  - id: no-secrets
+    rule: "No credentials or secrets in VCS."
+  - id: user-only-config
+    rule: "Do not modify Omarchy defaults under ~/.local/share/omarchy; only user-space overrides under ~/.config."
+  - id: reversible-deploy
+    rule: "All deployments must be reversible; stow provides this naturally."
+  - id: portable-paths
+    rule: "Assume $HOME and XDG locations; avoid machine-specific absolute paths."
+  - id: xdg-respect
+    rule: "Respect XDG environment variables; fall back to standard paths when unset."
+
+acceptance_criteria:
+  - "Repository structure matches repo_layout specification."
+  - ".gitignore exists and excludes local overrides and secret patterns."
+  - "install.sh, update.sh, and doctor.sh exist and are executable."
+  - "install.sh performs pre-flight checks and fails fast on missing dependencies."
+  - "install.sh lets stow handle conflict detection with helpful error messages."
+  - ".stow-global-ignore prevents non-config files from being symlinked."
+  - "README.md matches tone and content constraints."
+  - "LICENSE file is present with MIT text and year."
+  - "Brewfile and pacman.txt contain core package lists for Eden functionality."
+  - "No file contains secrets or matches forbidden patterns."
+  - "Stow operations produce symlinks; *.template files are discovered and copied once."
+  - "Running install.sh twice is safe and idempotent."
+  - "update.sh checks for local changes before git pull."
+  - "doctor.sh performs basic health checks with clear output."
+  - "${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/ directory is created."
+  - "All path references respect XDG_CONFIG_HOME with fallback to .config."
+  - "Makefile targets invoke shell scripts as documented."
+
+non_goals:
+  - "Providing concrete configuration file contents (Hyprland, yabai, skhd, etc.)."
+  - "Maintaining backup copies of existing configurations."
+  - "Supporting Linux distributions beyond Arch."
+  - "Supporting operating systems beyond Arch Linux and macOS."
+  - "Automating 1Password CLI authentication."
+  - "Automating package installation (user installs packages manually from lists)."
+  - "Defining git workflow or commit conventions (out of scope)."
