@@ -1,0 +1,21 @@
+# Work-specific git configuration template
+# Copy to ~/.config/eden/local/gitconfig.work and customize
+# Included only when working in ~/work/ directories
+
+[user]
+	email = your.name@company.com  # Replace with your work email
+
+[alias]
+	# Work-specific aliases - customize as needed
+	standup = log --since='1 day ago' --author='Your Name' --oneline
+	review = log --oneline --no-merges origin/main..HEAD
+	wip = commit -am "WIP: work in progress"
+
+# Work-specific URL rewrites (optional)
+# [url "git@github.com:company-name/"]
+# 	insteadOf = company:
+
+# Work-specific credential settings (optional)
+# [credential "https://github.com/company-name"]
+# 	helper = custom-helper
+

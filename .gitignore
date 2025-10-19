@@ -1,6 +1,14 @@
 # Local overrides (per-machine, not tracked)
 .config/eden/local/
 
+# Eden branches configuration (per-machine)
+.config/eden/branches
+branches
+
+# Local notes and ideas (not for public repo)
+.ideas
+.notes
+
 # Secret patterns (never commit these)
 *.key
 *.secret

@@ -1,0 +1,20 @@
+# Layer 3: Machine-specific git configuration template
+# Copy this to ~/.config/eden/local/gitconfig and customize
+# This file is NOT tracked in the public Eden repo
+
+# Work context: override for work projects
+# Applies to any git repo under ~/work/ or ~/projects/work/
+[includeIf "gitdir:~/work/"]
+	path = ~/.config/eden/local/gitconfig.work
+
+# Alternative work location
+[includeIf "gitdir:~/projects/work/"]
+	path = ~/.config/eden/local/gitconfig.work
+
+# Add more conditional includes as needed:
+# [includeIf "gitdir:~/clients/acme/"]
+#     path = ~/.config/eden/local/gitconfig.acme
+
+# Personal projects use defaults from layer 1 & 2
+# (no override needed - that's your base config)
+

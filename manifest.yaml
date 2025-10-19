@@ -151,6 +151,7 @@ repo_layout:
         - "Shell configuration (zsh, bash)"
         - "User binaries and scripts"
         - "Terminal emulator configuration"
+        - "Eden templates for branch repositories"
     - id: arch
       target: "$HOME"
       description: "Arch Linux overlays; no defaults edited under ~/.local/share/omarchy."
@@ -191,6 +192,19 @@ layering_guidance:
 local_config:
   strategy: "single-version"
   update_behavior: "Overwrite all tracked files; preserve local overrides via include directives."
+  branches:
+    concept: "Eden supports multiple 'branches' - separate repos that extend Eden with private/contextual configs"
+    pattern: "Eden is the trunk (public), branches are extensions (private, specific)"
+    registration: "List branch repo paths in ~/.config/eden/branches (one per line)"
+    deployment: "Each branch stows independently into $HOME, layering naturally"
+    use_cases:
+      - "branch-work: Work email, VPN, company aliases"
+      - "branch-personal: Experimental configs, beta tools"
+      - "branch-client: Per-client contexts"
+      - "branch-machine: Machine-specific hardware settings"
+    rationale: >
+      Branches enable multiple private contexts (work, personal, clients) without
+      mixing them into a single repo. Each branch is independently versioned.
   override_strategy:
     include_directive_pattern:
       description: >
@@ -417,7 +431,7 @@ compliance_rules:
 
 acceptance_criteria:
   - "Repository structure matches repo_layout specification."
-  - ".gitignore exists and excludes local overrides and secret patterns."
+  - ".gitignore exists and excludes local overrides, secret patterns, and branch configs."
   - "install.sh, update.sh, and doctor.sh exist and are executable."
   - "install.sh performs pre-flight checks and fails fast on missing dependencies."
   - "install.sh lets stow handle conflict detection with helpful error messages."
@@ -431,6 +445,8 @@ acceptance_criteria:
   - "update.sh checks for local changes before git pull."
   - "doctor.sh performs basic health checks with clear output."
   - "${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/ directory is created."
+  - "Eden templates directory stows to ~/.config/eden/templates/ with examples."
+  - "Branch concept is documented in manifest and template README."
   - "All path references respect XDG_CONFIG_HOME with fallback to .config."
   - "Makefile targets invoke shell scripts as documented."
 
