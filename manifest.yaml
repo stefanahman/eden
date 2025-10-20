@@ -100,7 +100,7 @@ tooling:
   stow:
     enabled: true
     rationale: "Symlink-based deployment of packages into $HOME."
-    deployment_strategy: "All tracked files are symlinked; .template files are copied once during install."
+    deployment_strategy: "All tracked files are symlinked to maintain live connection with Eden repository."
   shells:
     preferred: ["zsh", "bash"]
 
@@ -118,6 +118,7 @@ repo_layout:
     - install.sh       # OS detector + symlink deployment + PATH hygiene
     - update.sh        # git pull + re-apply symlinks
     - doctor.sh        # validation and health check
+    - graft.sh         # discover and integrate branch configs
     - Brewfile         # macOS package list
     - pacman.txt       # Arch Linux package list
     - .stow-global-ignore
@@ -149,9 +150,9 @@ repo_layout:
       domains:
         - "Git configuration (shared base)"
         - "Shell configuration (zsh, bash)"
+        - "Neovim editor configuration"
         - "User binaries and scripts"
         - "Terminal emulator configuration"
-        - "Eden templates for branch repositories"
     - id: arch
       target: "$HOME"
       description: "Arch Linux overlays; no defaults edited under ~/.local/share/omarchy."
@@ -219,21 +220,12 @@ local_config:
           tracked_file: "packages/common/.config/zsh/.zshrc"
           sources: "${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/zshrc.local"
           note: "Shell can source optional file with [ -f ... ] && source pattern."
-    template_pattern:
-      description: >
-        Fallback for programs without include directive support. Ship template
-        files that install.sh copies once (not symlinks) for user customization.
-      discovery: "Find all files matching *.template in packages/ subdirectories."
-      naming_convention: "config.template copies to config (strip .template extension)"
-      examples:
-        - template: "packages/common/.config/program/config.template"
-          copies_to: "${XDG_CONFIG_HOME:-$HOME/.config}/program/config"
-          note: "Copied during install only if destination doesn't exist; user owns after."
   namespacing:
     eden_config_dir: "${XDG_CONFIG_HOME:-$HOME/.config}/eden/"
     purpose: "Namespace all Eden-specific local overrides to avoid conflicts."
     structure:
       - "local/"      # user's machine-specific overrides (git-ignored)
+      - "branches"    # registry file listing paths to branch repos (git-ignored)
     rationale: >
       Keep all Eden-managed local configuration namespaced under XDG-compliant
       directory to avoid polluting user's home with loose override files.
@@ -277,10 +269,11 @@ bootstrap_behavior:
   installation_sequence:
     - "Symlink 'common' package to $HOME using stow."
     - "Symlink OS-specific package ('arch' or 'mac') to $HOME using stow."
-    - "Find and copy all *.template files (strip extension) if destination doesn't exist."
+    - "Optionally install packages from Brewfile/pacman.txt with --packages flag."
     - "Ensure $HOME/.local/bin is in PATH for zsh and bash shell configs."
     - "Create ${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/ for user overrides."
-    - "Print success message and suggest running doctor.sh for validation."
+    - "Create empty ${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches file for branch registration."
+    - "Print success message and suggest running doctor.sh and 'make graft'."
   stow_ordering:
     rationale: "Common first, then OS-specific overlay. OS layer can override common if needed."
     conflict_resolution: "Stow merges directories; OS-specific files take precedence (stowed second)."
@@ -289,7 +282,7 @@ bootstrap_behavior:
     principle: "Safe to run multiple times without side effects or errors."
     guidelines:
       - "Re-stowing existing correct symlinks is a no-op."
-      - "Template files are copied only if destination doesn't exist."
+      - "Package installation with --packages flag is safe (uses --needed for pacman, brew handles idempotency)."
       - "PATH modifications check for existing entries before adding."
       - "Creating existing directories succeeds silently (mkdir -p behavior)."
     rationale: "User can safely re-run install.sh for repairs or after git pull."
@@ -306,9 +299,8 @@ update_behavior:
   update_sequence:
     - "Run git pull to fetch latest changes."
     - "Re-stow common and OS-specific packages (same as install)."
-    - "Find and copy any new *.template files if destinations don't exist."
-    - "Print success message."
-  strategy: "Overwrite all Eden-managed symlinks; preserve local override files and copied templates."
+    - "Print success message and suggest running 'make graft' to update branch integrations."
+  strategy: "Overwrite all Eden-managed symlinks; preserve local override files in ~/.config/eden/local/."
   idempotency: "Safe to run multiple times; re-stowing is a no-op if already up to date."
 
 doctor_behavior:
@@ -399,6 +391,10 @@ makefile_targets:
     - id: mac
       accomplishment: "Deploy common + mac packages only."
       implementation: "Runs stow for common and mac"
+    - id: graft
+      accomplishment: "Discover and integrate branch configs into local overrides."
+      implementation: "Invokes ./graft.sh"
+      details: "Scans registered branch repos for context-specific configs (git, zsh, etc.) and grafts them into local config files using include directives"
   rationale: >
     Scripts contain the logic; Makefile is a thin convenience layer.
     Users can run scripts directly or use make targets.
@@ -439,13 +435,15 @@ acceptance_criteria:
   - "LICENSE file is present with MIT text and year."
   - "Brewfile and pacman.txt contain core package lists for Eden functionality."
   - "No file contains secrets or matches forbidden patterns."
-  - "Stow operations produce symlinks; *.template files are discovered and copied once."
+  - "Stow operations produce symlinks from Eden packages to $HOME."
   - "Running install.sh twice is safe and idempotent."
+  - "install.sh supports --packages flag for optional package installation."
   - "update.sh checks for local changes before git pull."
   - "doctor.sh performs basic health checks with clear output."
   - "${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/ directory is created."
-  - "Eden templates directory stows to ~/.config/eden/templates/ with examples."
-  - "Branch concept is documented in manifest and template README."
+  - "${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches file is created by install.sh."
+  - "graft.sh discovers and integrates branch configs into local gitconfig."
+  - "Branch concept is documented in manifest and README."
   - "All path references respect XDG_CONFIG_HOME with fallback to .config."
   - "Makefile targets invoke shell scripts as documented."
 
