@@ -108,6 +108,35 @@ EOF
 }
 
 # =============================================================================
+# GRAFTER: MCP (Model Context Protocol)
+# =============================================================================
+graft_mcp() {
+    log "Grafting MCP servers..."
+    
+    # Check if eden-mcp-merge exists
+    if ! command -v eden-mcp-merge >/dev/null 2>&1; then
+        warn "eden-mcp-merge not found in PATH. Skipping MCP graft."
+        return 0
+    fi
+    
+    # Check if jq is installed
+    if ! command -v jq >/dev/null 2>&1; then
+        warn "jq not installed. Skipping MCP graft."
+        echo "  Install with: sudo pacman -S jq  # or brew install jq"
+        return 0
+    fi
+    
+    # Run the merge
+    if eden-mcp-merge 2>&1 | grep -q "MCP config merged"; then
+        echo "  ✓ MCP servers merged successfully"
+    else
+        warn "MCP merge had warnings (check output above)"
+    fi
+    
+    return 0
+}
+
+# =============================================================================
 # FUTURE GRAFTERS
 # =============================================================================
 # graft_zshrc() {
@@ -130,6 +159,8 @@ main() {
     
     # Run grafters
     graft_gitconfig
+    echo ""
+    graft_mcp
     
     # Future grafters:
     # graft_zshrc

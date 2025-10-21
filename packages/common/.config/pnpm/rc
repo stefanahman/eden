@@ -1,0 +1,17 @@
+# pnpm configuration
+# Store global packages in XDG-compliant location
+global-dir=${XDG_DATA_HOME}/pnpm/global
+global-bin-dir=${HOME}/.local/bin
+
+# Store cache in XDG cache directory
+cache-dir=${XDG_CACHE_HOME}/pnpm
+
+# Store state in XDG data directory
+state-dir=${XDG_DATA_HOME}/pnpm/state
+
+# Auto-install peers for less friction
+auto-install-peers=true
+
+# Strict peer dependencies (warn but don't fail)
+strict-peer-dependencies=false
+

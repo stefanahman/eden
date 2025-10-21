@@ -1,0 +1,87 @@
+#!/bin/bash
+# Eden Node Setup - Helper for managing Node.js versions with fnm
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+log() {
+    echo -e "${GREEN}▸${NC} $1"
+}
+
+info() {
+    echo -e "${BLUE}ℹ${NC} $1"
+}
+
+warn() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Eden Node Setup - fnm Quick Guide"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Check if fnm is installed
+if ! command -v fnm >/dev/null 2>&1; then
+    warn "fnm is not installed yet"
+    echo ""
+    echo "Install fnm with:"
+    echo "  macOS:  brew install fnm"
+    echo "  Arch:   sudo pacman -S fnm"
+    echo ""
+    echo "Then restart your shell or run: source ~/.zshrc"
+    exit 1
+fi
+
+log "fnm is installed: $(fnm --version)"
+echo ""
+
+# Show installed versions
+info "Installed Node versions:"
+if fnm list | grep -q "v"; then
+    fnm list
+else
+    echo "  (none installed yet)"
+fi
+echo ""
+
+# Show current version
+if command -v node >/dev/null 2>&1; then
+    info "Current Node version: $(node --version)"
+    echo ""
+fi
+
+# Usage guide
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Usage Guide"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "Install Node versions:"
+echo "  fnm install 20        # Install latest Node 20.x"
+echo "  fnm install 18        # Install latest Node 18.x"
+echo "  fnm install --lts     # Install latest LTS version"
+echo ""
+echo "Use a version globally:"
+echo "  fnm use 20            # Switch to Node 20"
+echo "  fnm default 20        # Set Node 20 as default"
+echo ""
+echo "Per-project versions (automatic switching):"
+echo "  cd ~/my-project"
+echo "  echo '20' > .node-version    # Use Node 20 for this project"
+echo "  fnm install                  # Install if not present"
+echo ""
+echo "When you cd into a project with .node-version,"
+echo "fnm automatically switches to that version!"
+echo ""
+echo "List available versions:"
+echo "  fnm list              # Show installed versions"
+echo "  fnm list-remote       # Show all available versions"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+

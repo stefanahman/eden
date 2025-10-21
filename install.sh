@@ -129,8 +129,15 @@ else
     error "Failed to stow $OS package"
 fi
 
-# Create Eden config structure (not stowed, user-specific)
-log "Setting up Eden config directory..."
+# Create Eden directory structure (not stowed, user-specific)
+log "Setting up Eden directories..."
+
+# Binaries in ~/.eden/bin (like cargo, volta, fnm)
+EDEN_BIN="$HOME/.eden/bin"
+mkdir -p "$EDEN_BIN"
+verbose "✓ Created $EDEN_BIN/"
+
+# Configs in ~/.config/eden (XDG-compliant)
 EDEN_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/eden"
 mkdir -p "$EDEN_CONFIG/local"
 verbose "✓ Created $EDEN_CONFIG/local/"
@@ -138,6 +145,14 @@ verbose "✓ Created $EDEN_CONFIG/local/"
 # Create empty branches file (users can add branch repo paths here)
 touch "$EDEN_CONFIG/branches"
 verbose "✓ Created $EDEN_CONFIG/branches"
+
+# Symlink Eden scripts to ~/.eden/bin
+log "Installing Eden scripts..."
+for script in "$EDEN_DIR"/packages/common/.local/bin/eden-*; do
+    script_name=$(basename "$script")
+    ln -sf "$script" "$EDEN_BIN/$script_name"
+    verbose "✓ Linked $script_name"
+done
 
 # Install packages (optional)
 if $INSTALL_PACKAGES; then
@@ -166,10 +181,9 @@ if $INSTALL_PACKAGES; then
 fi
 
 # Check PATH (informational only)
-if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-    warn "~/.local/bin is not in your PATH"
-    echo "  Add this to your shell config (.zshrc or .bashrc):"
-    echo "    export PATH=\"\$HOME/.local/bin:\$PATH\""
+if [[ ":$PATH:" != *":$HOME/.eden/bin:"* ]]; then
+    warn "~/.eden/bin is not in your PATH yet"
+    echo "  Eden's .zshrc will add it automatically after you restart your shell"
 fi
 
 # Success!

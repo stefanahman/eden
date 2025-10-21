@@ -1,0 +1,165 @@
+#!/bin/bash
+# Eden MCP Setup - Helper for configuring GitHub MCP with 1Password
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+log() {
+    echo -e "${GREEN}▸${NC} $1"
+}
+
+error() {
+    echo -e "${RED}✗${NC} $1" >&2
+    exit 1
+}
+
+warn() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
+
+info() {
+    echo -e "${BLUE}ℹ${NC} $1"
+}
+
+# Check if op (1Password CLI) is installed
+if ! command -v op >/dev/null 2>&1; then
+    error "1Password CLI (op) is not installed. Install from: https://developer.1password.com/docs/cli/get-started/"
+fi
+
+# Check if op is authenticated
+if ! op account list >/dev/null 2>&1; then
+    error "1Password CLI is not authenticated. Run 'op signin' first."
+fi
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Eden MCP Setup - GitHub Integration"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Check if token already exists
+if op item get "eden-github-mcp-token" >/dev/null 2>&1; then
+    warn "eden-github-mcp-token already exists in 1Password"
+    echo ""
+    read -p "Do you want to update it? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        log "Keeping existing token. Exiting."
+        exit 0
+    fi
+fi
+
+# Instructions for creating the token
+echo ""
+info "GitHub Personal Access Token Setup"
+echo ""
+echo "This token allows the AI in Cursor to interact with GitHub via MCP."
+echo ""
+echo "What you can do with MCP:"
+echo "  • Ask AI to create GitHub issues from TODO comments"
+echo "  • Have AI create pull requests with your changes"
+echo "  • Let AI search your repos and read file contents"
+echo "  • Ask AI to manage labels, milestones, and assignments"
+echo "  • Have AI fork repos, create branches, merge PRs"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Step 1: Generate Token on GitHub"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "  Visit: ${BLUE}https://github.com/settings/personal-access-tokens/new${NC}"
+echo ""
+echo "  ${GREEN}Use Fine-grained tokens${NC} (recommended for better security)"
+echo ""
+echo "  Token Configuration:"
+echo "    • Token name: ${GREEN}Eden MCP Server${NC}"
+echo "    • Expiration: ${GREEN}90 days${NC} (or your preference)"
+echo "    • Repository access: ${GREEN}All repositories${NC} (or specific repos)"
+echo ""
+echo "  ${GREEN}Required${NC} Repository Permissions:"
+echo "    ${GREEN}✓${NC} Contents        - ${YELLOW}Read and write${NC} (read files, push changes)"
+echo "    ${GREEN}✓${NC} Issues          - ${YELLOW}Read and write${NC} (create/manage issues)"
+echo "    ${GREEN}✓${NC} Pull requests   - ${YELLOW}Read and write${NC} (create/manage PRs)"
+echo "    ${GREEN}✓${NC} Metadata        - ${YELLOW}Read-only${NC} (repo metadata, always included)"
+echo ""
+echo "  ${BLUE}Optional${NC} Repository Permissions:"
+echo "    ○ Commit statuses  - ${YELLOW}Read-only${NC} (check CI status)"
+echo "    ○ Discussions      - ${YELLOW}Read and write${NC} (manage discussions)"
+echo "    ○ Workflows        - ${YELLOW}Read and write${NC} (update GitHub Actions)"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Step 2: Copy Your Token"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "  After clicking 'Generate token', copy it immediately."
+echo "  ${YELLOW}⚠${NC}  You won't be able to see it again!"
+echo ""
+read -p "Press Enter when you have your token ready..." -s
+echo ""
+echo ""
+
+# Prompt for token
+read -sp "Paste your GitHub Personal Access Token: " TOKEN
+echo ""
+
+if [ -z "$TOKEN" ]; then
+    error "Token cannot be empty"
+fi
+
+# Validate token format (basic check)
+if [[ ! "$TOKEN" =~ ^(ghp_|github_pat_)[a-zA-Z0-9_]+ ]]; then
+    warn "Token format doesn't match expected GitHub token pattern"
+    read -p "Continue anyway? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        error "Aborted"
+    fi
+fi
+
+# Save to 1Password
+log "Saving token to 1Password..."
+
+if op item get "eden-github-mcp-token" >/dev/null 2>&1; then
+    # Update existing item
+    op item edit "eden-github-mcp-token" credential="$TOKEN" >/dev/null
+    log "Token updated in 1Password"
+else
+    # Create new item
+    op item create --category="API Credential" \
+        --title="eden-github-mcp-token" \
+        --vault="Private" \
+        credential="$TOKEN" >/dev/null
+    log "Token saved to 1Password (Private vault)"
+fi
+
+# Verify it can be read
+log "Verifying token retrieval..."
+if RETRIEVED=$(op read "op://Private/eden-github-mcp-token/credential" 2>/dev/null); then
+    if [ "$RETRIEVED" = "$TOKEN" ]; then
+        log "Token verified successfully"
+    else
+        error "Token verification failed (retrieved token doesn't match)"
+    fi
+else
+    error "Failed to retrieve token from 1Password"
+fi
+
+echo ""
+log "Setup complete! 🎉"
+echo ""
+echo "Next steps:"
+echo "  1. Restart Cursor to load the MCP configuration"
+echo "  2. In Cursor, you can now ask me to:"
+echo "     • Create issues in your repositories"
+echo "     • Search repositories"
+echo "     • Create pull requests"
+echo "     • And more!"
+echo ""
+info "The token is securely stored in 1Password and will be"
+info "retrieved automatically when Cursor starts."
+echo ""
+

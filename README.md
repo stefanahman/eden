@@ -42,7 +42,7 @@ sudo pacman -S --needed $(cat pacman.txt)
 - **arch**: Arch Linux overlays (Hyprland, Omarchy)
 - **mac**: macOS overlays (yabai, skhd)
 
-Configurations are symlinked into `$HOME`. Platform-specific differences layer cleanly over shared foundations. Local machine overrides live in `~/.config/eden/local/` and remain untracked.
+Configurations are symlinked into `$HOME`. Platform-specific differences layer cleanly over shared foundations. Local machine overrides live in `~/.config/eden/` (XDG-compliant), while Eden binaries are managed in `~/.eden/bin/` (like cargo, volta, fnm).
 
 ## Philosophy
 

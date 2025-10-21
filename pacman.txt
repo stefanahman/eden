@@ -16,6 +16,8 @@ tree
 ripgrep
 fd
 bat
+fnm
+pnpm
 
 # Editor
 neovim
@@ -23,6 +25,13 @@ neovim
 # System tools
 btop
 jq
+
+# Security & secrets
+# Note: 1Password packages - if using Omarchy repo, they're available there.
+#       Otherwise install from AUR: yay -S 1password-beta 1password-cli
+1password-beta
+1password-cli
+openvpn
 
 # To be added: more tools as Eden grows
 

@@ -2,6 +2,7 @@
 README.md
 LICENSE
 manifest.yaml
+.eden-secrets
 
 # Scripts and build files
 Makefile
@@ -11,8 +12,14 @@ Makefile
 Brewfile
 pacman.txt
 
+# Development and testing
+tests/
+docs/
+
 # Git artifacts
 \.git
 \.gitignore
 \.gitkeep$
 
+# MCP config - merged by graft.sh, not stowed
+# (Note: Cursor looks for ~/.cursor/mcp.json, not in .config)

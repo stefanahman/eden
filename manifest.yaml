@@ -61,6 +61,10 @@ dependencies:
   optional:
     - name: "1Password CLI (op)"
       rationale: "Runtime secret retrieval; required only if using secret_management features."
+    - name: "fnm (Fast Node Manager)"
+      rationale: "Multi-version Node.js manager; required for MCP servers and development tools."
+    - name: "pnpm"
+      rationale: "Fast, efficient package manager; required for MCP servers and Node.js tooling."
 
 secret_management:
   provider: "1Password"
@@ -153,6 +157,7 @@ repo_layout:
         - "Neovim editor configuration"
         - "User binaries and scripts"
         - "Terminal emulator configuration"
+        - "Cursor IDE configuration (MCP servers, AI integrations)"
     - id: arch
       target: "$HOME"
       description: "Arch Linux overlays; no defaults edited under ~/.local/share/omarchy."
@@ -253,6 +258,35 @@ binaries:
   location: "packages/common/.local/bin/"
   purpose: "Executable scripts for personal workflows; improved incrementally over time."
   note: "For private/context-specific binaries, use Eden branch repos."
+  eden_utilities:
+    - name: "eden-mcp-setup"
+      purpose: "Helper script for configuring GitHub MCP with 1Password integration."
+      usage: "Run 'eden-mcp-setup' to securely store GitHub token for MCP servers."
+
+mcp_integration:
+  concept: "Model Context Protocol (MCP) enables AI assistants to interact with external services"
+  servers:
+    - name: "github"
+      package: "@modelcontextprotocol/server-github"
+      purpose: "Allows AI agents to create issues, search repos, manage PRs, etc."
+      authentication: "GitHub Personal Access Token stored in 1Password"
+      configuration: "packages/common/.config/cursor/mcp_config.json"
+  setup:
+    description: "MCP servers are configured per-tool (Cursor) and use 1Password for secrets"
+    steps:
+      - "Install fnm and pnpm (via Brewfile/pacman.txt)"
+      - "Run 'eden-mcp-setup' to store GitHub token in 1Password"
+      - "Restart Cursor to load MCP configuration"
+      - "AI agents can now interact with GitHub on your behalf"
+  token_scopes:
+    required:
+      - "repo (full control) or public_repo (public repos only)"
+    optional:
+      - "write:discussion (for GitHub Discussions)"
+  rationale: >
+    MCP servers extend AI capabilities securely. Tokens are fetched at runtime
+    from 1Password, never stored in files. Configuration is symlinked via stow,
+    keeping Eden as the single source of truth.
 
 bootstrap_behavior:
   installer: "./install.sh"
@@ -380,7 +414,8 @@ makefile_targets:
         Last update:    2025-01-15 14:23
         Symlinks:       ✓ 47 active, 0 broken
         Dependencies:   ✓ git 2.43.0, stow 2.3.1
-        Local config:   ~/.config/eden/local/ exists
+        Local config:   ~/.config/eden/local/ exists (XDG)
+        Eden binaries:  ~/.eden/bin/ (4 scripts)
         Secrets:        ✓ 1Password CLI authenticated
     - id: clean
       accomplishment: "Remove all Eden symlinks from $HOME."

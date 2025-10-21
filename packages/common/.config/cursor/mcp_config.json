@@ -1,0 +1,14 @@
+{
+  "$comment": "Model Context Protocol (MCP) Configuration - Cursor IDE",
+  "$comment2": "To pin Node version for MCP servers, create .node-version in this directory",
+  "mcpServers": {
+    "github-eden": {
+      "command": "sh",
+      "args": [
+        "-c",
+        "PATH=\"$HOME/.eden/bin:$HOME/.volta/bin:/usr/local/bin:/usr/bin:/bin\" OP_BIOMETRIC_UNLOCK_ENABLED=true GITHUB_PERSONAL_ACCESS_TOKEN=$(op read 'op://Private/eden-github-mcp-token/credential' 2>/dev/null || echo '') pnpm dlx @modelcontextprotocol/server-github"
+      ]
+    }
+  }
+}
+
