@@ -10,7 +10,7 @@ Eden uses 1Password to securely store and retrieve secrets at runtime.
 
 **Install Eden packages:**
 ```bash
-./install.sh --packages
+eden install
 ```
 
 This installs both the 1Password desktop app and CLI:
@@ -30,7 +30,7 @@ Eden works with 1Password CLI via desktop app integration.
 
 ```bash
 # Install all Eden packages including 1Password
-./install.sh --packages
+eden install
 ```
 
 **Note for Arch users:** You'll need `yay` AUR helper:
@@ -175,7 +175,7 @@ Benefits:
 
 ```bash
 # 1. Install Eden packages (includes 1password desktop + CLI)
-./install.sh --packages
+eden install
 
 # 2. Launch 1Password desktop app
 # macOS: Open from Applications

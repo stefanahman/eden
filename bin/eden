@@ -59,10 +59,11 @@ show_help() {
     echo "  install [package]     Install packages (no args = all from Brewfile/pacman.txt)"
     echo "                        Specific packages: gcloud | Use --list to see all"
     echo "  update                Update Eden from git and re-apply symlinks"
-    echo "  stow [--adopt]        Apply Eden symlinks (common + platform packages)"
+    echo "  plant [--adopt]       Plant Eden configs (wraps GNU Stow with helpful checks)"
     echo "                        Use --adopt to pull existing files into Eden"
-    echo "  unstow                Remove Eden symlinks (temporary, keeps ~/.eden/)"
-    echo "  uninstall             Complete Eden removal (unstow + remove ~/.eden/)"
+    echo "  unplant               Remove Eden symlinks (temporary, keeps ~/.eden/)"
+    echo "  stow / unstow         Direct aliases if you prefer (plant/unplant recommended)"
+    echo "  uninstall             Complete Eden removal (unplant + remove ~/.eden/)"
     echo "  graft                 Discover and integrate branch configs"
     echo "  doctor                Validate Eden installation health"
     echo "  status                Show Eden system overview and health"
@@ -72,10 +73,6 @@ show_help() {
     echo "  check-package <name>  Check if a package exists (official repo, AUR, or brew)"
     echo "  list-packages         Show platform packages (Brewfile/pacman.txt)"
     echo "  packages              [deprecated] Use 'eden install' instead"
-    echo ""
-    echo -e "${BOLD}Platform Commands:${RESET}"
-    echo "  deploy-arch           Deploy common + arch packages only"
-    echo "  deploy-mac            Deploy common + mac packages only"
     echo ""
     echo -e "${BOLD}Utility Commands:${RESET}"
     echo "  eden-secrets          Manage 1Password secrets"
@@ -88,7 +85,8 @@ show_help() {
     echo "  eden install gcloud   # Install Google Cloud CLI"
     echo "  eden install --list   # See all available packages"
     echo "  eden update           # Update to latest Eden changes"
-    echo "  eden stow --adopt     # Pull existing configs into Eden"
+    echo "  eden plant            # Plant Eden configs (apply symlinks)"
+    echo "  eden plant --adopt    # Pull existing configs into Eden"
     echo "  eden graft            # Integrate branch configurations"
     echo "  eden doctor           # Check system health"
     echo "  eden check-package fnm  # Check where a package is available"
@@ -316,26 +314,6 @@ run_script() {
     "$script_path" "$@"
 }
 
-# Deploy platform-specific packages
-deploy_platform() {
-    local platform="$1"
-    print_header "Deploying Eden for $platform"
-    
-    cd "$EDEN_ROOT"
-    
-    # Stow packages in order
-    print_info "Stowing common package..."
-    stow -v -d packages -t "$HOME" common
-    
-    print_info "Stowing eden package..."
-    stow -v -d packages -t "$HOME" eden
-    
-    print_info "Stowing $platform package..."
-    stow -v -d packages -t "$HOME" "$platform"
-    
-    print_success "Deployment complete"
-}
-
 # Main command dispatcher
 main() {
     if [ $# -eq 0 ]; then
@@ -416,27 +394,46 @@ main() {
         update)
             run_script "eden-update" "$@"
             ;;
-        stow)
+        plant|stow)
             # Check for --adopt flag
             ADOPT_FLAG=""
             if [[ "$*" == *"--adopt"* ]]; then
                 ADOPT_FLAG="--adopt"
-                print_header "Adopting and Stowing Eden Configs"
+                print_header "Planting Eden Configs (with --adopt)"
                 echo ""
                 print_info "This will move existing files into Eden and create symlinks"
                 echo ""
             else
-                print_header "Applying Eden Symlinks"
+                print_header "Planting Eden Configs"
+            fi
+            
+            # Check if stow is installed
+            if ! command -v stow &> /dev/null; then
+                print_error "GNU Stow is not installed"
+                echo ""
+                echo "Install stow first:"
+                case "$(uname -s)" in
+                    Darwin)
+                        echo "  brew install stow"
+                        ;;
+                    Linux)
+                        echo "  sudo pacman -S stow"
+                        echo "  # or: yay -S stow"
+                        ;;
+                esac
+                echo ""
+                echo "Or run: eden install"
+                exit 1
             fi
             
             cd "$EDEN_ROOT"
             case "$(uname -s)" in
                 Darwin)
-                    print_info "Stowing common + eden + mac packages..."
+                    print_info "Planting common + eden + mac packages (using GNU Stow)..."
                     stow -v $ADOPT_FLAG -d packages -t "$HOME" common eden mac
                     ;;
                 Linux)
-                    print_info "Stowing common + eden + arch packages..."
+                    print_info "Planting common + eden + arch packages (using GNU Stow)..."
                     stow -v $ADOPT_FLAG -d packages -t "$HOME" common eden arch
                     ;;
             esac
@@ -447,20 +444,39 @@ main() {
                 print_info "Next steps:"
                 echo "  1. Review changes: cd $EDEN_ROOT && git status"
                 echo "  2. Check diffs: git diff"
-                echo "  3. Commit if satisfied: git add -A && git commit -m 'Adopt configs from Omarchy'"
+                echo "  3. Commit if satisfied: git add -A && git commit -m 'Adopt configs from system'"
                 echo "  4. Or revert: git checkout ."
             else
-                print_success "Eden symlinks applied"
+                print_success "Eden configs planted successfully"
             fi
             ;;
-        unstow|clean)
-            print_header "Removing Eden Symlinks"
+        unplant|unstow|clean)
+            print_header "Unplanting Eden Configs"
+            
+            # Check if stow is installed
+            if ! command -v stow &> /dev/null; then
+                print_warning "GNU Stow is not installed, cannot unplant cleanly"
+                echo ""
+                print_info "Symlinks remain in place. Install stow first:"
+                case "$(uname -s)" in
+                    Darwin)
+                        echo "  brew install stow"
+                        ;;
+                    Linux)
+                        echo "  sudo pacman -S stow"
+                        ;;
+                esac
+                exit 1
+            fi
+            
             cd "$EDEN_ROOT"
             case "$(uname -s)" in
                 Darwin)
+                    print_info "Unplanting common + eden + mac packages (using GNU Stow)..."
                     stow -D -d packages -t "$HOME" common eden mac 2>/dev/null || true
                     ;;
                 Linux)
+                    print_info "Unplanting common + eden + arch packages (using GNU Stow)..."
                     stow -D -d packages -t "$HOME" common eden arch 2>/dev/null || true
                     ;;
             esac
@@ -473,16 +489,16 @@ main() {
                 rmdir "$HOME/.eden" 2>/dev/null || true
             fi
             
-            print_success "Eden symlinks removed"
+            print_success "Eden configs unplanted successfully"
             [ -d "$HOME/.eden" ] && print_info "~/.eden/ preserved (contains branch configs/binaries)"
             ;;
         uninstall)
             print_header "Uninstalling Eden"
             echo ""
             print_warning "This will completely remove Eden from your system:"
-            echo "  • Remove all Eden symlinks"
+            echo "  • Unplant all Eden configs (remove symlinks)"
             echo "  • Delete ~/.eden/ directory (grafted binaries, configs)"
-            echo "  • Remove root eden wrapper script"
+            echo "  • Remove eden wrapper from ~/.local/bin/"
             echo ""
             echo -n "Are you sure? [y/N] "
             read -r response
@@ -492,16 +508,20 @@ main() {
             fi
             
             echo ""
-            print_info "Removing Eden symlinks..."
+            print_info "Unplanting Eden configs..."
             cd "$EDEN_ROOT"
-            case "$(uname -s)" in
-                Darwin)
-                    stow -D -d packages -t "$HOME" common eden mac 2>/dev/null || true
-                    ;;
-                Linux)
-                    stow -D -d packages -t "$HOME" common eden arch 2>/dev/null || true
-                    ;;
-            esac
+            if command -v stow &> /dev/null; then
+                case "$(uname -s)" in
+                    Darwin)
+                        stow -D -d packages -t "$HOME" common eden mac 2>/dev/null || true
+                        ;;
+                    Linux)
+                        stow -D -d packages -t "$HOME" common eden arch 2>/dev/null || true
+                        ;;
+                esac
+            else
+                print_warning "Stow not found, skipping symlink removal"
+            fi
             
             print_info "Removing ~/.eden/ directory..."
             rm -rf "$HOME/.eden"
@@ -542,12 +562,6 @@ main() {
             ;;
         check-package)
             check_package "$@"
-            ;;
-        deploy-arch)
-            deploy_platform "arch"
-            ;;
-        deploy-mac)
-            deploy_platform "mac"
             ;;
         version|--version|-v)
             show_version

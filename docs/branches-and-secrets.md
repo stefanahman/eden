@@ -196,9 +196,13 @@ EOF
 echo "~/branch-work" >> ~/.config/eden/branches
 ```
 
-### 5. Deploy Branch
+### 5. Plant Branch Configs
 ```bash
+# Recommended: Use eden's plant command (provides helpful checks)
 cd ~/branch-work
+eden plant
+
+# Alternative: Use GNU Stow directly if you prefer
 stow -t $HOME -d packages common
 ```
 

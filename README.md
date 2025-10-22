@@ -2,7 +2,7 @@
 
 Eden is a personal computing environment that travels across machines.
 
-It holds configurations, small tools, and organizational patterns that enable coherent work on Arch Linux and macOS. The structure is simple: shared foundations in `common`, platform-specific adaptations in `arch` and `mac`, and symlink-based deployment via GNU Stow.
+It holds configurations, small tools, and organizational patterns that enable coherent work on Arch Linux and macOS. The structure is simple: shared foundations in `common`, platform-specific adaptations in `arch` and `mac`, and symlink-based deployment using GNU Stow (wrapped in Eden's `plant` command for ease of use).
 
 ## Purpose
 
@@ -17,24 +17,20 @@ This is not a framework or a distribution. It is a working environment, shaped b
 git clone <your-eden-repo> ~/eden
 cd ~/eden
 
-# Install (symlink configs only)
+# Bootstrap: Install eden wrapper (no dependencies required)
 ./install.sh
 
-# Or install with packages
-./install.sh --packages
+# Install platform packages (includes stow)
+eden install
+
+# Plant configurations into your system
+eden plant
 
 # Validate installation
-./doctor.sh
+eden doctor
 ```
 
-Install packages manually anytime:
-```bash
-# macOS
-brew bundle
-
-# Arch Linux
-sudo pacman -S --needed $(cat pacman.txt)
-```
+Eden grows in stages: first the command wrapper, then tools and packages, then configuration planting. This sequence requires only git at the start.
 
 ## Structure
 
@@ -42,7 +38,7 @@ sudo pacman -S --needed $(cat pacman.txt)
 - **arch**: Arch Linux overlays (Hyprland, Omarchy)
 - **mac**: macOS overlays (yabai, skhd)
 
-Configurations are symlinked into `$HOME`. Platform-specific differences layer cleanly over shared foundations. Local machine overrides live in `~/.config/eden/` (XDG-compliant), while Eden binaries are managed in `~/.eden/bin/` (like cargo, volta, fnm).
+Configurations are planted into `$HOME` using `eden plant` (a wrapper around GNU Stow that checks requirements and provides helpful guidance). Platform-specific differences layer cleanly over shared foundations. Local machine overrides live in `~/.config/eden/` (XDG-compliant), while Eden binaries are managed in `~/.eden/bin/` (like cargo, volta, fnm).
 
 ## Philosophy
 

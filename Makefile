@@ -1,6 +1,6 @@
-.PHONY: help install update doctor status clean arch mac graft
+.PHONY: help install update doctor status clean graft
 
-# Detect OS for platform-specific targets
+# Detect OS for clean target
 UNAME := $(shell uname -s)
 ifeq ($(UNAME),Linux)
 	OS := arch
@@ -13,19 +13,18 @@ help:
 	@echo "Eden - Personal Environment Manager"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make install        Bootstrap Eden (symlinks only)"
-	@echo "  make update         Update Eden from git and re-deploy"
+	@echo "  make install        Bootstrap Eden wrapper (no stow required)"
+	@echo "  make update         Update Eden from git and re-apply configs"
 	@echo "  make doctor         Validate Eden installation health"
 	@echo "  make graft          Graft branch configs into local gitconfig"
-	@echo "  make status         Show Eden system overview (not yet implemented)"
+	@echo "  make status         Show Eden system overview"
 	@echo "  make clean          Remove all Eden symlinks from \$$HOME"
-	@echo "  make arch           Deploy common + arch packages only"
-	@echo "  make mac            Deploy common + mac packages only"
 	@echo ""
-	@echo "Install options:"
-	@echo "  ./install.sh --packages    Install with packages (brew/pacman)"
-	@echo "  ./install.sh --verbose     Show detailed output"
-	@echo "  ./install.sh --help        Show all options"
+	@echo "Bootstrap workflow:"
+	@echo "  ./install.sh        # Install eden wrapper (no dependencies)"
+	@echo "  eden install        # Install packages (includes GNU Stow)"
+	@echo "  eden plant          # Plant configs (wraps stow with checks)"
+	@echo "  eden doctor         # Validate installation"
 
 install:
 	@./install.sh
@@ -44,13 +43,6 @@ status:
 	@echo "Run 'make doctor' for health check"
 
 clean:
-	@echo "Removing Eden symlinks..."
+	@echo "Unplanting Eden configs..."
 	@stow -D -t $(HOME) -d packages common $(OS) 2>/dev/null || true
-	@echo "✓ Eden symlinks removed"
-
-arch:
-	@stow -v -t $(HOME) -d packages common arch
-
-mac:
-	@stow -v -t $(HOME) -d packages common mac
-
+	@echo "✓ Eden configs unplanted"
