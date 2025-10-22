@@ -64,6 +64,7 @@ show_help() {
     echo -e "${BOLD}Package Management:${RESET}"
     echo "  packages              Install packages from Brewfile (macOS) or pacman.txt (Arch)"
     echo "  list-packages         Show available packages for current platform"
+    echo "  check-package <name>  Check if a package exists (official repo, AUR, or brew)"
     echo ""
     echo -e "${BOLD}Platform Commands:${RESET}"
     echo "  deploy-arch           Deploy common + arch packages only"
@@ -80,6 +81,7 @@ show_help() {
     echo "  eden graft            # Integrate branch configurations"
     echo "  eden doctor           # Check system health"
     echo "  eden packages         # Install platform packages"
+    echo "  eden check-package fnm  # Check where a package is available"
     echo ""
     echo -e "${BOLD}Environment:${RESET}"
     echo "  Eden Root: $EDEN_ROOT"
@@ -122,17 +124,26 @@ install_packages() {
             ;;
         Linux)
             print_info "Linux detected - installing from pacman.txt"
-            if ! command -v pacman &> /dev/null; then
-                print_error "pacman not found. This script supports Arch Linux."
-                exit 1
-            fi
             cd "$EDEN_ROOT"
             if [ -f "pacman.txt" ]; then
                 # Filter out comments and empty lines
                 local packages=$(grep -v '^#' pacman.txt | grep -v '^$' | tr '\n' ' ')
-                print_info "Installing packages: $packages"
-                sudo pacman -S --needed $packages
-                print_success "Packages installed from pacman.txt"
+                
+                # Check for yay (AUR helper) first
+                if command -v yay &> /dev/null; then
+                    print_info "Using yay (includes AUR packages)"
+                    yay -S --needed $packages
+                    print_success "Packages installed from pacman.txt"
+                elif command -v pacman &> /dev/null; then
+                    print_info "Using pacman (AUR packages will be skipped)"
+                    print_info "For AUR packages, install yay first"
+                    sudo pacman -S --needed $packages 2>&1 || true
+                    echo ""
+                    print_info "Install yay: git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si"
+                else
+                    print_error "Neither yay nor pacman found. Are you on Arch Linux?"
+                    exit 1
+                fi
             else
                 print_error "pacman.txt not found"
                 exit 1
@@ -164,6 +175,101 @@ list_packages() {
             echo ""
             if [ -f "$EDEN_ROOT/pacman.txt" ]; then
                 cat "$EDEN_ROOT/pacman.txt"
+            fi
+            ;;
+        *)
+            print_error "Unsupported platform: $(uname -s)"
+            exit 1
+            ;;
+    esac
+}
+
+# Check if a package exists and where
+check_package() {
+    local pkg="$1"
+    
+    if [ -z "$pkg" ]; then
+        print_error "Usage: eden check-package <package-name>"
+        exit 1
+    fi
+    
+    print_header "Checking package: $pkg"
+    echo ""
+    
+    case "$(uname -s)" in
+        Darwin)
+            print_info "Platform: macOS (Homebrew)"
+            echo ""
+            
+            if ! command -v brew &> /dev/null; then
+                print_error "Homebrew not installed"
+                exit 1
+            fi
+            
+            # Search brew
+            echo "Searching Homebrew..."
+            if brew search "$pkg" 2>/dev/null | grep -q "^$pkg\$"; then
+                print_success "Found in Homebrew formulae: $pkg"
+                echo ""
+                brew info "$pkg" 2>/dev/null | head -5
+            elif brew search --cask "$pkg" 2>/dev/null | grep -q "^$pkg\$"; then
+                print_success "Found in Homebrew casks: $pkg"
+                echo ""
+                brew info --cask "$pkg" 2>/dev/null | head -5
+            else
+                echo "Searching for similar packages:"
+                brew search "$pkg" 2>/dev/null | head -10
+            fi
+            ;;
+        Linux)
+            print_info "Platform: Arch Linux"
+            echo ""
+            
+            # Check priority: Omarchy -> Official repos -> AUR
+            
+            # 1. Check Omarchy repo first
+            if pacman -Ss "^$pkg$" 2>/dev/null | grep -q "^omarchy/"; then
+                print_success "Found in Omarchy repo: $pkg"
+                echo ""
+                pacman -Si "$pkg" 2>/dev/null | grep -E "^(Repository|Name|Version|Description)" || true
+            # 2. Check official repos
+            elif pacman -Ss "^$pkg$" 2>/dev/null | grep -q "^"; then
+                print_success "Found in official repos: $pkg"
+                echo ""
+                pacman -Si "$pkg" 2>/dev/null | grep -E "^(Repository|Name|Version|Description)" || true
+            # 3. Check AUR if yay is available
+            elif command -v yay &> /dev/null; then
+                echo "Not in Omarchy or official repos, checking AUR..."
+                if yay -Ss "^$pkg$" 2>/dev/null | grep -q "^aur/$pkg"; then
+                    print_success "Found in AUR: $pkg"
+                    echo ""
+                    yay -Si "$pkg" 2>/dev/null | grep -E "^(Repository|Name|Version|Description)" || true
+                else
+                    print_error "Package not found in Omarchy, official repos, or AUR"
+                    echo ""
+                    echo "Searching for similar packages:"
+                    echo ""
+                    echo "Omarchy repo:"
+                    pacman -Sl omarchy 2>/dev/null | grep "$pkg" | head -10 || echo "  (none found)"
+                    echo ""
+                    echo "Official repos:"
+                    pacman -Ss "$pkg" 2>/dev/null | head -10 || echo "  (none found)"
+                    echo ""
+                    echo "AUR:"
+                    yay -Ss "$pkg" 2>/dev/null | grep "^aur/" | head -10 || echo "  (none found)"
+                fi
+            else
+                print_error "Package not found in Omarchy or official repos"
+                echo ""
+                echo "Install yay to check AUR: git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si"
+                echo ""
+                echo "Searching for similar packages:"
+                echo ""
+                echo "Omarchy repo:"
+                pacman -Sl omarchy 2>/dev/null | grep "$pkg" | head -10 || echo "  (none found)"
+                echo ""
+                echo "Official repos:"
+                pacman -Ss "$pkg" 2>/dev/null | head -10 || echo "  (none found)"
             fi
             ;;
         *)
@@ -299,6 +405,9 @@ main() {
             ;;
         list-packages)
             list_packages
+            ;;
+        check-package)
+            check_package "$@"
             ;;
         deploy-arch)
             deploy_platform "arch"

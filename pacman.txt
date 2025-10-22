@@ -1,6 +1,24 @@
 # Arch Linux packages
-# Install with: sudo pacman -S --needed $(cat pacman.txt)
-# Or with yay: yay -S --needed $(cat pacman.txt)
+# 
+# Package priority order:
+#   1. Omarchy repo (custom repo, preferred source)
+#   2. Official Arch repos (core, extra, multilib)
+#   3. AUR (requires yay or paru)
+#
+# Installation:
+#   Quick install all: grep -v '^#' pacman.txt | grep -v '^$' | xargs yay -S --needed
+#   Check package: eden check-package <name>
+#
+# Note: yay/pacman automatically selects the best source in priority order
+
+# === Omarchy Repository Packages ===
+# (Configured via /etc/pacman.conf)
+
+# Security & secrets
+1password-beta
+1password-cli
+
+# === Official Repository Packages ===
 
 # Core tools (required for Eden)
 git
@@ -16,11 +34,6 @@ tree
 ripgrep
 fd
 bat
-fnm
-pnpm
-
-# Cloud tools
-google-cloud-cli
 
 # Editor
 neovim
@@ -29,12 +42,19 @@ neovim
 btop
 jq
 
-# Security & secrets
-# Note: 1Password packages - if using Omarchy repo, they're available there.
-#       Otherwise install from AUR: yay -S 1password-beta 1password-cli
-1password-beta
-1password-cli
+# VPN
 openvpn
+
+# === AUR Packages (requires yay/paru) ===
+
+# Node.js version manager
+fnm-bin
+
+# Node.js package manager (also in community, but AUR has latest)
+pnpm
+
+# Cloud tools
+google-cloud-cli
 
 # To be added: more tools as Eden grows
 

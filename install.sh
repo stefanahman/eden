@@ -166,15 +166,25 @@ if $INSTALL_PACKAGES; then
             error "Homebrew not found. Install from https://brew.sh/ first."
         fi
     elif [ "$OS" = "arch" ]; then
-        if command -v pacman >/dev/null 2>&1; then
-            verbose "Installing packages with pacman..."
+        # Check for yay (AUR helper) first, as some packages are AUR-only
+        if command -v yay >/dev/null 2>&1; then
+            verbose "Installing packages with yay (includes AUR)..."
             # Read packages into array, skipping comments and empty lines
             mapfile -t packages < <(grep -v '^#' "$EDEN_DIR/pacman.txt" | grep -v '^$' | tr -d ' ')
             if [ ${#packages[@]} -gt 0 ]; then
-                sudo pacman -S --needed "${packages[@]}" || warn "Some packages failed to install"
+                yay -S --needed "${packages[@]}" || warn "Some packages failed to install"
+            fi
+        elif command -v pacman >/dev/null 2>&1; then
+            verbose "Installing packages with pacman (AUR packages will be skipped)..."
+            # Read packages into array, skipping comments and empty lines
+            mapfile -t packages < <(grep -v '^#' "$EDEN_DIR/pacman.txt" | grep -v '^$' | tr -d ' ')
+            if [ ${#packages[@]} -gt 0 ]; then
+                sudo pacman -S --needed "${packages[@]}" 2>&1 || true
+                warn "Some packages require AUR access. Install yay and re-run with: eden packages"
+                echo "  Install yay: git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si"
             fi
         else
-            error "pacman not found. Are you on Arch Linux?"
+            error "Neither yay nor pacman found. Are you on Arch Linux?"
         fi
     fi
     verbose "✓ Package installation complete"
