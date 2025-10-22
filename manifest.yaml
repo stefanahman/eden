@@ -258,6 +258,25 @@ binaries:
   location: "packages/common/.local/bin/"
   purpose: "Executable scripts for personal workflows; improved incrementally over time."
   note: "For private/context-specific binaries, use Eden branch repos."
+  eden_cli:
+    name: "eden"
+    purpose: "Central command dispatcher for Eden environment management."
+    location: "packages/common/.local/bin/eden (stows to ~/.local/bin/eden)"
+    commands:
+      - "install [--packages] - Bootstrap Eden on a fresh system"
+      - "update - Update Eden from git and re-apply symlinks"
+      - "graft - Discover and integrate branch configs"
+      - "doctor - Validate Eden installation health"
+      - "status - Show Eden system overview"
+      - "clean - Remove all Eden symlinks"
+      - "packages - Install packages from Brewfile/pacman.txt"
+      - "list-packages - Show available packages"
+      - "deploy-arch / deploy-mac - Platform-specific deployment"
+      - "version - Show Eden version and location"
+      - "help - Show usage information"
+    rationale: >
+      Single entry point for all Eden operations. Provides consistent interface
+      across platforms with colored output, error handling, and helpful messages.
   eden_utilities:
     - name: "eden-mcp-setup"
       purpose: "Helper script for configuring GitHub MCP with 1Password integration."
@@ -304,10 +323,10 @@ bootstrap_behavior:
     - "Symlink 'common' package to $HOME using stow."
     - "Symlink OS-specific package ('arch' or 'mac') to $HOME using stow."
     - "Optionally install packages from Brewfile/pacman.txt with --packages flag."
-    - "Ensure $HOME/.local/bin is in PATH for zsh and bash shell configs."
+    - "Ensure $HOME/.local/bin and $HOME/.eden/bin are in PATH via shell configs."
     - "Create ${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/ for user overrides."
     - "Create empty ${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches file for branch registration."
-    - "Print success message and suggest running doctor.sh and 'make graft'."
+    - "Print success message and suggest running 'eden doctor' and 'eden graft'."
   stow_ordering:
     rationale: "Common first, then OS-specific overlay. OS layer can override common if needed."
     conflict_resolution: "Stow merges directories; OS-specific files take precedence (stowed second)."
@@ -415,7 +434,8 @@ makefile_targets:
         Symlinks:       ✓ 47 active, 0 broken
         Dependencies:   ✓ git 2.43.0, stow 2.3.1
         Local config:   ~/.config/eden/local/ exists (XDG)
-        Eden binaries:  ~/.eden/bin/ (4 scripts)
+        Eden CLI:       ~/.local/bin/eden (available)
+        Eden utilities: ~/.eden/bin/ (eden-* helper scripts)
         Secrets:        ✓ 1Password CLI authenticated
     - id: clean
       accomplishment: "Remove all Eden symlinks from $HOME."

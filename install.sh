@@ -181,9 +181,20 @@ if $INSTALL_PACKAGES; then
 fi
 
 # Check PATH (informational only)
+PATH_WARNINGS=()
+if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    PATH_WARNINGS+=("~/.local/bin")
+fi
 if [[ ":$PATH:" != *":$HOME/.eden/bin:"* ]]; then
-    warn "~/.eden/bin is not in your PATH yet"
-    echo "  Eden's .zshrc will add it automatically after you restart your shell"
+    PATH_WARNINGS+=("~/.eden/bin")
+fi
+
+if [ ${#PATH_WARNINGS[@]} -gt 0 ]; then
+    warn "The following directories are not in your PATH yet:"
+    for dir in "${PATH_WARNINGS[@]}"; do
+        echo "    • $dir"
+    done
+    echo "  Eden's shell configuration will add them automatically after you restart your shell"
 fi
 
 # Success!
@@ -191,8 +202,15 @@ echo ""
 log "Eden installed successfully! 🌳"
 echo ""
 echo "Next steps:"
-echo "  • Run './doctor.sh' to validate installation"
+echo "  • Restart your shell or run: source ~/.zshenv"
+echo "  • Run 'eden doctor' to validate installation"
+echo "  • Run 'eden packages' to install packages from Brewfile/pacman.txt"
 echo "  • Create a branch repo for private configs (see README.md)"
-echo "  • Run 'make graft' after adding branch repos to sync configs"
+echo "  • Run 'eden graft' after adding branch repos to sync configs"
+echo ""
+echo "Quick reference:"
+echo "  • eden help     - Show all available commands"
+echo "  • eden status   - Check Eden system health"
+echo "  • eden update   - Update Eden and re-apply configs"
 echo ""
 

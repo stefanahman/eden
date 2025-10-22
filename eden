@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Eden CLI - Root-level wrapper for immediate availability
+# This script is available before stowing; it delegates to the actual eden binary
+
+set -euo pipefail
+
+# Determine Eden root directory (where this script lives)
+EDEN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EDEN_BIN="$EDEN_ROOT/packages/common/.local/bin/eden"
+
+# If the real eden binary exists, delegate to it
+if [ -f "$EDEN_BIN" ]; then
+    exec "$EDEN_BIN" "$@"
+else
+    echo "Error: Eden binary not found at $EDEN_BIN" >&2
+    exit 1
+fi
+

@@ -1,0 +1,22 @@
+# bash profile - Environment variables for bash
+# This file is sourced for login shells
+
+# XDG Base Directory specification
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+
+# PATH configuration
+# Add user binaries to PATH if not already present
+
+# Add ~/.local/bin (where stowed binaries go)
+if [[ -d "$HOME/.local/bin" ]] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
+# Add ~/.eden/bin (where eden-* helper scripts go)
+if [[ -d "$HOME/.eden/bin" ]] && [[ ":$PATH:" != *":$HOME/.eden/bin:"* ]]; then
+    export PATH="$HOME/.eden/bin:$PATH"
+fi
+
