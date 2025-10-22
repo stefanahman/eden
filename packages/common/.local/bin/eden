@@ -6,7 +6,16 @@ set -euo pipefail
 
 # Determine Eden root directory
 # This script lives in packages/common/.local/bin/, so go up 4 levels
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve symlinks first to find the actual script location
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+# Follow symlinks to get the real path
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    # If the symlink is relative, make it absolute
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 EDEN_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
 # Color codes for output
@@ -36,48 +45,46 @@ print_info() {
 
 # Show help
 show_help() {
-    cat << EOF
-$(print_header "Eden - Personal Environment Manager")
-
-${BOLD}Usage:${RESET}
-  eden <command> [options]
-
-${BOLD}Core Commands:${RESET}
-  install [--packages]  Bootstrap Eden on a fresh system
-                        Use --packages to install packages from Brewfile/pacman.txt
-  update                Update Eden from git and re-apply symlinks
-  stow [--adopt]        Apply Eden symlinks (common + platform packages)
-                        Use --adopt to pull existing files into Eden
-  unstow                Remove Eden symlinks (same as clean)
-  graft                 Discover and integrate branch configs
-  doctor                Validate Eden installation health
-  status                Show Eden system overview and health
-
-${BOLD}Package Management:${RESET}
-  packages              Install packages from Brewfile (macOS) or pacman.txt (Arch)
-  list-packages         Show available packages for current platform
-
-${BOLD}Platform Commands:${RESET}
-  deploy-arch           Deploy common + arch packages only
-  deploy-mac            Deploy common + mac packages only
-
-${BOLD}Utility Commands:${RESET}
-  version               Show Eden version and location
-  help                  Show this help message
-
-${BOLD}Examples:${RESET}
-  eden install          # Bootstrap Eden (first-time setup)
-  eden update           # Update to latest Eden changes
-  eden stow --adopt     # Pull existing configs into Eden (useful after upstream updates)
-  eden graft            # Integrate branch configurations
-  eden doctor           # Check system health
-  eden packages         # Install platform packages
-
-${BOLD}Environment:${RESET}
-  Eden Root: $EDEN_ROOT
-
-For more information, see the README at $EDEN_ROOT/README.md
-EOF
+    print_header "Eden - Personal Environment Manager"
+    echo ""
+    echo -e "${BOLD}Usage:${RESET}"
+    echo "  eden <command> [options]"
+    echo ""
+    echo -e "${BOLD}Core Commands:${RESET}"
+    echo "  install [--packages]  Bootstrap Eden on a fresh system"
+    echo "                        Use --packages to install packages from Brewfile/pacman.txt"
+    echo "  update                Update Eden from git and re-apply symlinks"
+    echo "  stow [--adopt]        Apply Eden symlinks (common + platform packages)"
+    echo "                        Use --adopt to pull existing files into Eden"
+    echo "  unstow                Remove Eden symlinks (same as clean)"
+    echo "  graft                 Discover and integrate branch configs"
+    echo "  doctor                Validate Eden installation health"
+    echo "  status                Show Eden system overview and health"
+    echo ""
+    echo -e "${BOLD}Package Management:${RESET}"
+    echo "  packages              Install packages from Brewfile (macOS) or pacman.txt (Arch)"
+    echo "  list-packages         Show available packages for current platform"
+    echo ""
+    echo -e "${BOLD}Platform Commands:${RESET}"
+    echo "  deploy-arch           Deploy common + arch packages only"
+    echo "  deploy-mac            Deploy common + mac packages only"
+    echo ""
+    echo -e "${BOLD}Utility Commands:${RESET}"
+    echo "  version               Show Eden version and location"
+    echo "  help                  Show this help message"
+    echo ""
+    echo -e "${BOLD}Examples:${RESET}"
+    echo "  eden install          # Bootstrap Eden (first-time setup)"
+    echo "  eden update           # Update to latest Eden changes"
+    echo "  eden stow --adopt     # Pull existing configs into Eden (useful after upstream updates)"
+    echo "  eden graft            # Integrate branch configurations"
+    echo "  eden doctor           # Check system health"
+    echo "  eden packages         # Install platform packages"
+    echo ""
+    echo -e "${BOLD}Environment:${RESET}"
+    echo "  Eden Root: $EDEN_ROOT"
+    echo ""
+    echo "For more information, see the README at $EDEN_ROOT/README.md"
 }
 
 # Show version
