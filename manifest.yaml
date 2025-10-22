@@ -255,22 +255,89 @@ conditional_config:
     Inline conditionals are acceptable for trivial differences.
 
 binaries:
-  location: "packages/common/.local/bin/"
-  purpose: "Executable scripts for personal workflows; improved incrementally over time."
-  note: "For private/context-specific binaries, use Eden branch repos."
+  structure:
+    core_location: "packages/common/.local/bin/ (stows to ~/.local/bin/)"
+    internal_location: "packages/common/.local/libexec/ (not in PATH)"
+    branch_location: "~/.eden/bin/ (managed via graft)"
+  purpose: "Executable scripts for Eden core functionality, internal utilities, and branch workflows."
+  organization:
+    rationale: "Two-tier binary organization provides clear namespace separation"
+    core_binaries:
+      location: "~/.local/bin/"
+      source: "Stowed from packages/common/.local/bin/"
+      naming: "Only 'eden' command"
+      examples:
+        - "eden - Main CLI dispatcher (only user-facing command)"
+      management: "Tracked in git, deployed via stow"
+      rationale: >
+        Only the main eden CLI is exposed in PATH. This keeps the user's PATH
+        clean and provides a unified interface. All functionality is accessed
+        through the eden command with subcommands.
+    internal_utilities:
+      location: "packages/common/.local/libexec/"
+      source: "Called internally by eden CLI, not in PATH"
+      naming: "Simple names (no prefix needed)"
+      examples:
+        - "gcloud-setup - Google Cloud CLI installer"
+        - "mcp-setup - MCP configuration helper"
+        - "node-setup - Node.js environment setup"
+      management: "Tracked in git, stowed but not in PATH"
+      access: "Via eden subcommands: 'eden install gcloud', not 'eden-gcloud-setup'"
+      rationale: >
+        Internal utilities don't pollute user PATH. They're called by the eden
+        CLI as needed. This follows Unix convention (libexec for internal
+        executables) and provides better UX through unified interface.
+    branch_binaries:
+      location: "~/.eden/bin/"
+      source: "Grafted from branch repos' .local/bin/ directories"
+      naming: "No prefix requirement; recommend '{branch}-{script}' for clarity"
+      examples:
+        - "work-deploy - From branch-work"
+        - "work-vpn - From branch-work"
+        - "client-sync - From branch-client"
+      management: "Symlinked automatically via 'eden graft', not for manual use"
+      rationale: >
+        Branch binaries are isolated in ~/.eden/bin/ which is ONLY managed by
+        the graft system. This directory should never be manually edited - it's
+        purely for automated branch integration. Clear separation means:
+        (1) Eden core in ~/.local/bin with eden- prefix
+        (2) Branch scripts in ~/.eden/bin via graft automation
+        (3) Personal scripts in ~/.local/bin (standard XDG location)
+        This keeps ~/.eden/bin as a pure reflection of branch state, makes
+        removal clean (rm -rf ~/.eden), and follows the principle that branches
+        are the source of truth. Scripts are symlinked not copied.
+    path_configuration:
+      required: "Both ~/.local/bin and ~/.eden/bin must be in PATH"
+      setup: "Shell configs (.zshenv, .bash_profile) add both directories"
+      priority: "~/.local/bin before ~/.eden/bin (core before branches)"
+      note: "libexec/ is NOT in PATH - utilities are called by eden CLI"
+  unified_install_interface:
+    concept: "Single 'eden install' command for all package needs"
+    usage:
+      - "eden install           # Install all platform packages (Brewfile/pacman.txt)"
+      - "eden install gcloud    # Install Google Cloud CLI"
+      - "eden install --list    # Show available packages"
+    rationale: >
+      Unified interface is intuitive (like npm install, apt install) and
+      eliminates confusion between bootstrap and package installation.
+      Bootstrap remains './install.sh' (before eden exists), but after that
+      all installation goes through 'eden install'.
   eden_cli:
     name: "eden"
     purpose: "Central command dispatcher for Eden environment management."
     location: "packages/common/.local/bin/eden (stows to ~/.local/bin/eden)"
     commands:
-      - "install [--packages] - Bootstrap Eden on a fresh system"
+      - "install [package] - Install all packages or specific package (e.g., gcloud)"
+      - "install --list - List all available packages"
       - "update - Update Eden from git and re-apply symlinks"
+      - "stow [--adopt] - Apply Eden symlinks; --adopt pulls existing files into Eden"
+      - "unstow - Remove Eden symlinks (alias: clean)"
       - "graft - Discover and integrate branch configs"
       - "doctor - Validate Eden installation health"
       - "status - Show Eden system overview"
-      - "clean - Remove all Eden symlinks"
-      - "packages - Install packages from Brewfile/pacman.txt"
-      - "list-packages - Show available packages"
+      - "check-package <name> - Check if package exists (official, AUR, or brew)"
+      - "list-packages - Show platform packages (Brewfile/pacman.txt)"
+      - "packages - [deprecated] Use 'eden install' instead"
       - "deploy-arch / deploy-mac - Platform-specific deployment"
       - "version - Show Eden version and location"
       - "help - Show usage information"
@@ -279,12 +346,15 @@ binaries:
       across platforms with colored output, error handling, and helpful messages.
   eden_utilities:
     - name: "eden-mcp-setup"
+      location: "~/.local/bin/eden-mcp-setup (user-facing)"
       purpose: "Helper script for configuring GitHub MCP with 1Password integration."
       usage: "Run 'eden-mcp-setup' to securely store GitHub token for MCP servers."
-    - name: "eden-gcloud-setup"
+  internal_utilities:
+    - name: "gcloud-setup"
+      location: "packages/common/.local/libexec/gcloud-setup (internal)"
       purpose: "Install Google Cloud CLI using official Google installer."
-      usage: "Run 'eden-gcloud-setup' to download and install gcloud from Google's official source."
-      rationale: "AUR packages for gcloud are outdated. This provides the official version."
+      usage: "Called via 'eden install gcloud' - not directly in PATH."
+      rationale: "AUR packages for gcloud are outdated. Uses official Google installer."
 
 mcp_integration:
   concept: "Model Context Protocol (MCP) enables AI assistants to interact with external services"

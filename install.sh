@@ -132,10 +132,11 @@ fi
 # Create Eden directory structure (not stowed, user-specific)
 log "Setting up Eden directories..."
 
-# Binaries in ~/.eden/bin (like cargo, volta, fnm)
+# Binaries in ~/.eden/bin (for branch-managed scripts via graft)
+# Note: This directory is ONLY for automated branch integration, not manual use
 EDEN_BIN="$HOME/.eden/bin"
 mkdir -p "$EDEN_BIN"
-verbose "✓ Created $EDEN_BIN/"
+verbose "✓ Created $EDEN_BIN/ (branch automation only)"
 
 # Configs in ~/.config/eden (XDG-compliant)
 EDEN_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/eden"
@@ -146,13 +147,9 @@ verbose "✓ Created $EDEN_CONFIG/local/"
 touch "$EDEN_CONFIG/branches"
 verbose "✓ Created $EDEN_CONFIG/branches"
 
-# Symlink Eden scripts to ~/.eden/bin
-log "Installing Eden scripts..."
-for script in "$EDEN_DIR"/packages/common/.local/bin/eden-*; do
-    script_name=$(basename "$script")
-    ln -sf "$script" "$EDEN_BIN/$script_name"
-    verbose "✓ Linked $script_name"
-done
+# Binary locations:
+#   ~/.local/bin/  - Eden core (eden, eden-*) + personal scripts (standard XDG)
+#   ~/.eden/bin/   - Branch scripts only (automated via 'eden graft')
 
 # Install packages (optional)
 if $INSTALL_PACKAGES; then
@@ -180,7 +177,7 @@ if $INSTALL_PACKAGES; then
             mapfile -t packages < <(grep -v '^#' "$EDEN_DIR/pacman.txt" | grep -v '^$' | tr -d ' ')
             if [ ${#packages[@]} -gt 0 ]; then
                 sudo pacman -S --needed "${packages[@]}" 2>&1 || true
-                warn "Some packages require AUR access. Install yay and re-run with: eden packages"
+                warn "Some packages require AUR access. Install yay and re-run with: eden install"
                 echo "  Install yay: git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si"
             fi
         else
@@ -214,7 +211,7 @@ echo ""
 echo "Next steps:"
 echo "  • Restart your shell or run: source ~/.zshenv"
 echo "  • Run 'eden doctor' to validate installation"
-echo "  • Run 'eden packages' to install packages from Brewfile/pacman.txt"
+echo "  • Run 'eden install' to install packages from Brewfile/pacman.txt"
 echo "  • Create a branch repo for private configs (see README.md)"
 echo "  • Run 'eden graft' after adding branch repos to sync configs"
 echo ""

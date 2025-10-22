@@ -51,8 +51,8 @@ show_help() {
     echo "  eden <command> [options]"
     echo ""
     echo -e "${BOLD}Core Commands:${RESET}"
-    echo "  install [--packages]  Bootstrap Eden on a fresh system"
-    echo "                        Use --packages to install packages from Brewfile/pacman.txt"
+    echo "  install [package]     Install packages (no args = all from Brewfile/pacman.txt)"
+    echo "                        Specific packages: gcloud | Use --list to see all"
     echo "  update                Update Eden from git and re-apply symlinks"
     echo "  stow [--adopt]        Apply Eden symlinks (common + platform packages)"
     echo "                        Use --adopt to pull existing files into Eden"
@@ -62,9 +62,10 @@ show_help() {
     echo "  status                Show Eden system overview and health"
     echo ""
     echo -e "${BOLD}Package Management:${RESET}"
-    echo "  packages              Install packages from Brewfile (macOS) or pacman.txt (Arch)"
-    echo "  list-packages         Show available packages for current platform"
+    echo "  install --list        List all available packages to install"
     echo "  check-package <name>  Check if a package exists (official repo, AUR, or brew)"
+    echo "  list-packages         Show platform packages (Brewfile/pacman.txt)"
+    echo "  packages              [deprecated] Use 'eden install' instead"
     echo ""
     echo -e "${BOLD}Platform Commands:${RESET}"
     echo "  deploy-arch           Deploy common + arch packages only"
@@ -75,12 +76,13 @@ show_help() {
     echo "  help                  Show this help message"
     echo ""
     echo -e "${BOLD}Examples:${RESET}"
-    echo "  eden install          # Bootstrap Eden (first-time setup)"
+    echo "  eden install          # Install all platform packages"
+    echo "  eden install gcloud   # Install Google Cloud CLI"
+    echo "  eden install --list   # See all available packages"
     echo "  eden update           # Update to latest Eden changes"
-    echo "  eden stow --adopt     # Pull existing configs into Eden (useful after upstream updates)"
+    echo "  eden stow --adopt     # Pull existing configs into Eden"
     echo "  eden graft            # Integrate branch configurations"
     echo "  eden doctor           # Check system health"
-    echo "  eden packages         # Install platform packages"
     echo "  eden check-package fnm  # Check where a package is available"
     echo ""
     echo -e "${BOLD}Environment:${RESET}"
@@ -329,7 +331,32 @@ main() {
     
     case "$command" in
         install)
-            run_script "install.sh" "$@"
+            # Unified install interface
+            case "${1:-all}" in
+                all|--all|"")
+                    install_packages
+                    ;;
+                --list)
+                    print_header "Available Packages"
+                    echo ""
+                    echo "Platform packages (from Brewfile/pacman.txt):"
+                    echo "  eden install        # Install all platform packages"
+                    echo ""
+                    echo "Additional tools:"
+                    echo "  gcloud             # Google Cloud CLI (official)"
+                    echo ""
+                    echo "Future additions will appear here as they're implemented."
+                    ;;
+                gcloud)
+                    shift
+                    "$EDEN_ROOT/packages/common/.local/libexec/gcloud-setup" "$@"
+                    ;;
+                *)
+                    print_error "Unknown package: $1"
+                    echo "Run 'eden install --list' to see available packages"
+                    exit 1
+                    ;;
+            esac
             ;;
         update)
             run_script "update.sh" "$@"
@@ -401,6 +428,7 @@ main() {
             fi
             ;;
         packages)
+            print_warning "'eden packages' is deprecated, use 'eden install' instead"
             install_packages
             ;;
         list-packages)

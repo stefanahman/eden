@@ -56,7 +56,7 @@ pnpm
 # === Install via Eden Utilities ===
 
 # Cloud tools
-# google-cloud-cli - Install via: eden-gcloud-setup (uses official Google installer)
+# google-cloud-cli - Install via: eden install gcloud (uses official Google installer)
 #   AUR packages are outdated or community-maintained alternatives
 #   This utility installs the official version from Google
 

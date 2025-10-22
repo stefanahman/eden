@@ -137,6 +137,97 @@ graft_mcp() {
 }
 
 # =============================================================================
+# GRAFTER: Binaries
+# =============================================================================
+graft_binaries() {
+    local eden_bin="$HOME/.eden/bin"
+    local added=0
+    local skipped=0
+    local conflicts=()
+    
+    log "Grafting branch binaries..."
+    
+    # Ensure ~/.eden/bin exists
+    mkdir -p "$eden_bin"
+    
+    # Track which branch owns which script (for conflict detection)
+    declare -A script_owners
+    
+    # Read each branch repo path
+    while IFS= read -r branch_path || [ -n "$branch_path" ]; then
+        # Skip empty lines and comments
+        [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
+        
+        # Expand tilde
+        branch_path="${branch_path/#\~/$HOME}"
+        
+        if [ ! -d "$branch_path" ]; then
+            continue
+        fi
+        
+        # Get branch name from path
+        local branch_name=$(basename "$branch_path")
+        
+        # Look for .local/bin directory in the branch
+        local bin_dir="$branch_path/.local/bin"
+        if [ -d "$bin_dir" ]; then
+            for script in "$bin_dir"/*; do
+                [ -e "$script" ] || continue
+                [ -f "$script" ] || continue  # Skip directories
+                
+                local script_name=$(basename "$script")
+                local target="$eden_bin/$script_name"
+                
+                # Check if script already exists and points elsewhere
+                if [ -L "$target" ]; then
+                    local current_target=$(readlink "$target")
+                    if [ "$current_target" != "$script" ]; then
+                        local existing_owner="${script_owners[$script_name]:-unknown}"
+                        conflicts+=("$script_name: $existing_owner vs $branch_name")
+                        continue
+                    fi
+                    echo "  ✓ $script_name ($branch_name) [already linked]"
+                    skipped=$((skipped + 1))
+                    script_owners["$script_name"]="$branch_name"
+                    continue
+                elif [ -e "$target" ]; then
+                    conflicts+=("$script_name: file exists (not a symlink)")
+                    continue
+                fi
+                
+                # Create symlink
+                ln -sf "$script" "$target"
+                echo "  + $script_name ($branch_name)"
+                added=$((added + 1))
+                script_owners["$script_name"]="$branch_name"
+            done
+        fi
+    done < "$BRANCHES_FILE"
+    
+    # Report results
+    if [ $added -gt 0 ]; then
+        echo "  → Grafted $added new binary(ies)"
+    fi
+    [ $skipped -gt 0 ] && echo "  → Skipped $skipped already grafted"
+    
+    # Report conflicts
+    if [ ${#conflicts[@]} -gt 0 ]; then
+        echo ""
+        warn "Conflicts detected:"
+        for conflict in "${conflicts[@]}"; do
+            echo "    • $conflict"
+        done
+        echo "  Rename scripts or remove from one branch to resolve."
+    fi
+    
+    if [ $added -eq 0 ] && [ $skipped -eq 0 ] && [ ${#conflicts[@]} -eq 0 ]; then
+        echo "  → No binaries found in branches"
+    fi
+    
+    return 0
+}
+
+# =============================================================================
 # FUTURE GRAFTERS
 # =============================================================================
 # graft_zshrc() {
@@ -161,6 +252,8 @@ main() {
     graft_gitconfig
     echo ""
     graft_mcp
+    echo ""
+    graft_binaries
     
     # Future grafters:
     # graft_zshrc
