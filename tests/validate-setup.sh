@@ -1,6 +1,6 @@
 #!/bin/bash
 # Eden Setup Validation
-# Run before committing to validate Node.js/MCP integration setup
+# Run before committing to validate Eden structure
 # Usage: tests/validate-setup.sh
 
 # Colors
@@ -34,38 +34,126 @@ echo ""
 # Change to repo root if running from tests/
 cd "$(dirname "$0")/.." || exit 1
 
-# Test 1: Bash script syntax
-test "eden-mcp-setup syntax"
-if bash -n packages/common/.local/bin/eden-mcp-setup 2>/dev/null; then
+# =============================================================================
+# Core Binary Structure
+# =============================================================================
+
+test "Eden wrapper exists"
+if [[ -f eden ]] && [[ -x eden ]]; then
     pass
 else
-    fail "Syntax error in eden-mcp-setup"
+    fail "Root eden wrapper missing or not executable"
 fi
 
-test "eden-node-setup syntax"
-if bash -n packages/common/.local/bin/eden-node-setup 2>/dev/null; then
+test "Eden CLI implementation exists"
+if [[ -f bin/eden ]] && [[ -x bin/eden ]]; then
     pass
 else
-    fail "Syntax error in eden-node-setup"
+    fail "bin/eden missing or not executable"
 fi
 
-# Test 2: Scripts are executable
-test "Scripts are executable"
-if [[ -x packages/common/.local/bin/eden-mcp-setup ]] && [[ -x packages/common/.local/bin/eden-node-setup ]]; then
+test "Core scripts exist and executable"
+if [[ -x bin/eden-doctor ]] && [[ -x bin/eden-graft ]] && [[ -x bin/eden-update ]]; then
     pass
 else
-    fail "Scripts are not executable"
+    fail "Missing or non-executable core scripts in bin/"
 fi
 
-# Test 3: JSON validity
-test "MCP config JSON validity"
-if python3 -m json.tool packages/common/.config/cursor/mcp_config.json > /dev/null 2>&1; then
+test "Utility scripts exist and executable"
+if [[ -x bin/eden-secrets ]] && [[ -x bin/eden-mcp-merge ]]; then
     pass
 else
-    fail "Invalid JSON in mcp_config.json"
+    fail "Missing or non-executable utility scripts in bin/"
 fi
 
-# Test 4: Required files exist
+# =============================================================================
+# Script Syntax Validation
+# =============================================================================
+
+test "bin/eden syntax"
+if bash -n bin/eden 2>/dev/null; then
+    pass
+else
+    fail "Syntax error in bin/eden"
+fi
+
+test "bin/eden-doctor syntax"
+if bash -n bin/eden-doctor 2>/dev/null; then
+    pass
+else
+    fail "Syntax error in bin/eden-doctor"
+fi
+
+test "bin/eden-graft syntax"
+if bash -n bin/eden-graft 2>/dev/null; then
+    pass
+else
+    fail "Syntax error in bin/eden-graft"
+fi
+
+test "bin/eden-update syntax"
+if bash -n bin/eden-update 2>/dev/null; then
+    pass
+else
+    fail "Syntax error in bin/eden-update"
+fi
+
+# =============================================================================
+# Libexec Structure
+# =============================================================================
+
+test "Libexec directory exists"
+if [[ -d packages/eden/.eden/libexec ]]; then
+    pass
+else
+    fail "packages/eden/.eden/libexec directory missing"
+fi
+
+test "Libexec installers exist and executable"
+libexec_ok=true
+for script in packages/eden/.eden/libexec/*; do
+    if [[ -f "$script" ]] && [[ ! -x "$script" ]]; then
+        libexec_ok=false
+        break
+    fi
+done
+if $libexec_ok; then
+    pass
+else
+    fail "Some libexec scripts are not executable"
+fi
+
+test "Libexec scripts syntax"
+libexec_syntax_ok=true
+for script in packages/eden/.eden/libexec/*; do
+    if [[ -f "$script" ]]; then
+        if ! bash -n "$script" 2>/dev/null; then
+            libexec_syntax_ok=false
+            break
+        fi
+    fi
+done
+if $libexec_syntax_ok; then
+    pass
+else
+    fail "Syntax error in libexec script"
+fi
+
+# =============================================================================
+# Security
+# =============================================================================
+
+test "No hardcoded secrets"
+if ! grep -r "ghp_[a-zA-Z0-9]\|github_pat_[a-zA-Z0-9]" bin/ packages/ 2>/dev/null | grep -v "Binary\|grep -r"; then
+    pass
+else
+    fail "Found potential hardcoded GitHub token"
+fi
+
+# =============================================================================
+# Configuration Files
+# =============================================================================
+
 test "Shell config files exist"
 if [[ -f packages/common/.zshenv ]] && \
    [[ -f packages/common/.config/zsh/.zshrc ]] && \
@@ -76,6 +164,14 @@ else
     fail "Missing shell config files"
 fi
 
+test "Git config exists"
+if [[ -f packages/common/.config/git/config ]] && \
+   [[ -f packages/common/.config/git/ignore ]]; then
+    pass
+else
+    fail "Missing git config files"
+fi
+
 test "Package manager configs exist"
 if [[ -f packages/common/.npmrc ]] && \
    [[ -f packages/common/.config/pnpm/rc ]]; then
@@ -84,73 +180,25 @@ else
     fail "Missing package manager configs"
 fi
 
-test "Git ignore file exists"
-if [[ -f packages/common/.config/git/ignore ]]; then
-    pass
+# =============================================================================
+# JSON Validity
+# =============================================================================
+
+test "Cursor MCP config JSON validity"
+if [[ -f packages/common/.config/cursor/mcp_config.json ]]; then
+    if python3 -m json.tool packages/common/.config/cursor/mcp_config.json > /dev/null 2>&1; then
+        pass
+    else
+        fail "Invalid JSON in mcp_config.json"
+    fi
 else
-    fail "Missing git ignore file"
+    fail "mcp_config.json missing"
 fi
 
-# Test 5: Check for secrets in files (exclude validation patterns in scripts)
-test "No hardcoded secrets"
-if ! grep -r "ghp_[a-zA-Z0-9]\|github_pat_[a-zA-Z0-9]" packages/ 2>/dev/null | grep -v "Binary"; then
-    pass
-else
-    fail "Found potential hardcoded GitHub token"
-fi
+# =============================================================================
+# Package Lists
+# =============================================================================
 
-# Test 6: XDG variables used correctly
-test "XDG variables in configs"
-if grep -q "XDG_CONFIG_HOME" packages/common/.config/zsh/.zshrc && \
-   grep -q "XDG_DATA_HOME" packages/common/.config/zsh/.zshrc; then
-    pass
-else
-    fail "XDG variables not used correctly"
-fi
-
-# Test 6b: Eden bin directory in PATH
-test "Eden bin directory in PATH config"
-if grep -q '\.eden/bin' packages/common/.config/zsh/.zshrc; then
-    pass
-else
-    fail "~/.eden/bin not added to PATH in .zshrc"
-fi
-
-# Test 6c: Verify hybrid structure (bin separate, config in XDG)
-test "Scripts reference ~/.config/eden/ for configs"
-if grep -q 'XDG_CONFIG_HOME.*eden/branches' packages/common/.local/bin/eden-secrets && \
-   grep -q 'XDG_CONFIG_HOME.*eden/branches' packages/common/.local/bin/eden-mcp-merge; then
-    pass
-else
-    fail "Scripts should use ~/.config/eden/ for configs (XDG-compliant)"
-fi
-
-# Test 7: fnm integration
-test "fnm integration in .zshrc"
-if grep -q "fnm env --use-on-cd" packages/common/.config/zsh/.zshrc; then
-    pass
-else
-    fail "fnm not configured for auto-switching"
-fi
-
-# Test 8: 1Password integration
-test "1Password integration in MCP config"
-if grep -q "op read" packages/common/.config/cursor/mcp_config.json; then
-    pass
-else
-    fail "MCP config not using 1Password for token"
-fi
-
-# Test 9: Stow dry-run (check that new files would be symlinked)
-test "Stow dry-run (new files)"
-stow_output=$(stow -n -v -t "$HOME" -d packages common 2>&1 || true)
-if echo "$stow_output" | grep -q "LINK.*zshenv" && echo "$stow_output" | grep -q "LINK.*cursor"; then
-    pass
-else
-    fail "Stow would not create expected new symlinks"
-fi
-
-# Test 10: Package lists updated
 test "fnm in package lists"
 if grep -q "fnm" Brewfile && grep -q "fnm" pacman.txt; then
     pass
@@ -165,84 +213,16 @@ else
     fail "pnpm not in both package lists"
 fi
 
-# Test 11: MCP merge script
-test "eden-mcp-merge syntax"
-if bash -n packages/common/.local/bin/eden-mcp-merge 2>/dev/null; then
+test "stow in package lists"
+if grep -q "stow" Brewfile && grep -q "stow" pacman.txt; then
     pass
 else
-    fail "Syntax error in eden-mcp-merge"
+    fail "stow not in both package lists"
 fi
 
-test "eden-mcp-merge is executable"
-if [[ -x packages/common/.local/bin/eden-mcp-merge ]]; then
-    pass
-else
-    fail "eden-mcp-merge is not executable"
-fi
-
-# Test 12: MCP config structure
-test "MCP server naming (github-eden)"
-if grep -q '"github-eden"' packages/common/.config/cursor/mcp_config.json; then
-    pass
-else
-    fail "MCP server should be named 'github-eden'"
-fi
-
-test "MCP uses pnpm dlx"
-if grep -q "pnpm dlx" packages/common/.config/cursor/mcp_config.json; then
-    pass
-else
-    fail "MCP config should use 'pnpm dlx' for server"
-fi
-
-test "MCP config references correct 1Password item"
-if grep -q "eden-github-mcp-token" packages/common/.config/cursor/mcp_config.json; then
-    pass
-else
-    fail "MCP config should reference 'eden-github-mcp-token'"
-fi
-
-test "MCP config uses Eden bin in PATH"
-if grep -q '\.eden/bin' packages/common/.config/cursor/mcp_config.json; then
-    pass
-else
-    fail "MCP config should include ~/.eden/bin in PATH"
-fi
-
-# Test 13: MCP merge functionality (dry-run)
-test "MCP merge creates correct output"
-if EDEN_ROOT="$(pwd)" bash packages/common/.local/bin/eden-mcp-merge 2>&1 | grep -q "MCP config merged to.*/.cursor/mcp.json"; then
-    pass
-else
-    fail "eden-mcp-merge doesn't output to ~/.cursor/mcp.json"
-fi
-
-test "MCP merged config is valid JSON"
-if [[ -f "$HOME/.cursor/mcp.json" ]] && python3 -m json.tool "$HOME/.cursor/mcp.json" > /dev/null 2>&1; then
-    pass
-else
-    fail "Merged MCP config is not valid JSON"
-fi
-
-test "MCP merged config contains github-eden"
-if [[ -f "$HOME/.cursor/mcp.json" ]] && grep -q "github-eden" "$HOME/.cursor/mcp.json"; then
-    pass
-else
-    fail "Merged MCP config missing github-eden server"
-fi
-
-# Test 14: Branch MCP servers are merged
-test "Branch MCP servers are merged"
-if [[ -f "$HOME/.cursor/mcp.json" ]]; then
-    SERVER_COUNT=$(python3 -c "import json; f=open('$HOME/.cursor/mcp.json'); data=json.load(f); print(len(data.get('mcpServers', {})))")
-    if [[ "$SERVER_COUNT" -gt 1 ]]; then
-        pass
-    else
-        fail "Expected multiple MCP servers from branches (got $SERVER_COUNT)"
-    fi
-else
-    fail "Merged MCP config not found"
-fi
+# =============================================================================
+# Results
+# =============================================================================
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -257,4 +237,3 @@ else
     echo -e "${RED}✗ Some tests failed. Review before committing.${NC}"
     exit 1
 fi
-

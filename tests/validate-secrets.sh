@@ -41,16 +41,16 @@ fi
 echo -e "${BLUE}ℹ${NC} Running secrets validation..."
 echo ""
 
-if packages/common/.local/bin/eden-secrets validate; then
+if bin/eden-secrets validate; then
     echo -e "${GREEN}✓${NC} All secrets configured"
     exit 0
 else
     echo ""
     echo -e "${YELLOW}⚠${NC} Some secrets are not configured (this is optional)"
     echo ""
-    echo "To set up secrets:"
-    echo "  eden-mcp-setup    # For GitHub MCP integration"
-    echo ""
+echo "To set up secrets:"
+echo "  eden install mcp    # For GitHub MCP integration"
+echo ""
     exit 0  # Don't fail - secrets are optional for development
 fi
 
