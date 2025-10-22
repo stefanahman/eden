@@ -53,8 +53,12 @@ fnm-bin
 # Node.js package manager (also in community, but AUR has latest)
 pnpm
 
+# === Install via Eden Utilities ===
+
 # Cloud tools
-google-cloud-cli
+# google-cloud-cli - Install via: eden-gcloud-setup (uses official Google installer)
+#   AUR packages are outdated or community-maintained alternatives
+#   This utility installs the official version from Google
 
 # To be added: more tools as Eden grows
 

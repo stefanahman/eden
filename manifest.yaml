@@ -281,6 +281,10 @@ binaries:
     - name: "eden-mcp-setup"
       purpose: "Helper script for configuring GitHub MCP with 1Password integration."
       usage: "Run 'eden-mcp-setup' to securely store GitHub token for MCP servers."
+    - name: "eden-gcloud-setup"
+      purpose: "Install Google Cloud CLI using official Google installer."
+      usage: "Run 'eden-gcloud-setup' to download and install gcloud from Google's official source."
+      rationale: "AUR packages for gcloud are outdated. This provides the official version."
 
 mcp_integration:
   concept: "Model Context Protocol (MCP) enables AI assistants to interact with external services"
