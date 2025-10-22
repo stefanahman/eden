@@ -1,0 +1,97 @@
+#!/bin/bash
+# graft-mcp - Merge MCP servers from trunk and branches
+# Part of Eden's pluggable grafter system
+set -e
+
+# Check if jq is installed
+if ! command -v jq >/dev/null 2>&1; then
+    echo "  ⚠ jq required for MCP graft (skipping)"
+    exit 0
+fi
+
+# Find Eden root
+if [[ -z "$EDEN_ROOT" ]]; then
+    SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+    EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
+fi
+
+CANONICAL_CONFIG="$HOME/.config/mcp/servers.json"
+TRUNK_CONFIG="$EDEN_ROOT/packages/common/.config/mcp/servers.json"
+
+# Check if trunk config exists
+if [[ ! -f "$TRUNK_CONFIG" ]]; then
+    echo "  → No trunk MCP config (skipping)"
+    exit 0
+fi
+
+echo "  → Merging MCP servers from trunk"
+
+# Initialize with trunk config
+MERGED_JSON=$(cat "$TRUNK_CONFIG")
+
+# Merge branch configs if branches file exists
+BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+if [[ -f "$BRANCHES_FILE" ]]; then
+    while IFS= read -r branch_path; do
+        [[ -z "$branch_path" ]] && continue
+        [[ "$branch_path" =~ ^[[:space:]]*# ]] && continue
+        
+        # Expand tilde
+        branch_path="${branch_path/#\~/$HOME}"
+        
+        branch_name=$(basename "$branch_path")
+        
+        # Canonical path (mirrors HOME directory)
+        branch_config="$branch_path/.config/mcp/servers.json"
+        
+        # Legacy fallbacks for backwards compatibility
+        if [[ ! -f "$branch_config" ]]; then
+            branch_config="$branch_path/.cursor/mcp.json"
+        fi
+        if [[ ! -f "$branch_config" ]]; then
+            branch_config="$branch_path/packages/common/.config/cursor/mcp_config.branch.json"
+        fi
+        
+        if [[ -f "$branch_config" ]]; then
+            echo "  → Merging MCP servers from: $branch_name"
+            
+            # Merge mcpServers from branch into merged config
+            MERGED_JSON=$(echo "$MERGED_JSON" | jq --slurpfile branch "$branch_config" \
+                '.mcpServers += $branch[0].mcpServers')
+        fi
+    done < "$BRANCHES_FILE"
+fi
+
+# Ensure canonical directory exists
+mkdir -p "$(dirname "$CANONICAL_CONFIG")"
+
+# Write merged config to canonical location
+echo "$MERGED_JSON" | jq '.' > "$CANONICAL_CONFIG"
+
+# Create symlinks for MCP clients
+# Cursor
+CURSOR_CONFIG="$HOME/.cursor/mcp.json"
+if [[ -L "$CURSOR_CONFIG" ]] || [[ ! -f "$CURSOR_CONFIG" ]]; then
+    mkdir -p "$(dirname "$CURSOR_CONFIG")"
+    ln -sf "$CANONICAL_CONFIG" "$CURSOR_CONFIG" 2>/dev/null || true
+elif [[ -f "$CURSOR_CONFIG" ]]; then
+    echo "  ⚠ Cursor config exists (not a symlink, skipping symlink)"
+fi
+
+# Claude Desktop (macOS)
+if [[ "$(uname)" == "Darwin" ]]; then
+    CLAUDE_CONFIG="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+    CLAUDE_DIR="$(dirname "$CLAUDE_CONFIG")"
+    if [[ -d "$CLAUDE_DIR" ]]; then
+        if [[ -L "$CLAUDE_CONFIG" ]] || [[ ! -f "$CLAUDE_CONFIG" ]]; then
+            ln -sf "$CANONICAL_CONFIG" "$CLAUDE_CONFIG" 2>/dev/null || true
+        fi
+    fi
+fi
+
+# Show summary
+SERVER_COUNT=$(echo "$MERGED_JSON" | jq '.mcpServers | length')
+echo "  → Configured $SERVER_COUNT MCP server(s)"
+
+exit 0
+
