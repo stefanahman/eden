@@ -119,14 +119,13 @@ repo_layout:
     - README.md        # conceptual; no tech instructions beyond purpose/intent
     - LICENSE          # MIT text
     - .gitignore       # ignore local overrides, state, secrets
-    - install.sh       # OS detector + symlink deployment + PATH hygiene
-    - update.sh        # git pull + re-apply symlinks
-    - doctor.sh        # validation and health check
-    - graft.sh         # discover and integrate branch configs
+    - install.sh       # bootstrap installer (no dependencies)
+    - eden             # root wrapper that calls bin/eden
+    - bin/             # eden core scripts (eden, eden-doctor, eden-graft, eden-update, etc.)
     - Brewfile         # macOS package list
     - pacman.txt       # Arch Linux package list
     - .stow-global-ignore
-    - Makefile         # convenience targets
+    - test.sh          # test runner
   package_lists:
     brewfile:
       purpose: "Package declarations for macOS via Homebrew."
@@ -452,20 +451,22 @@ bootstrap_behavior:
     verbose_mode: "Support --verbose or -v flag for detailed stow output and diagnostics."
 
 update_behavior:
-  updater: "./update.sh"
+  command: "eden update"
+  implementation: "bin/eden-update"
   purpose: "Update Eden from git and re-apply symlinks."
   pre_update_checks:
     - "Check for local uncommitted changes in Eden repository."
     - "If local changes exist, fail fast with message: 'Commit or stash local changes first.'"
   update_sequence:
     - "Run git pull to fetch latest changes."
-    - "Re-stow common and OS-specific packages (same as install)."
-    - "Print success message and suggest running 'make graft' to update branch integrations."
+    - "Re-plant common and OS-specific packages (same as initial plant)."
+    - "Print success message and suggest running 'eden graft' to update branch integrations."
   strategy: "Overwrite all Eden-managed symlinks; preserve local override files in ~/.config/eden/local/."
-  idempotency: "Safe to run multiple times; re-stowing is a no-op if already up to date."
+  idempotency: "Safe to run multiple times; re-planting is a no-op if already up to date."
 
 doctor_behavior:
-  validator: "./doctor.sh"
+  command: "eden doctor"
+  implementation: "bin/eden-doctor"
   purpose: "Basic health check of Eden installation; expand checks over time."
   initial_checks:
     - "Verify dependencies (git, stow) are installed and meet version requirements."
@@ -500,7 +501,7 @@ version_management:
     - "If update breaks system: git log --oneline to review recent changes"
     - "Find last stable commit or tag: git tag -l"
     - "Rollback: git checkout <tag-or-hash>"
-    - "Re-apply: make update to deploy rolled-back state"
+    - "Re-apply: eden update to deploy rolled-back state"
   rationale: >
     Git provides natural versioning and time-travel. Tagging stable states
     enables confident experimentation with easy recovery paths.
@@ -511,56 +512,32 @@ stow_ignore:
   should_ignore:
     - "README.md and other documentation"
     - "LICENSE"
-    - "Makefile and shell scripts (install.sh, update.sh, doctor.sh)"
+    - "Bootstrap script (install.sh)"
+    - "Eden wrapper (eden - copied to ~/.local/bin/)"
+    - "Core scripts (bin/ directory)"
     - "Package manager files (Brewfile, pacman.txt)"
     - "Git repository metadata (.git, .gitignore)"
     - "Eden manifest (manifest.yaml)"
+    - "Test files (test.sh, tests/)"
 
-makefile_targets:
-  relationship: "Makefile provides convenience targets that invoke shell scripts."
-  purpose: "Simple, memorable commands (make install) that delegate to POSIX shell scripts."
-  targets:
-    - id: install
-      accomplishment: "Bootstrap Eden on a fresh system."
-      implementation: "Invokes ./install.sh"
-    - id: update
-      accomplishment: "Update Eden from git and re-apply symlinks."
-      implementation: "Invokes ./update.sh"
-    - id: doctor
-      accomplishment: "Validate Eden installation health."
-      implementation: "Invokes ./doctor.sh"
-    - id: status
-      accomplishment: "Show Eden system overview and health at a glance."
-      implementation: "Script that prints formatted report"
-      output_example: |
-        Eden Status
-        ===========
-        Platform:       macOS (Darwin)
-        Active packages: common, mac
-        Repository:     ✓ Clean (no uncommitted changes)
-        Last update:    2025-01-15 14:23
-        Symlinks:       ✓ 47 active, 0 broken
-        Dependencies:   ✓ git 2.43.0, stow 2.3.1
-        Local config:   ~/.config/eden/local/ exists (XDG)
-        Eden CLI:       ~/.local/bin/eden (available)
-        Eden utilities: ~/.eden/bin/ (eden-* helper scripts)
-        Secrets:        ✓ 1Password CLI authenticated
-    - id: clean
-      accomplishment: "Remove all Eden symlinks from $HOME."
-      implementation: "Runs stow -D for common and OS-specific packages"
-    - id: arch
-      accomplishment: "Deploy common + arch packages only."
-      implementation: "Runs stow for common and arch"
-    - id: mac
-      accomplishment: "Deploy common + mac packages only."
-      implementation: "Runs stow for common and mac"
-    - id: graft
-      accomplishment: "Discover and integrate branch configs into local overrides."
-      implementation: "Invokes ./graft.sh"
-      details: "Scans registered branch repos for context-specific configs (git, zsh, etc.) and grafts them into local config files using include directives"
+eden_cli_interface:
+  concept: "Unified eden command provides all functionality"
+  bootstrap: "./install.sh - Installs eden wrapper (only requires git)"
+  primary_commands:
+    - "eden install - Install platform packages"
+    - "eden plant - Plant configs (wraps GNU Stow with checks)"
+    - "eden unplant - Remove configs temporarily"
+    - "eden update - Update Eden and re-apply configs"
+    - "eden graft - Integrate branch configurations"
+    - "eden doctor - Validate installation health"
+    - "eden status - Show system overview"
+  implementation:
+    wrapper: "eden (root) copies to ~/.local/bin/eden"
+    core: "bin/eden - main dispatcher"
+    utilities: "bin/eden-* - individual command implementations"
   rationale: >
-    Scripts contain the logic; Makefile is a thin convenience layer.
-    Users can run scripts directly or use make targets.
+    Single unified CLI interface. No Makefile needed - eden commands handle
+    everything with better error checking, platform detection, and user guidance.
 
 documentation:
   readme:
@@ -590,25 +567,24 @@ compliance_rules:
 acceptance_criteria:
   - "Repository structure matches repo_layout specification."
   - ".gitignore exists and excludes local overrides, secret patterns, and branch configs."
-  - "install.sh, update.sh, and doctor.sh exist and are executable."
-  - "install.sh performs pre-flight checks and fails fast on missing dependencies."
-  - "install.sh lets stow handle conflict detection with helpful error messages."
+  - "install.sh bootstraps eden wrapper (only requires git)."
+  - "install.sh is idempotent and safe to run multiple times."
+  - "eden CLI (bin/eden) provides unified interface for all operations."
+  - "eden plant checks for stow availability and provides helpful guidance."
+  - "eden update (bin/eden-update) checks for local changes before git pull."
+  - "eden doctor (bin/eden-doctor) performs health checks with clear output."
+  - "eden graft (bin/eden-graft) discovers and integrates branch configs."
   - ".stow-global-ignore prevents non-config files from being symlinked."
   - "README.md matches tone and content constraints."
   - "LICENSE file is present with MIT text and year."
   - "Brewfile and pacman.txt contain core package lists for Eden functionality."
   - "No file contains secrets or matches forbidden patterns."
-  - "Stow operations produce symlinks from Eden packages to $HOME."
-  - "Running install.sh twice is safe and idempotent."
-  - "install.sh supports --packages flag for optional package installation."
-  - "update.sh checks for local changes before git pull."
-  - "doctor.sh performs basic health checks with clear output."
+  - "Plant operations produce symlinks from Eden packages to $HOME."
   - "${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/ directory is created."
   - "${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches file is created by install.sh."
-  - "graft.sh discovers and integrates branch configs into local gitconfig."
   - "Branch concept is documented in manifest and README."
   - "All path references respect XDG_CONFIG_HOME with fallback to .config."
-  - "Makefile targets invoke shell scripts as documented."
+  - "Eden wrapper at ~/.local/bin/eden always available after install.sh."
 
 non_goals:
   - "Providing concrete configuration file contents (Hyprland, yabai, skhd, etc.)."
