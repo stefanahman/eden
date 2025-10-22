@@ -19,6 +19,9 @@ bat
 fnm
 pnpm
 
+# Cloud tools
+google-cloud-cli
+
 # Editor
 neovim
 

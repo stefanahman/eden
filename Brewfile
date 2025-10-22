@@ -18,6 +18,9 @@ brew "bat"         # Better cat with syntax highlighting
 brew "fnm"         # Fast Node Manager - multi-version Node.js support
 brew "pnpm"        # Fast, efficient package manager
 
+# Cloud tools
+brew "google-cloud-sdk"  # Google Cloud CLI (gcloud)
+
 # Editor
 brew "neovim"
 
