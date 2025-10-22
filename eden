@@ -1,18 +1,31 @@
 #!/usr/bin/env bash
-# Eden CLI - Root-level wrapper for immediate availability
-# This script is available before stowing; it delegates to the actual eden binary
+# Eden CLI - Smart wrapper for persistent availability
+# This wrapper is installed to ~/.local/bin/eden and works before/after stow/unstow
+# It always calls the latest version from the Eden repository
 
 set -euo pipefail
 
-# Determine Eden root directory (where this script lives)
-EDEN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-EDEN_BIN="$EDEN_ROOT/packages/common/.local/bin/eden"
+# Find the Eden repository
+# This wrapper should know where Eden lives
+EDEN_REPO="${EDEN_REPO:-$HOME/Development/eden}"
 
-# If the real eden binary exists, delegate to it
+# Try common locations if default doesn't work
+if [ ! -d "$EDEN_REPO" ]; then
+    # Check if this script itself is in the repo (when called as ./eden)
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "$SCRIPT_DIR/bin/eden" ]; then
+        EDEN_REPO="$SCRIPT_DIR"
+    fi
+fi
+
+EDEN_BIN="$EDEN_REPO/bin/eden"
+
+# If the real eden binary exists in repo, delegate to it
 if [ -f "$EDEN_BIN" ]; then
     exec "$EDEN_BIN" "$@"
 else
     echo "Error: Eden binary not found at $EDEN_BIN" >&2
+    echo "Set EDEN_REPO environment variable to your Eden repository location" >&2
+    echo "Example: export EDEN_REPO=~/Development/eden" >&2
     exit 1
 fi
-

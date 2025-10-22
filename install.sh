@@ -102,6 +102,13 @@ verbose "Eden directory: $EDEN_DIR"
 
 cd "$EDEN_DIR" || error "Failed to cd to Eden directory"
 
+# Install eden wrapper permanently to ~/.local/bin/
+log "Installing eden CLI wrapper..."
+mkdir -p "$HOME/.local/bin"
+cp -f "$EDEN_DIR/eden" "$HOME/.local/bin/eden"
+chmod +x "$HOME/.local/bin/eden"
+verbose "✓ eden wrapper installed to ~/.local/bin/eden"
+
 # Stow packages
 log "Deploying Eden packages..."
 
@@ -119,6 +126,14 @@ else
     2. Use stow --adopt to keep existing files and adjust Eden
     
   Run with --verbose to see details."
+fi
+
+# Stow eden package (internal utilities)
+verbose "Stowing eden package..."
+if stow $STOW_VERBOSE -t "$HOME" -d packages eden 2>&1; then
+    verbose "✓ eden package deployed"
+else
+    error "Failed to stow eden package"
 fi
 
 # Stow OS-specific package
