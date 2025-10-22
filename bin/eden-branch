@@ -1,0 +1,358 @@
+#!/bin/bash
+# eden-branch - Manage Eden branches
+# Branches are separate git repos for private, context-specific configurations
+set -e
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+log() {
+    echo -e "${GREEN}▸${RESET} $1"
+}
+
+warn() {
+    echo -e "${YELLOW}⚠${RESET} $1"
+}
+
+info() {
+    echo -e "${BLUE}→${RESET} $1"
+}
+
+bold() {
+    echo -e "${BOLD}$1${RESET}"
+}
+
+BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+
+# Show help
+show_help() {
+    bold "Eden Branch Management"
+    echo ""
+    echo "Usage: eden branch <command> [options]"
+    echo ""
+    echo "Commands:"
+    echo "  add <path>       Register an existing branch"
+    echo "  new <path>       Create and register a new branch"
+    echo "  list             List all registered branches"
+    echo "  remove <path>    Unregister a branch"
+    echo "  help             Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  eden branch new ~/branch-work"
+    echo "  eden branch add ~/existing-branch"
+    echo "  eden branch list"
+    echo ""
+    echo "Branches extend Eden with private configurations:"
+    echo "  • Structure mirrors HOME directory (~/) for consistency"
+    echo "  • Can contain .eden-secrets, binaries, configs, MCP servers"
+    echo "  • Use 'eden graft' to integrate branch configs into Eden"
+    echo ""
+    echo "See docs/branches-and-secrets.md for more information"
+}
+
+# Add a branch
+add_branch() {
+    local branch_path="$1"
+    
+    if [ -z "$branch_path" ]; then
+        warn "Usage: eden branch add <path>"
+        exit 1
+    fi
+    
+    # Expand tilde
+    branch_path="${branch_path/#\~/$HOME}"
+    
+    # Convert to absolute path if relative
+    if [[ ! "$branch_path" = /* ]]; then
+        branch_path="$(cd "$(dirname "$branch_path")" 2>/dev/null && pwd)/$(basename "$branch_path")"
+    fi
+    
+    # Check if directory exists
+    if [ ! -d "$branch_path" ]; then
+        warn "Directory does not exist: $branch_path"
+        echo ""
+        echo "Create it first with:"
+        echo "  mkdir -p $branch_path"
+        echo "  cd $branch_path && git init"
+        echo ""
+        echo "Or use: eden branch init $branch_path"
+        exit 1
+    fi
+    
+    # Create branches file if it doesn't exist
+    mkdir -p "$(dirname "$BRANCHES_FILE")"
+    touch "$BRANCHES_FILE"
+    
+    # Check if already registered
+    if grep -qF "$branch_path" "$BRANCHES_FILE" 2>/dev/null; then
+        warn "Branch already registered: $branch_path"
+        exit 0
+    fi
+    
+    # Add to branches file
+    echo "$branch_path" >> "$BRANCHES_FILE"
+    
+    log "Branch registered: $branch_path"
+    echo ""
+    info "Next steps:"
+    echo "  1. Add configs to the branch (see docs/branches-and-secrets.md)"
+    echo "  2. Run 'eden graft' to integrate branch configs"
+}
+
+# List branches
+list_branches() {
+    if [ ! -f "$BRANCHES_FILE" ]; then
+        warn "No branches registered"
+        echo ""
+        echo "Register a branch with: eden branch add <path>"
+        exit 0
+    fi
+    
+    bold "Registered Branches"
+    echo ""
+    
+    local count=0
+    while IFS= read -r branch_path || [ -n "$branch_path" ]; do
+        # Skip empty lines and comments
+        [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
+        
+        # Expand tilde for display
+        local display_path="${branch_path/#\~/$HOME}"
+        
+        count=$((count + 1))
+        
+        # Check if directory exists
+        if [ -d "$display_path" ]; then
+            echo "  ✓ $branch_path"
+            
+            # Show git status if it's a git repo
+            if [ -d "$display_path/.git" ]; then
+                local branch=$(cd "$display_path" && git branch --show-current 2>/dev/null || echo "unknown")
+                echo "    Git: $branch"
+            fi
+            
+            # Show if it has secrets
+            if [ -f "$display_path/.eden-secrets" ]; then
+                local secret_count=$(grep -c "^\[secret\]" "$display_path/.eden-secrets" 2>/dev/null || echo 0)
+                echo "    Secrets: $secret_count defined"
+            fi
+            
+            # Show if it has MCP configs
+            if [ -f "$display_path/.config/mcp/servers.json" ] || [ -f "$display_path/.cursor/mcp.json" ]; then
+                echo "    MCP: config found"
+            fi
+        else
+            echo "  ✗ $branch_path (not found)"
+        fi
+        echo ""
+    done < "$BRANCHES_FILE"
+    
+    if [ $count -eq 0 ]; then
+        warn "No branches registered"
+        echo ""
+        echo "Register a branch with: eden branch add <path>"
+    else
+        echo "Total: $count branch(es)"
+        echo ""
+        info "Run 'eden graft' to integrate branch configs"
+    fi
+}
+
+# Remove a branch
+remove_branch() {
+    local branch_path="$1"
+    
+    if [ -z "$branch_path" ]; then
+        warn "Usage: eden branch remove <path>"
+        exit 1
+    fi
+    
+    if [ ! -f "$BRANCHES_FILE" ]; then
+        warn "No branches registered"
+        exit 1
+    fi
+    
+    # Expand tilde
+    branch_path="${branch_path/#\~/$HOME}"
+    
+    # Remove from file
+    if grep -qF "$branch_path" "$BRANCHES_FILE"; then
+        # Create temp file without the branch
+        grep -vF "$branch_path" "$BRANCHES_FILE" > "$BRANCHES_FILE.tmp"
+        mv "$BRANCHES_FILE.tmp" "$BRANCHES_FILE"
+        
+        log "Branch unregistered: $branch_path"
+        echo ""
+        info "The directory still exists. Remove it manually if needed:"
+        echo "  rm -rf $branch_path"
+    else
+        warn "Branch not found in registry: $branch_path"
+        exit 1
+    fi
+}
+
+# Create a new branch
+new_branch() {
+    local branch_path="$1"
+    
+    if [ -z "$branch_path" ]; then
+        warn "Usage: eden branch new <path>"
+        exit 1
+    fi
+    
+    # Expand tilde
+    branch_path="${branch_path/#\~/$HOME}"
+    
+    # Convert to absolute path if relative
+    if [[ ! "$branch_path" = /* ]]; then
+        branch_path="$(pwd)/$branch_path"
+    fi
+    
+    local branch_name=$(basename "$branch_path")
+    
+    log "Initializing branch: $branch_name"
+    echo ""
+    
+    # Create directory
+    if [ -d "$branch_path" ]; then
+        warn "Directory already exists: $branch_path"
+    else
+        mkdir -p "$branch_path"
+        info "Created directory: $branch_path"
+    fi
+    
+    
+    # Create basic structure
+    mkdir -p "$branch_path/.config/eden/local"
+    mkdir -p "$branch_path/.local/bin"
+    
+    # Create README
+    if [ ! -f "$branch_path/README.md" ]; then
+        cat > "$branch_path/README.md" << EOF
+# Eden Branch: $branch_name
+
+Private configuration branch for Eden.
+
+## Contents
+
+- \`.eden-secrets\`: Secret requirements for 1Password
+- \`.config/eden/local/\`: Configuration files (git, etc.)
+- \`.local/bin/\`: Branch-specific scripts
+- \`.cursor/mcp.json\`: Cursor MCP server configurations
+
+## Usage
+
+Register this branch with Eden:
+
+\`\`\`bash
+eden branch add $branch_path
+eden graft
+\`\`\`
+
+## Structure
+
+\`\`\`
+$branch_name/
+├── .eden-secrets              # Secret definitions
+├── .config/
+│   ├── mcp/
+│   │   └── servers.json      # MCP server configs (client-agnostic)
+│   └── eden/
+│       └── local/
+│           └── gitconfig.$branch_name  # Git config for this context
+└── .local/
+    └── bin/                   # Branch-specific scripts
+\`\`\`
+
+Note: Branch structure mirrors HOME directory (~/) for consistency.
+
+See [branches-and-secrets.md](https://github.com/yourusername/eden/blob/main/docs/branches-and-secrets.md) for more info.
+EOF
+        info "Created README.md"
+    fi
+    
+    # Create .gitignore
+    if [ ! -f "$branch_path/.gitignore" ]; then
+        cat > "$branch_path/.gitignore" << 'EOF'
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Backup files
+*~
+*.swp
+*.bak
+EOF
+        info "Created .gitignore"
+    fi
+    
+    # Create sample .eden-secrets
+    if [ ! -f "$branch_path/.eden-secrets" ]; then
+        cat > "$branch_path/.eden-secrets" << EOF
+# Eden Secrets for $branch_name
+# Define 1Password requirements for this branch
+
+# Example:
+# [secret]
+# name=Example Secret
+# path=op://Private/Example/password
+# description=Example secret for $branch_name
+# required_by=Some application or script
+# setup_command=example-setup
+EOF
+        info "Created .eden-secrets template"
+    fi
+    
+    # Register the branch
+    add_branch "$branch_path"
+    
+    echo ""
+    log "Branch created and registered!"
+    echo ""
+    info "Next steps:"
+    echo "  1. cd $branch_path"
+    echo "  2. Add your private configs (MCP, secrets, binaries, etc.)"
+    echo "  3. Run 'eden graft' to integrate the branch"
+    echo ""
+    info "💡 Tip: Use git to version control this branch"
+}
+
+# Main
+main() {
+    local command="${1:-help}"
+    shift || true
+    
+    case "$command" in
+        add)
+            add_branch "$@"
+            ;;
+        list|ls)
+            list_branches "$@"
+            ;;
+        remove|rm)
+            remove_branch "$@"
+            ;;
+        new|create)
+            new_branch "$@"
+            ;;
+        help|--help|-h)
+            show_help
+            ;;
+        *)
+            warn "Unknown command: $command"
+            echo ""
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
+

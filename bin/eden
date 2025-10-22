@@ -65,6 +65,7 @@ show_help() {
     echo "  stow / unstow         Direct aliases if you prefer (plant/unplant recommended)"
     echo "  uninstall             Complete Eden removal (unplant + remove ~/.eden/)"
     echo "  graft                 Discover and integrate branch configs"
+    echo "  branch                Manage Eden branches (add, list, remove, init)"
     echo "  doctor                Validate Eden installation health"
     echo "  status                Show Eden system overview and health"
     echo ""
@@ -539,6 +540,9 @@ main() {
             ;;
         graft)
             run_script "eden-graft" "$@"
+            ;;
+        branch)
+            run_script "eden-branch" "$@"
             ;;
         doctor)
             run_script "eden-doctor" "$@"
