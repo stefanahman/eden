@@ -256,37 +256,53 @@ conditional_config:
 
 binaries:
   structure:
-    core_location: "packages/common/.local/bin/ (stows to ~/.local/bin/)"
-    internal_location: "packages/common/.local/libexec/ (not in PATH)"
+    core_location: "~/.local/bin/eden (wrapper, copied during install)"
+    implementation_location: "bin/eden (main CLI, not stowed)"
+    utility_binaries: "packages/common/.local/bin/ (stows to ~/.local/bin/)"
+    internal_location: "packages/eden/.eden/libexec/ (stows to ~/.eden/libexec/)"
     branch_location: "~/.eden/bin/ (managed via graft)"
   purpose: "Executable scripts for Eden core functionality, internal utilities, and branch workflows."
   organization:
-    rationale: "Two-tier binary organization provides clear namespace separation"
-    core_binaries:
+    rationale: "Smart wrapper pattern keeps eden command always available"
+    core_binary:
+      wrapper: "~/.local/bin/eden (copied from root eden script)"
+      implementation: "bin/eden (main CLI with all commands)"
+      lifecycle: >
+        Wrapper installed by install.sh, survives stow/unstow, only removed by uninstall.
+        Implementation in bin/eden is always called by wrapper, gets latest code from repo.
+      benefits:
+        - "eden command always available (even after unstow)"
+        - "No stow conflicts with eden binary"
+        - "Always runs latest code from repo"
+        - "Clean separation: wrapper (persistent) vs implementation (versioned)"
+    utility_binaries:
       location: "~/.local/bin/"
       source: "Stowed from packages/common/.local/bin/"
-      naming: "Only 'eden' command"
+      naming: "Prefixed with 'eden-' for Eden utilities"
       examples:
-        - "eden - Main CLI dispatcher (only user-facing command)"
+        - "eden-mcp-setup - MCP configuration helper"
+        - "eden-node-setup - Node.js setup utility"
+        - "eden-secrets - 1Password secrets manager"
       management: "Tracked in git, deployed via stow"
       rationale: >
-        Only the main eden CLI is exposed in PATH. This keeps the user's PATH
-        clean and provides a unified interface. All functionality is accessed
-        through the eden command with subcommands.
+        Utility scripts that users might want to call directly, separate from
+        the main eden CLI. These are stowed/unstowed with common package.
     internal_utilities:
-      location: "packages/common/.local/libexec/"
-      source: "Called internally by eden CLI, not in PATH"
+      location: "~/.eden/libexec/"
+      source: "Stowed from packages/eden/.eden/libexec/"
       naming: "Simple names (no prefix needed)"
       examples:
         - "gcloud-setup - Google Cloud CLI installer"
         - "mcp-setup - MCP configuration helper"
         - "node-setup - Node.js environment setup"
-      management: "Tracked in git, stowed but not in PATH"
-      access: "Via eden subcommands: 'eden install gcloud', not 'eden-gcloud-setup'"
+      management: "Tracked in git, stowed to ~/.eden/libexec/ (not in PATH)"
+      access: "Via eden subcommands: 'eden install gcloud', not directly"
       rationale: >
-        Internal utilities don't pollute user PATH. They're called by the eden
-        CLI as needed. This follows Unix convention (libexec for internal
-        executables) and provides better UX through unified interface.
+        Internal utilities live in ~/.eden/libexec/ alongside branch binaries.
+        They're not in PATH but called by the eden CLI as needed. This keeps
+        all Eden ecosystem in one place (~/.eden/), provides clean uninstall,
+        follows Unix libexec convention, and offers better UX through unified
+        interface.
     branch_binaries:
       location: "~/.eden/bin/"
       source: "Grafted from branch repos' .local/bin/ directories"
@@ -300,17 +316,20 @@ binaries:
         Branch binaries are isolated in ~/.eden/bin/ which is ONLY managed by
         the graft system. This directory should never be manually edited - it's
         purely for automated branch integration. Clear separation means:
-        (1) Eden core in ~/.local/bin with eden- prefix
-        (2) Branch scripts in ~/.eden/bin via graft automation
-        (3) Personal scripts in ~/.local/bin (standard XDG location)
-        This keeps ~/.eden/bin as a pure reflection of branch state, makes
-        removal clean (rm -rf ~/.eden), and follows the principle that branches
-        are the source of truth. Scripts are symlinked not copied.
+        (1) Eden core in bin/ (repo root, committed to Eden)
+        (2) Tool installers in libexec/ (internal, not in PATH)
+        (3) Personal/branch scripts in ~/.eden/bin/ (grafted from branches)
+        ALL personal scripts should live in private branch repositories under
+        .local/bin/ and will be automatically grafted. Do NOT add personal
+        scripts to the core Eden repository. This keeps Eden core clean and
+        minimal, branches are the source of truth for personal workflows.
     path_configuration:
-      required: "Both ~/.local/bin and ~/.eden/bin must be in PATH"
-      setup: "Shell configs (.zshenv, .bash_profile) add both directories"
-      priority: "~/.local/bin before ~/.eden/bin (core before branches)"
-      note: "libexec/ is NOT in PATH - utilities are called by eden CLI"
+      required: "~/.eden/bin must be in PATH for branch binaries"
+      setup: "Shell configs (.zshenv, .bash_profile) add ~/.eden/bin"
+      note: >
+        libexec/ is NOT in PATH - utilities are called internally by eden CLI.
+        ~/.local/bin is standard XDG location (in PATH by default), but Eden
+        core binaries are now in bin/ (repo root), accessed via smart wrapper.
   unified_install_interface:
     concept: "Single 'eden install' command for all package needs"
     usage:
@@ -325,13 +344,27 @@ binaries:
   eden_cli:
     name: "eden"
     purpose: "Central command dispatcher for Eden environment management."
-    location: "packages/common/.local/bin/eden (stows to ~/.local/bin/eden)"
+    architecture: "Smart wrapper pattern for persistent availability"
+    locations:
+      wrapper: "eden (root) → copies to ~/.local/bin/eden during install"
+      core_scripts: "bin/ directory contains all Eden core operations"
+    structure:
+      - "bin/eden - Main CLI dispatcher"
+      - "bin/eden-doctor - Health checks and validation"
+      - "bin/eden-graft - Branch configuration integration"
+      - "bin/eden-update - Update Eden from git"
+    how_it_works: >
+      The wrapper at ~/.local/bin/eden always calls bin/eden from the repo.
+      This means 'eden' command works before/after stow/unstow. Only 'eden uninstall'
+      removes the wrapper for complete removal. All core operations (doctor, graft,
+      update) are now organized in bin/ with eden- prefix for clarity.
     commands:
       - "install [package] - Install all packages or specific package (e.g., gcloud)"
       - "install --list - List all available packages"
       - "update - Update Eden from git and re-apply symlinks"
       - "stow [--adopt] - Apply Eden symlinks; --adopt pulls existing files into Eden"
-      - "unstow - Remove Eden symlinks (alias: clean)"
+      - "unstow - Remove Eden symlinks (temporary, keeps ~/.eden/)"
+      - "uninstall - Complete Eden removal (unstow + remove ~/.eden/)"
       - "graft - Discover and integrate branch configs"
       - "doctor - Validate Eden installation health"
       - "status - Show Eden system overview"
@@ -351,7 +384,8 @@ binaries:
       usage: "Run 'eden-mcp-setup' to securely store GitHub token for MCP servers."
   internal_utilities:
     - name: "gcloud-setup"
-      location: "packages/common/.local/libexec/gcloud-setup (internal)"
+      location: "~/.eden/libexec/gcloud-setup (internal)"
+      source: "packages/eden/.eden/libexec/gcloud-setup"
       purpose: "Install Google Cloud CLI using official Google installer."
       usage: "Called via 'eden install gcloud' - not directly in PATH."
       rationale: "AUR packages for gcloud are outdated. Uses official Google installer."
