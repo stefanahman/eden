@@ -16,8 +16,8 @@ error() {
     exit 1
 }
 
-# Get Eden directory
-EDEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get Eden directory (parent of bin/)
+EDEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$EDEN_DIR" || error "Failed to cd to Eden directory"
 
 # Check for uncommitted changes

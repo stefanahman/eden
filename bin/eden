@@ -16,7 +16,8 @@ while [ -L "$SCRIPT_PATH" ]; do
     [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
 done
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
-EDEN_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+# bin/eden is one level deep from repo root
+EDEN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -43,6 +44,10 @@ print_info() {
     echo -e "${BLUE}→${RESET} $1"
 }
 
+print_warning() {
+    echo -e "${YELLOW}⚠${RESET} $1"
+}
+
 # Show help
 show_help() {
     print_header "Eden - Personal Environment Manager"
@@ -56,7 +61,8 @@ show_help() {
     echo "  update                Update Eden from git and re-apply symlinks"
     echo "  stow [--adopt]        Apply Eden symlinks (common + platform packages)"
     echo "                        Use --adopt to pull existing files into Eden"
-    echo "  unstow                Remove Eden symlinks (same as clean)"
+    echo "  unstow                Remove Eden symlinks (temporary, keeps ~/.eden/)"
+    echo "  uninstall             Complete Eden removal (unstow + remove ~/.eden/)"
     echo "  graft                 Discover and integrate branch configs"
     echo "  doctor                Validate Eden installation health"
     echo "  status                Show Eden system overview and health"
@@ -72,6 +78,8 @@ show_help() {
     echo "  deploy-mac            Deploy common + mac packages only"
     echo ""
     echo -e "${BOLD}Utility Commands:${RESET}"
+    echo "  eden-secrets          Manage 1Password secrets"
+    echo "  eden-mcp-merge        Merge MCP configuration files"
     echo "  version               Show Eden version and location"
     echo "  help                  Show this help message"
     echo ""
@@ -285,7 +293,14 @@ check_package() {
 run_script() {
     local script_name="$1"
     shift
-    local script_path="$EDEN_ROOT/$script_name"
+    
+    # Scripts are now in bin/ directory
+    local script_path="$EDEN_ROOT/bin/$script_name"
+    
+    # For install.sh, check root directory
+    if [ "$script_name" = "install.sh" ]; then
+        script_path="$EDEN_ROOT/install.sh"
+    fi
     
     if [ ! -f "$script_path" ]; then
         print_error "Script not found: $script_path"
@@ -308,11 +323,13 @@ deploy_platform() {
     
     cd "$EDEN_ROOT"
     
-    # Stow common first
+    # Stow packages in order
     print_info "Stowing common package..."
     stow -v -d packages -t "$HOME" common
     
-    # Stow platform package
+    print_info "Stowing eden package..."
+    stow -v -d packages -t "$HOME" eden
+    
     print_info "Stowing $platform package..."
     stow -v -d packages -t "$HOME" "$platform"
     
@@ -343,23 +360,61 @@ main() {
                     echo "  eden install        # Install all platform packages"
                     echo ""
                     echo "Additional tools:"
-                    echo "  gcloud             # Google Cloud CLI (official)"
+                    
+                    # Auto-discover packages from libexec
+                    LIBEXEC_DIR="$HOME/.eden/libexec"
+                    if [ ! -d "$LIBEXEC_DIR" ]; then
+                        LIBEXEC_DIR="$EDEN_ROOT/packages/eden/.eden/libexec"
+                    fi
+                    
+                    if [ -d "$LIBEXEC_DIR" ]; then
+                        for script in "$LIBEXEC_DIR"/*; do
+                            if [ -f "$script" ] && [ -x "$script" ]; then
+                                local pkg_name=$(basename "$script" | sed 's/-setup$//')
+                                # Try to extract description from script (first line with # comment after shebang)
+                                local desc=$(grep -m 1 "^# " "$script" | sed 's/^# //' | head -1)
+                                [ -z "$desc" ] && desc="Install/configure $pkg_name"
+                                printf "  %-18s # %s\n" "$pkg_name" "$desc"
+                            fi
+                        done
+                    else
+                        echo "  (libexec not found - run 'eden stow' first)"
+                    fi
+                    
                     echo ""
-                    echo "Future additions will appear here as they're implemented."
-                    ;;
-                gcloud)
-                    shift
-                    "$EDEN_ROOT/packages/common/.local/libexec/gcloud-setup" "$@"
+                    echo "Usage: eden install <package>"
                     ;;
                 *)
-                    print_error "Unknown package: $1"
-                    echo "Run 'eden install --list' to see available packages"
-                    exit 1
+                    # Auto-discover and run package installer from libexec
+                    local pkg_name="$1"
+                    shift
+                    
+                    LIBEXEC_DIR="$HOME/.eden/libexec"
+                    if [ ! -d "$LIBEXEC_DIR" ]; then
+                        LIBEXEC_DIR="$EDEN_ROOT/packages/eden/.eden/libexec"
+                    fi
+                    
+                    # Try both with and without -setup suffix
+                    local installer=""
+                    for candidate in "$LIBEXEC_DIR/$pkg_name" "$LIBEXEC_DIR/${pkg_name}-setup"; do
+                        if [ -f "$candidate" ] && [ -x "$candidate" ]; then
+                            installer="$candidate"
+                            break
+                        fi
+                    done
+                    
+                    if [ -n "$installer" ]; then
+                        "$installer" "$@"
+                    else
+                        print_error "Unknown package: $pkg_name"
+                        echo "Run 'eden install --list' to see available packages"
+                        exit 1
+                    fi
                     ;;
             esac
             ;;
         update)
-            run_script "update.sh" "$@"
+            run_script "eden-update" "$@"
             ;;
         stow)
             # Check for --adopt flag
@@ -377,12 +432,12 @@ main() {
             cd "$EDEN_ROOT"
             case "$(uname -s)" in
                 Darwin)
-                    print_info "Stowing common + mac packages..."
-                    stow -v $ADOPT_FLAG -d packages -t "$HOME" common mac
+                    print_info "Stowing common + eden + mac packages..."
+                    stow -v $ADOPT_FLAG -d packages -t "$HOME" common eden mac
                     ;;
                 Linux)
-                    print_info "Stowing common + arch packages..."
-                    stow -v $ADOPT_FLAG -d packages -t "$HOME" common arch
+                    print_info "Stowing common + eden + arch packages..."
+                    stow -v $ADOPT_FLAG -d packages -t "$HOME" common eden arch
                     ;;
             esac
             
@@ -403,28 +458,79 @@ main() {
             cd "$EDEN_ROOT"
             case "$(uname -s)" in
                 Darwin)
-                    stow -D -d packages -t "$HOME" common mac 2>/dev/null || true
+                    stow -D -d packages -t "$HOME" common eden mac 2>/dev/null || true
                     ;;
                 Linux)
-                    stow -D -d packages -t "$HOME" common arch 2>/dev/null || true
+                    stow -D -d packages -t "$HOME" common eden arch 2>/dev/null || true
                     ;;
             esac
+            
+            # Clean up ~/.eden/ if it's empty or only contains empty directories
+            if [ -d "$HOME/.eden" ]; then
+                # Remove empty subdirectories
+                find "$HOME/.eden" -type d -empty -delete 2>/dev/null || true
+                # Remove ~/.eden if now empty
+                rmdir "$HOME/.eden" 2>/dev/null || true
+            fi
+            
             print_success "Eden symlinks removed"
+            [ -d "$HOME/.eden" ] && print_info "~/.eden/ preserved (contains branch configs/binaries)"
+            ;;
+        uninstall)
+            print_header "Uninstalling Eden"
+            echo ""
+            print_warning "This will completely remove Eden from your system:"
+            echo "  • Remove all Eden symlinks"
+            echo "  • Delete ~/.eden/ directory (grafted binaries, configs)"
+            echo "  • Remove root eden wrapper script"
+            echo ""
+            echo -n "Are you sure? [y/N] "
+            read -r response
+            if [[ ! "$response" =~ ^[Yy]$ ]]; then
+                echo "Uninstall cancelled"
+                exit 0
+            fi
+            
+            echo ""
+            print_info "Removing Eden symlinks..."
+            cd "$EDEN_ROOT"
+            case "$(uname -s)" in
+                Darwin)
+                    stow -D -d packages -t "$HOME" common eden mac 2>/dev/null || true
+                    ;;
+                Linux)
+                    stow -D -d packages -t "$HOME" common eden arch 2>/dev/null || true
+                    ;;
+            esac
+            
+            print_info "Removing ~/.eden/ directory..."
+            rm -rf "$HOME/.eden"
+            
+            print_info "Removing eden wrapper from ~/.local/bin/..."
+            rm -f "$HOME/.local/bin/eden"
+            
+            echo ""
+            print_success "Eden uninstalled successfully"
+            echo ""
+            print_info "Note: Shell config PATH entries remain but are harmless"
+            echo "  To fully clean up, remove Eden PATH entries from:"
+            echo "  • ~/.config/zsh/.zshenv"
+            echo "  • ~/.config/bash/profile"
             ;;
         graft)
-            run_script "graft.sh" "$@"
+            run_script "eden-graft" "$@"
             ;;
         doctor)
-            run_script "doctor.sh" "$@"
+            run_script "eden-doctor" "$@"
             ;;
         status|info)
-            # Check if status.sh exists, otherwise show basic info
-            if [ -f "$EDEN_ROOT/status.sh" ]; then
-                run_script "status.sh" "$@"
+            # Check if eden-status exists, otherwise show basic info
+            if [ -f "$EDEN_ROOT/bin/eden-status" ]; then
+                run_script "eden-status" "$@"
             else
                 show_version
                 echo ""
-                run_script "doctor.sh" "$@"
+                run_script "eden-doctor" "$@"
             fi
             ;;
         packages)

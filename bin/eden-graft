@@ -16,6 +16,9 @@ warn() {
     echo -e "${YELLOW}⚠${NC} $1"
 }
 
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
 
 # Check if branches file exists
@@ -154,7 +157,7 @@ graft_binaries() {
     declare -A script_owners
     
     # Read each branch repo path
-    while IFS= read -r branch_path || [ -n "$branch_path" ]; then
+    while IFS= read -r branch_path || [ -n "$branch_path" ]; do
         # Skip empty lines and comments
         [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
         
@@ -228,6 +231,39 @@ graft_binaries() {
 }
 
 # =============================================================================
+# GRAFTER: Secrets
+# =============================================================================
+graft_secrets() {
+    log "Validating secrets from trunk and branches..."
+    
+    # Check if eden-secrets exists
+    if [ ! -f "$SCRIPT_DIR/eden-secrets" ]; then
+        echo "  → eden-secrets not found, skipping"
+        return 0
+    fi
+    
+    # Run validation (will check trunk + all branches)
+    if "$SCRIPT_DIR/eden-secrets" validate --quiet; then
+        echo "  ✓ All required secrets configured"
+        return 0
+    else
+        echo ""
+        warn "Some secrets are not configured"
+        echo ""
+        echo "  Secrets are defined in .eden-secrets files in:"
+        echo "    • Eden trunk: $SCRIPT_DIR/../.eden-secrets"
+        echo "    • Branch repos: check each branch for .eden-secrets"
+        echo ""
+        echo "  To configure missing secrets:"
+        echo "    eden-secrets validate    # See what's missing"
+        echo "    eden-secrets store <name> # Add a secret"
+        echo ""
+        echo "  Or run 'eden install mcp' to set up MCP secrets"
+        return 0
+    fi
+}
+
+# =============================================================================
 # FUTURE GRAFTERS
 # =============================================================================
 # graft_zshrc() {
@@ -254,6 +290,8 @@ main() {
     graft_mcp
     echo ""
     graft_binaries
+    echo ""
+    graft_secrets
     
     # Future grafters:
     # graft_zshrc

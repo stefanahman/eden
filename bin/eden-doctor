@@ -28,8 +28,8 @@ section() {
     echo "$1"
 }
 
-# Get Eden directory
-EDEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get Eden directory (parent of bin/)
+EDEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 section "Eden Health Check"
 section "=================="
@@ -72,19 +72,52 @@ else
     check_fail "Not a git repository"
 fi
 
-# Check Eden directories
-section "Structure:"
+# Check Eden directories and binaries
+section "Eden Structure:"
 
-if [ -d "${XDG_CONFIG_HOME:-$HOME/.config}/eden/local" ]; then
-    check_pass "Local config directory exists"
+# Check smart wrapper
+if [ -f "$HOME/.local/bin/eden" ] && [ ! -L "$HOME/.local/bin/eden" ]; then
+    check_pass "Eden wrapper installed at ~/.local/bin/eden"
 else
-    check_fail "Local config directory missing: ${XDG_CONFIG_HOME:-$HOME/.config}/eden/local"
+    if [ -L "$HOME/.local/bin/eden" ]; then
+        check_warn "Eden wrapper is a symlink (should be copied file)"
+    else
+        check_fail "Eden wrapper not found at ~/.local/bin/eden"
+    fi
 fi
 
-if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches" ]; then
-    check_pass "Branches file exists"
+# Check main implementation
+if [ -f "$EDEN_DIR/bin/eden" ]; then
+    check_pass "Eden CLI implementation at bin/eden"
 else
-    check_fail "Branches file missing: ${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+    check_fail "Eden CLI missing at bin/eden"
+fi
+
+# Check ~/.eden structure
+if [ -d "$HOME/.eden" ]; then
+    check_pass "~/.eden directory exists"
+    
+    if [ -d "$HOME/.eden/libexec" ]; then
+        LIBEXEC_COUNT=$(find "$HOME/.eden/libexec" -type f 2>/dev/null | wc -l)
+        check_pass "~/.eden/libexec exists ($LIBEXEC_COUNT internal utilities)"
+    else
+        check_warn "~/.eden/libexec not found (may not be stowed yet)"
+    fi
+    
+    if [ -d "$HOME/.eden/bin" ]; then
+        BIN_COUNT=$(find "$HOME/.eden/bin" -type l 2>/dev/null | wc -l)
+        check_pass "~/.eden/bin exists ($BIN_COUNT grafted binaries)"
+    else
+        check_warn "~/.eden/bin not found (no branch binaries grafted)"
+    fi
+    
+    if [ -f "$HOME/.eden/config/branches" ]; then
+        check_pass "Branch tracking file exists"
+    else
+        check_warn "No branch tracking file (run 'eden graft' to set up)"
+    fi
+else
+    check_warn "~/.eden directory not found (may not be stowed yet)"
 fi
 
 # Check symlinks
@@ -115,10 +148,11 @@ fi
 section "Package Statistics:"
 
 COMMON_COUNT=$(find "$EDEN_DIR/packages/common" -type f 2>/dev/null | wc -l)
+EDEN_COUNT=$(find "$EDEN_DIR/packages/eden" -type f 2>/dev/null | wc -l)
 ARCH_COUNT=$(find "$EDEN_DIR/packages/arch" -type f 2>/dev/null | wc -l)
 MAC_COUNT=$(find "$EDEN_DIR/packages/mac" -type f 2>/dev/null | wc -l)
 
-echo "  Files: $COMMON_COUNT in common, $ARCH_COUNT in arch, $MAC_COUNT in mac"
+echo "  Files: $COMMON_COUNT in common, $EDEN_COUNT in eden, $ARCH_COUNT in arch, $MAC_COUNT in mac"
 
 # Platform parity check
 section "Platform Parity:"
