@@ -66,6 +66,7 @@ show_help() {
     echo "  uninstall             Complete Eden removal (unplant + remove ~/.eden/)"
     echo "  graft                 Discover and integrate branch configs"
     echo "  branch                Manage Eden branches (add, list, remove, init)"
+    echo "  secrets               Manage 1Password secrets (list, validate)"
     echo "  doctor                Validate Eden installation health"
     echo "  status                Show Eden system overview and health"
     echo ""
@@ -76,7 +77,6 @@ show_help() {
     echo "  packages              [deprecated] Use 'eden install' instead"
     echo ""
     echo -e "${BOLD}Utility Commands:${RESET}"
-    echo "  eden-secrets          Manage 1Password secrets"
     echo "  eden-mcp-merge        Merge MCP configuration files"
     echo "  version               Show Eden version and location"
     echo "  help                  Show this help message"
@@ -89,6 +89,8 @@ show_help() {
     echo "  eden plant            # Plant Eden configs (apply symlinks)"
     echo "  eden plant --adopt    # Pull existing configs into Eden"
     echo "  eden graft            # Integrate branch configurations"
+    echo "  eden secrets list     # List required 1Password secrets"
+    echo "  eden secrets validate # Validate secrets exist in 1Password"
     echo "  eden doctor           # Check system health"
     echo "  eden check-package fnm  # Check where a package is available"
     echo ""
@@ -546,6 +548,9 @@ main() {
             ;;
         doctor)
             run_script "eden-doctor" "$@"
+            ;;
+        secrets)
+            run_script "eden-secrets" "$@"
             ;;
         status|info)
             # Check if eden-status exists, otherwise show basic info
