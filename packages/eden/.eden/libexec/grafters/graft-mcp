@@ -9,25 +9,28 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 0
 fi
 
-# Find Eden root
+# Detect Eden root from script location
 if [[ -z "$EDEN_ROOT" ]]; then
     SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
     EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
 fi
 
+# Expand variables in branch path
+expand_branch_path() {
+    local path="$1"
+    # Expand $EDEN_ROOT
+    path="${path//\$EDEN_ROOT/$EDEN_ROOT}"
+    # Expand tilde
+    path="${path/#\~/$HOME}"
+    echo "$path"
+}
+
 CANONICAL_CONFIG="$HOME/.config/mcp/servers.json"
-TRUNK_CONFIG="$EDEN_ROOT/packages/common/.config/mcp/servers.json"
 
-# Check if trunk config exists
-if [[ ! -f "$TRUNK_CONFIG" ]]; then
-    echo "  → No trunk MCP config (skipping)"
-    exit 0
-fi
+# Initialize with empty config
+MERGED_JSON='{"mcpServers": {}}'
 
-echo "  → Merging MCP servers from trunk"
-
-# Initialize with trunk config
-MERGED_JSON=$(cat "$TRUNK_CONFIG")
+echo "  → Merging MCP servers from branches"
 
 # Merge branch configs if branches file exists
 BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
@@ -36,8 +39,8 @@ if [[ -f "$BRANCHES_FILE" ]]; then
         [[ -z "$branch_path" ]] && continue
         [[ "$branch_path" =~ ^[[:space:]]*# ]] && continue
         
-        # Expand tilde
-        branch_path="${branch_path/#\~/$HOME}"
+        # Expand variables and tilde
+        branch_path=$(expand_branch_path "$branch_path")
         
         branch_name=$(basename "$branch_path")
         

@@ -28,6 +28,32 @@ bold() {
 
 BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
 
+# Detect Eden root
+detect_eden_root() {
+    # Check if we're in the Eden repo
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "$script_dir/../manifest.yaml" ]; then
+        echo "$(cd "$script_dir/.." && pwd)"
+    elif [ -d "$HOME/.eden" ]; then
+        # Fallback: assume standard location
+        echo "$HOME/eden"
+    else
+        echo "$HOME/eden"
+    fi
+}
+
+EDEN_ROOT=$(detect_eden_root)
+
+# Expand variables in branch path
+expand_branch_path() {
+    local path="$1"
+    # Expand $EDEN_ROOT
+    path="${path//\$EDEN_ROOT/$EDEN_ROOT}"
+    # Expand tilde
+    path="${path/#\~/$HOME}"
+    echo "$path"
+}
+
 # Show help
 show_help() {
     bold "Eden Branch Management"
@@ -120,13 +146,14 @@ list_branches() {
         # Skip empty lines and comments
         [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
         
-        # Expand tilde for display
-        local display_path="${branch_path/#\~/$HOME}"
+        # Expand variables and tilde for display
+        local display_path=$(expand_branch_path "$branch_path")
         
         count=$((count + 1))
         
         # Check if directory exists
         if [ -d "$display_path" ]; then
+            # Show original path (with variables) for readability
             echo "  ✓ $branch_path"
             
             # Show git status if it's a git repo

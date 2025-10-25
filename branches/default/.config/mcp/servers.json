@@ -1,6 +1,7 @@
 {
-  "$comment": "Model Context Protocol (MCP) Configuration - Cursor IDE",
-  "$comment2": "To pin Node version for MCP servers, create .node-version in this directory",
+  "$comment": "Model Context Protocol (MCP) Configuration - Default Branch",
+  "$comment2": "Eden's opinionated MCP server defaults",
+  "$comment3": "Add more servers in your personal branches: ~/branch-work/.config/mcp/servers.json",
   "mcpServers": {
     "github-eden": {
       "command": "sh",

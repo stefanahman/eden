@@ -34,11 +34,15 @@ Eden grows in stages: first the command wrapper, then tools and packages, then c
 
 ## Structure
 
-- **common**: Cross-platform configurations
-- **arch**: Arch Linux overlays (Hyprland, Omarchy)
-- **mac**: macOS overlays (yabai, skhd)
+Eden has three layers:
 
-Configurations are planted into `$HOME` using `eden plant` (a wrapper around GNU Stow that checks requirements and provides helpful guidance). Platform-specific differences layer cleanly over shared foundations. Local machine overrides live in `~/.config/eden/` (XDG-compliant), while Eden binaries are managed in `~/.eden/bin/` (like cargo, volta, fnm).
+1. **Packages** (`common`, `arch`, `mac`) - Minimal, cross-platform core
+2. **Default branch** (`branches/default`) - Opinionated extras (MCP servers, integrations)
+3. **Personal branches** (optional) - Private, context-specific extensions
+
+Core packages are planted into `$HOME` using `eden plant` (a wrapper around GNU Stow). The default branch and any personal branches are integrated via `eden graft`, which merges configurations intelligently.
+
+Local machine overrides live in `~/.config/eden/` (XDG-compliant), while Eden binaries are managed in `~/.eden/bin/` (like cargo, volta, fnm).
 
 ## Philosophy
 

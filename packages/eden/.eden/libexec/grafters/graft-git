@@ -3,6 +3,12 @@
 # Part of Eden's pluggable grafter system
 set -e
 
+# Detect Eden root from script location
+if [[ -z "$EDEN_ROOT" ]]; then
+    SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+    EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
+fi
+
 BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
 
 # Check if branches file exists
@@ -10,6 +16,16 @@ if [ ! -f "$BRANCHES_FILE" ]; then
     echo "  → No branches registered (skipping)"
     exit 0
 fi
+
+# Expand variables in branch path
+expand_branch_path() {
+    local path="$1"
+    # Expand $EDEN_ROOT
+    path="${path//\$EDEN_ROOT/$EDEN_ROOT}"
+    # Expand tilde
+    path="${path/#\~/$HOME}"
+    echo "$path"
+}
 
 gitconfig_local="${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/gitconfig"
 added=0
@@ -32,8 +48,8 @@ while IFS= read -r branch_path || [ -n "$branch_path" ]; do
     # Skip empty lines and comments
     [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
     
-    # Expand tilde
-    branch_path="${branch_path/#\~/$HOME}"
+    # Expand variables and tilde
+    branch_path=$(expand_branch_path "$branch_path")
     
     if [ ! -d "$branch_path" ]; then
         continue

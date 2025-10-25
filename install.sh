@@ -113,9 +113,24 @@ EDEN_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/eden"
 mkdir -p "$EDEN_CONFIG/local"
 verbose "✓ Created $EDEN_CONFIG/local/"
 
-# Create empty branches file (users can add branch repo paths here)
-touch "$EDEN_CONFIG/branches"
-verbose "✓ Created $EDEN_CONFIG/branches"
+# Create branches file with default branch
+if [ ! -f "$EDEN_CONFIG/branches" ]; then
+    cat > "$EDEN_CONFIG/branches" << EOF
+# Eden Branch Registry
+# List branch repository paths here (one per line)
+# Branches extend Eden with private, context-specific configurations
+
+# Eden's opinionated default branch (comment out to opt out)
+\$EDEN_ROOT/branches/default
+
+# Add your private branches below:
+# ~/branch-work
+# ~/branch-personal
+EOF
+    verbose "✓ Created $EDEN_CONFIG/branches with default branch"
+else
+    verbose "✓ $EDEN_CONFIG/branches already exists (not modified)"
+fi
 
 # Binary locations:
 #   ~/.local/bin/  - Eden core (eden, eden-*) + personal scripts (standard XDG)

@@ -7,14 +7,23 @@ Eden supports **branches** - separate git repositories that extend Eden with pri
 ## Branch Concept
 
 ```
-Eden (trunk)              branch-work              branch-personal
-├── packages/             ├── packages/            ├── packages/
-├── .eden-secrets         ├── .eden-secrets        ├── .eden-secrets
-└── (public repo)         └── (private repo)       └── (private repo)
+Eden packages        Default Branch       Personal Branches
+(minimal core)       (opinionated)        (private contexts)
+├── common/          ├── .config/         ├── .eden-secrets
+├── arch/            │   └── mcp/         ├── .config/
+├── mac/             ├── .eden-secrets    └── .local/bin/
+└── eden/            └── (public)         └── (private repos)
 ```
 
-**Eden trunk**: Public, cross-platform core configurations  
-**Branches**: Private extensions for specific contexts (work, personal, clients)
+**Eden packages**: Minimal, cross-platform foundations (stowed via `eden plant`)  
+**Default branch**: Opinionated extras shipped with Eden (MCP servers, integrations)  
+**Personal branches**: Private extensions for specific contexts (work, personal, clients)
+
+### Three Layers
+
+1. **Eden Packages** (`packages/`) - Minimal core, deployed via `eden plant` (stow)
+2. **Default Branch** (`branches/default`) - Opinionated defaults, grafted automatically
+3. **Personal Branches** (e.g., `~/branch-work`) - Your private configs, grafted on demand
 
 ## Secrets Integration
 
@@ -71,11 +80,18 @@ required_by=AI scripts and experiments
 
 ### Register Branches
 
-Create or edit `~/.config/eden/branches`:
-```
+The branches file (`~/.config/eden/branches`) is created automatically by `install.sh`:
+
+```bash
+# Eden's opinionated default branch (comment out to opt out)
+$EDEN_ROOT/branches/default
+
+# Add your private branches below:
 ~/branch-work
 ~/branch-personal
 ```
+
+**Note**: `$EDEN_ROOT` is expanded to your Eden repository path automatically.
 
 ### List All Secrets (Trunk + Branches)
 
@@ -244,13 +260,25 @@ Eden + branch-client-acme
 
 ## Philosophy
 
-**Eden trunk**: Public, shareable, cross-platform foundation  
-**Branches**: Private extensions for specific life contexts  
+**Eden packages**: Minimal, cross-platform foundation (stowed)  
+**Default branch**: Opinionated extras for good out-of-box experience (grafted)  
+**Personal branches**: Private extensions for specific life contexts (grafted)  
 **Secrets**: Centralized in 1Password, documented in `.eden-secrets`  
 
 This pattern enables:
 - **One environment, many contexts**
-- **Share Eden publicly, keep branches private**
+- **Minimal core, optional extras**
+- **Share Eden publicly, keep personal branches private**
 - **Automatic secret discovery and validation**
 - **Clear separation between public and private**
+
+### Why the Default Branch?
+
+The default branch keeps Eden's core packages minimal while providing a good first-use experience:
+
+- **Packages** are the foundation everyone needs (shell, git, editor)
+- **Default branch** has practical extras most users want (MCP servers, integrations)
+- **Personal branches** add your private, context-specific configs
+
+You can opt out of defaults by commenting out `$EDEN_ROOT/branches/default` in `~/.config/eden/branches`.
 
