@@ -92,15 +92,17 @@ verbose "Eden directory: $EDEN_DIR"
 
 cd "$EDEN_DIR" || error "Failed to cd to Eden directory"
 
-# Install eden wrapper permanently to ~/.local/bin/
-log "Installing eden CLI wrapper..."
-mkdir -p "$HOME/.local/bin"
-cp -f "$EDEN_DIR/eden" "$HOME/.local/bin/eden"
-chmod +x "$HOME/.local/bin/eden"
-verbose "✓ eden wrapper installed to ~/.local/bin/eden"
-
 # Create Eden directory structure (not stowed, user-specific)
 log "Setting up Eden directories..."
+
+# Configs in ~/.config/eden (XDG-compliant)
+EDEN_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/eden"
+mkdir -p "$EDEN_CONFIG/local"
+verbose "✓ Created $EDEN_CONFIG/"
+
+# Store repo path for the wrapper to find
+echo "$EDEN_DIR" > "$EDEN_CONFIG/repo"
+verbose "✓ Stored repo path: $EDEN_DIR"
 
 # Binaries in ~/.eden/bin (for branch-managed scripts via graft)
 # Note: This directory is ONLY for automated branch integration, not manual use
@@ -108,10 +110,12 @@ EDEN_BIN="$HOME/.eden/bin"
 mkdir -p "$EDEN_BIN"
 verbose "✓ Created $EDEN_BIN/ (branch automation only)"
 
-# Configs in ~/.config/eden (XDG-compliant)
-EDEN_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/eden"
-mkdir -p "$EDEN_CONFIG/local"
-verbose "✓ Created $EDEN_CONFIG/local/"
+# Install eden wrapper permanently to ~/.local/bin/
+log "Installing eden CLI wrapper..."
+mkdir -p "$HOME/.local/bin"
+cp -f "$EDEN_DIR/eden" "$HOME/.local/bin/eden"
+chmod +x "$HOME/.local/bin/eden"
+verbose "✓ eden wrapper installed to ~/.local/bin/eden"
 
 # Create branches file with default branch
 if [ ! -f "$EDEN_CONFIG/branches" ]; then
@@ -139,7 +143,7 @@ fi
 # Install packages (optional)
 if $INSTALL_PACKAGES; then
     log "Installing packages..."
-    
+
     if [ "$OS" = "mac" ]; then
         if command -v brew >/dev/null 2>&1; then
             verbose "Running brew bundle..."

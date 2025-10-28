@@ -6,26 +6,36 @@
 set -euo pipefail
 
 # Find the Eden repository
-# This wrapper should know where Eden lives
-EDEN_REPO="${EDEN_REPO:-$HOME/Development/eden}"
+# Strategy: Check config file first (set by install.sh), then environment variable
 
-# Try common locations if default doesn't work
-if [ ! -d "$EDEN_REPO" ]; then
-    # Check if this script itself is in the repo (when called as ./eden)
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "$SCRIPT_DIR/bin/eden" ]; then
-        EDEN_REPO="$SCRIPT_DIR"
-    fi
+EDEN_REPO=""
+
+# 1) Check XDG config location (set during installation)
+EDEN_CONFIG_PATH="${XDG_CONFIG_HOME:-$HOME/.config}/eden/repo"
+if [ -f "$EDEN_CONFIG_PATH" ]; then
+    EDEN_REPO="$(cat "$EDEN_CONFIG_PATH" 2>/dev/null | head -n1)"
 fi
 
-EDEN_BIN="$EDEN_REPO/bin/eden"
-
-# If the real eden binary exists in repo, delegate to it
-if [ -f "$EDEN_BIN" ]; then
-    exec "$EDEN_BIN" "$@"
-else
-    echo "Error: Eden binary not found at $EDEN_BIN" >&2
-    echo "Set EDEN_REPO environment variable to your Eden repository location" >&2
-    echo "Example: export EDEN_REPO=~/Development/eden" >&2
-    exit 1
+# 2) Fall back to environment variable
+if [ -z "$EDEN_REPO" ] || [ ! -d "$EDEN_REPO" ]; then
+    EDEN_REPO="${EDEN_REPO:-}"
 fi
+
+# Validate and delegate to the real eden binary
+if [ -n "$EDEN_REPO" ] && [ -f "$EDEN_REPO/bin/eden" ]; then
+    exec "$EDEN_REPO/bin/eden" "$@"
+fi
+
+# Error: couldn't find the repo
+echo "Error: Could not locate the Eden repository." >&2
+echo "" >&2
+echo "Please run the installer to set up Eden properly:" >&2
+echo "  cd /path/to/eden && ./install.sh" >&2
+echo "" >&2
+echo "Or manually configure the repo path:" >&2
+echo "  mkdir -p \"${XDG_CONFIG_HOME:-$HOME/.config}/eden\"" >&2
+echo "  echo '/path/to/eden' > \"${XDG_CONFIG_HOME:-$HOME/.config}/eden/repo\"" >&2
+echo "" >&2
+echo "Or set EDEN_REPO for this session:" >&2
+echo "  export EDEN_REPO='/path/to/eden'" >&2
+exit 1
