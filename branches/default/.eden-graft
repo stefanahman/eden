@@ -1,0 +1,18 @@
+# Eden Graft Allowlist
+#
+# List paths (relative to branch root) that should be symlinked to $HOME.
+# One path per line. Comments and blank lines are ignored.
+#
+# This file controls what configs from this branch get grafted by `eden graft`.
+
+# Window management & keyboard
+.config/karabiner/karabiner.json
+.config/yabai/yabairc
+.config/skhd/skhdrc
+
+# Add more configs as needed
+# Examples:
+# .config/nvim
+# .config/alacritty
+# .gitconfig
+

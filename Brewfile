@@ -24,8 +24,10 @@ cask "gcloud-cli"  # Google Cloud CLI (gcloud)
 # Editor
 brew "neovim"
 
-# Keyboard customization
+# Keyboard & window management
 cask "karabiner-elements"  # Advanced keyboard modifier and remapping
+brew "koekeishiya/formulae/yabai"  # Tiling window manager
+brew "koekeishiya/formulae/skhd"   # Hotkey daemon
 
 # Browsers
 cask "ungoogled-chromium"  # Privacy-focused Chromium without Google integration

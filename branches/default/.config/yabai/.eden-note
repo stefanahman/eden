@@ -1,0 +1,30 @@
+# yabai - Tiling Window Manager
+
+Automatic window tiling for macOS, inspired by bspwm and i3.
+
+## Setup
+
+1. Install: `brew install koekeishiya/formulae/yabai`
+2. Start service: `yabai --start-service`
+3. Grant accessibility permissions (System Settings → Privacy & Security → Accessibility)
+
+## Configuration
+
+- `yabairc` - Main config (BSP layout, gaps, opacity, rules)
+- Integrates with skhd for hotkeys
+- Uses borders for visual feedback
+
+## Features in This Config
+
+- BSP (binary space partition) layout
+- 8px gaps and padding
+- Window opacity (50% inactive, 100% active)
+- No animations (fast)
+- Borders integration (active window highlight)
+- System Settings/Dialogs unmanaged
+
+## Resources
+
+- [yabai wiki](https://github.com/koekeishiya/yabai/wiki)
+- [yabai scripting addition](https://github.com/koekeishiya/yabai/wiki/Installing-yabai-(latest-release)#configure-scripting-addition) - Advanced features (requires SIP disabled)
+

@@ -14,19 +14,33 @@ Create a conflict-free custom shortcut namespace on macOS by using right-side mo
 
 ### Shortcut Layers
 1. **Left-side modifiers**: Standard macOS (Cmd+C, Cmd+Tab, etc.)
-2. **Hyper + key**: Custom shortcuts (24 combinations)
-3. **Hyper + Shift + key**: Custom shortcut variants (24 more combinations)
+2. **Hyper + key**: Custom shortcuts (48+ combinations)
+3. **Hyper + Shift + key**: Variants (e.g., Hyper+B vs Hyper+Shift+B)
 
-Total: ~48 custom shortcuts with zero conflicts
+Total: Zero conflicts with native macOS
 
 ### Device-Specific: Filco Majestouch
 - Swap Left Cmd ↔ Left Option for Mac compatibility
 - ISO keyboard type (tall Enter key)
 - Product ID: 6168, Vendor ID: 1241
 
+## Complex Modifications
+
+### Mission Control Integration (Hyper Key)
+- **Hyper+M** → Mission Control (direct key code)
+- **Hyper+1-9** → Switch to Desktop 1-9 (triggers Control+1-9)
+
+These are handled by Karabiner (not skhd) for reliability and speed.
+
+### App Launchers & Window Management
+Handled by skhd (see .skhdrc):
+- Hyper+Return, Hyper+F, Hyper+C, etc. → Launch apps
+- Hyper+Arrows → Focus windows (yabai)
+- Hyper+Shift+Arrows → Swap windows (yabai)
+
 ## Benefits
 - Native macOS shortcuts untouched
+- Direct key code triggering (faster than simulated key combos)
 - Scalable custom shortcut system
-- Can use with Raycast, Keyboard Maestro, or custom automations
-- Shift variants for related actions (e.g., Hyper+T vs Hyper+Shift+T)
+- Integrates with Raycast, skhd, yabai seamlessly
 

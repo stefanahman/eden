@@ -1,0 +1,49 @@
+# skhd - Simple Hotkey Daemon
+
+Keyboard shortcut manager for macOS, pairs perfectly with yabai.
+
+## Configuration Location
+
+**Note:** skhd uses `~/.skhdrc` (home directory) instead of `~/.config/skhd/skhdrc`.
+This is not XDG-compliant, but it's how skhd works.
+
+## Setup
+
+1. Install: `brew install koekeishiya/formulae/skhd`
+2. Start service: `skhd --start-service`
+3. Grant accessibility permissions (System Settings → Privacy & Security → Accessibility)
+4. Config will be symlinked to `~/.skhdrc` via `eden plant`
+
+## Hyper Key Bindings (Omarchy Philosophy)
+
+Uses `rctrl + ralt + rcmd` as Hyper (mapped via Karabiner).
+
+### Launchers
+- Hyper+Return → Terminal (Alacritty)
+- Hyper+Space → Launcher (Raycast)
+
+### Apps
+- Hyper+F → Finder
+- Hyper+C → Cursor
+- Hyper+N → Neovim
+- Hyper+A → ChatGPT
+- Hyper+L → Linear
+- Hyper+S → Slack
+- Hyper+B → Browser
+
+### Window Management (yabai)
+- Hyper+Arrows → Focus windows
+- Hyper+Shift+Arrows → Swap windows
+- Hyper+E → Balance layout
+- Hyper+1-9 → Switch to workspace (triggers Control+1-9)
+
+### Mission Control Integration
+Mission Control shortcuts (configured in System Settings → Keyboard → Mission Control):
+- Control+Up → Mission Control (also: Hyper+M via Karabiner)
+- Control+1-9 → Switch to Desktop 1-9 (also: Hyper+1-9 via Karabiner)
+
+## Resources
+
+- [skhd repo](https://github.com/koekeishiya/skhd)
+- [skhd wiki](https://github.com/koekeishiya/skhd/wiki)
+

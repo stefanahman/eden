@@ -4,6 +4,7 @@ LICENSE
 manifest.yaml
 .eden-secrets
 .eden-note
+.eden-graft
 
 # Scripts and build files
 Makefile

@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# graft-configs - Symlink config files from branches using stow
+# This handles standard dotfiles and configs that don't need special merging logic
+
+set -euo pipefail
+
+# Detect Eden root from script location
+if [[ -z "${EDEN_ROOT:-}" ]]; then
+    SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+    EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
+fi
+
+BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+
+# Exit if no branches configured
+if [ ! -f "$BRANCHES_FILE" ]; then
+    echo "  → No branches registered (skipping)"
+    exit 0
+fi
+
+# Expand variables in branch path
+expand_branch_path() {
+    local path="$1"
+    # Expand $EDEN_ROOT
+    path="${path//\$EDEN_ROOT/$EDEN_ROOT}"
+    # Expand tilde
+    path="${path/#\~/$HOME}"
+    # Expand other environment variables
+    eval echo "$path"
+}
+
+echo "  → Symlinking configs from branches"
+
+GRAFTED_COUNT=0
+
+while IFS= read -r branch_path; do
+    [[ -z "$branch_path" ]] && continue
+    [[ "$branch_path" =~ ^[[:space:]]*# ]] && continue
+    
+    # Expand variables and tilde
+    branch_path=$(expand_branch_path "$branch_path")
+    branch_name=$(basename "$branch_path")
+    
+    if [[ -d "$branch_path" ]]; then
+        # Check for .eden-graft file (allowlist)
+        GRAFT_FILE="$branch_path/.eden-graft"
+        
+        if [[ ! -f "$GRAFT_FILE" ]]; then
+            # No .eden-graft file, skip this branch for config grafting
+            continue
+        fi
+        
+        echo "  → Grafting configs from: $branch_name"
+        
+        # Process each allowed path individually
+        while IFS= read -r config_path; do
+            [[ -z "$config_path" ]] && continue
+            [[ "$config_path" =~ ^[[:space:]]*# ]] && continue
+            config_path=$(echo "$config_path" | xargs)
+            
+            source_path="$branch_path/$config_path"
+            
+            # Skip if source doesn't exist
+            if [[ ! -e "$source_path" ]]; then
+                echo "    ⚠ Not found: $config_path (skipping)"
+                continue
+            fi
+            
+            # Get parent directory and item name
+            parent_dir=$(dirname "$config_path")
+            item_name=$(basename "$config_path")
+            
+            # Determine target and source directories
+            if [[ "$parent_dir" == "." ]]; then
+                target_dir="$HOME"
+                source_dir="$branch_path"
+            else
+                target_dir="$HOME/$parent_dir"
+                source_dir="$branch_path/$parent_dir"
+                
+                # Ensure target parent exists
+                mkdir -p "$target_dir"
+            fi
+            
+            # Directories: use stow (it handles tree structures intelligently)
+            # Files: stow expects directories as packages, so we use direct symlinks
+            if [[ -d "$source_path" ]]; then
+                cd "$source_dir"
+                if stow --adopt -t "$target_dir" "$item_name" 2>&1 | grep -q "(CONFLICT|WARNING|ERROR)"; then
+                    echo "    ⚠ Stow reported issues for $config_path"
+                else
+                    echo "    → Linked: $config_path"
+                fi
+            else
+                # Direct symlink for individual files
+                target_path="$target_dir/$item_name"
+                ln -sf "$source_path" "$target_path"
+                echo "    → Linked: $config_path"
+            fi
+            
+        done < "$GRAFT_FILE"
+        
+        GRAFTED_COUNT=$((GRAFTED_COUNT + 1))
+    fi
+done < "$BRANCHES_FILE"
+
+if [ "$GRAFTED_COUNT" -gt 0 ]; then
+    echo "  → Grafted configs from $GRAFTED_COUNT branch(es)"
+else
+    echo "  → No branch configs found"
+fi
+
