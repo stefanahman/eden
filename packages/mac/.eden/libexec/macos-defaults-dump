@@ -1,0 +1,337 @@
+#!/usr/bin/env bash
+# Generate macOS defaults reference library
+# Usage: eden os dump [--all]
+
+set -uo pipefail
+
+# Parse arguments
+INCLUDE_ALL=false
+if [[ "${1:-}" == "--all" ]]; then
+    INCLUDE_ALL=true
+fi
+
+# Determine Eden root directory
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+EDEN_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+
+CONFIG_DIR="$EDEN_ROOT/packages/mac/.config/macos"
+MACOS_VERSION=$(sw_vers -productVersion | cut -d. -f1)
+MACOS_FULL_VERSION=$(sw_vers -productVersion)
+OUTPUT_FILE="$CONFIG_DIR/defaults-${MACOS_VERSION}-dump.sh"
+
+# Color codes
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+GRAY='\033[0;90m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+print_header() {
+    echo -e "${BOLD}${BLUE}$1${RESET}"
+}
+
+print_info() {
+    echo -e "${BLUE}→${RESET} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}✓${RESET} $1"
+}
+
+# Discover domains
+print_header "Generating macOS Defaults Reference Library"
+echo -e "${GRAY}macOS $MACOS_FULL_VERSION${RESET}\n"
+
+print_info "Discovering preference domains..."
+ALL_DOMAINS=$(defaults domains 2>/dev/null | tr ',' '\n' | sed 's/^ //g' | sed 's/ $//g' | sort -u)
+
+# Core system preference domains (developer/power-user focused)
+CORE_SYSTEM_PATTERNS=(
+    "^NSGlobalDomain$"
+    "^com\.apple\.finder$"
+    "^com\.apple\.dock$"
+    "^com\.apple\.screencapture$"
+    "^com\.apple\.screensaver$"
+    "^com\.apple\.menuextra\."
+    "^com\.apple\.Accessibility$"
+    "^com\.apple\.universalaccess$"
+    "^com\.apple\.AppleMultitouch"
+    "^com\.apple\.driver\.AppleBluetoothMultitouch"
+    "^com\.apple\.desktopservices$"
+    "^com\.apple\.LaunchServices$"
+    "^com\.apple\.loginwindow$"
+    "^com\.apple\.systempreferences"
+    "^com\.apple\.preferences"
+    "^com\.apple\.TextEdit$"
+    "^com\.apple\.HIToolbox$"
+    "^com\.apple\.symbolichotkeys$"
+    "^com\.apple\.SoftwareUpdate$"
+    "^com\.apple\.keyboard"
+    "^com\.apple\.trackpad"
+    "^com\.apple\.mouse"
+    "^com\.apple\.sound"
+    "^com\.apple\.TimeMachine$"
+)
+
+DOMAINS_TO_SCAN=()
+while IFS= read -r domain; do
+    [[ -z "$domain" ]] && continue
+    
+    if $INCLUDE_ALL; then
+        # Include everything except obvious background services
+        if [[ "$domain" =~ (Agent|Daemon|Helper|Service|BackgroundTask|xpc)$ ]]; then
+            continue
+        fi
+        DOMAINS_TO_SCAN+=("$domain")
+    else
+        # Only core system domains
+        for pattern in "${CORE_SYSTEM_PATTERNS[@]}"; do
+            if [[ "$domain" =~ $pattern ]]; then
+                DOMAINS_TO_SCAN+=("$domain")
+                break
+            fi
+        done
+    fi
+done <<< "$ALL_DOMAINS"
+
+if $INCLUDE_ALL; then
+    echo -e "${GRAY}Found ${#DOMAINS_TO_SCAN[@]} domains to dump (all domains)${RESET}"
+    echo -e "${GRAY}This may take a few minutes...${RESET}"
+else
+    echo -e "${GRAY}Found ${#DOMAINS_TO_SCAN[@]} core domains to dump${RESET}"
+    echo -e "${GRAY}Use --all to include third-party apps and more${RESET}"
+fi
+echo ""
+
+# Detect type from plist value output
+detect_type() {
+    local value=$1
+    
+    if [[ "$value" =~ ^[01]$ ]]; then
+        echo "bool"
+    elif [[ "$value" =~ ^-?[0-9]+$ ]]; then
+        echo "int"
+    elif [[ "$value" =~ ^-?[0-9]+\.[0-9]+$ ]]; then
+        echo "float"
+    elif [[ "$value" =~ ^\( ]]; then
+        echo "array"
+    elif [[ "$value" =~ ^\{ ]]; then
+        echo "dict"
+    else
+        echo "string"
+    fi
+}
+
+# Format value for defaults write command
+format_value() {
+    local type=$1
+    local value=$2
+    
+    case "$type" in
+        bool)
+            if [[ "$value" == "1" ]]; then
+                echo "true"
+            else
+                echo "false"
+            fi
+            ;;
+        int|float)
+            echo "$value"
+            ;;
+        string)
+            echo "\"${value//\"/\\\"}\""
+            ;;
+        *)
+            echo "\"$value\""
+            ;;
+    esac
+}
+
+# Get friendly category name from domain
+get_category() {
+    local domain=$1
+    
+    case "$domain" in
+        NSGlobalDomain)
+            echo "Global System Settings"
+            ;;
+        com.apple.finder)
+            echo "Finder"
+            ;;
+        com.apple.dock)
+            echo "Dock & Mission Control"
+            ;;
+        com.apple.screencapture)
+            echo "Screenshots"
+            ;;
+        com.apple.menuextra.*)
+            echo "Menu Bar"
+            ;;
+        com.apple.screensaver)
+            echo "Screen Saver & Security"
+            ;;
+        com.apple.Accessibility|com.apple.universalaccess)
+            echo "Accessibility & Animations"
+            ;;
+        com.apple.AppleMultitouch*|com.apple.driver.AppleBluetoothMultitouch*)
+            echo "Trackpad & Mouse"
+            ;;
+        com.apple.Safari*)
+            echo "Safari"
+            ;;
+        com.apple.Mail*)
+            echo "Mail"
+            ;;
+        com.apple.Notes*)
+            echo "Notes"
+            ;;
+        com.apple.*)
+            echo "Apple System"
+            ;;
+        *)
+            echo "Third-Party Apps"
+            ;;
+    esac
+}
+
+# Generate keywords from domain and key
+generate_keywords() {
+    local domain=$1
+    local key=$2
+    
+    # Extract meaningful words from domain
+    local domain_words=$(echo "$domain" | sed 's/com\.apple\.//g' | sed 's/\([A-Z]\)/ \1/g' | tr '.' ' ' | tr '-' ' ' | tr '_' ' ')
+    
+    # Extract meaningful words from key
+    local key_words=$(echo "$key" | sed 's/\([A-Z]\)/ \1/g' | tr '-' ' ' | tr '_' ' ')
+    
+    # Combine and clean up (lowercase, squeeze spaces, trim)
+    echo "$domain_words $key_words" | tr '[:upper:]' '[:lower:]' | tr -s ' ' | xargs
+}
+
+# Start building output
+OUTPUT=""
+TOTAL_SETTINGS=0
+
+# Header
+OUTPUT+="#!/usr/bin/env bash\n"
+OUTPUT+="# macOS Defaults Reference Library - COMPREHENSIVE DUMP\n"
+OUTPUT+="# \n"
+OUTPUT+="# Generated from: macOS $MACOS_FULL_VERSION\n"
+OUTPUT+="# Generated: $(date '+%Y-%m-%d %H:%M:%S')\n"
+OUTPUT+="# By: eden os dump\n"
+OUTPUT+="# \n"
+OUTPUT+="# PURPOSE:\n"
+OUTPUT+="#   This is a REFERENCE file containing all discoverable macOS settings.\n"
+OUTPUT+="#   Use this to browse available options and copy what you want.\n"
+OUTPUT+="# \n"
+OUTPUT+="# WORKFLOW:\n"
+OUTPUT+="#   1. Browse this file (search, ask LLM, etc.)\n"
+OUTPUT+="#   2. Copy settings you want to: defaults-${MACOS_VERSION}.sh\n"
+OUTPUT+="#   3. Uncomment and apply: eden os load\n"
+OUTPUT+="# \n"
+OUTPUT+="# NOTE:\n"
+OUTPUT+="#   - ALL commands are commented out (this is a reference, not config)\n"
+OUTPUT+="#   - Includes system-managed settings (not just user preferences)\n"
+OUTPUT+="#   - May include app-specific settings\n"
+OUTPUT+="\n"
+
+# Scan each domain
+domain_index=0
+total_domains=${#DOMAINS_TO_SCAN[@]}
+
+for domain in "${DOMAINS_TO_SCAN[@]}"; do
+    ((domain_index++))
+    echo -e "${GRAY}[$domain_index/$total_domains]${RESET} ${BOLD}$(get_category "$domain")${RESET} ${GRAY}($domain)${RESET}"
+    
+    # Try to read entire domain
+    if domain_data=$(defaults read "$domain" 2>/dev/null); then
+        # Add category header to output
+        OUTPUT+="# $(printf '=%.0s' {1..76})\n"
+        OUTPUT+="# $(get_category "$domain")\n"
+        OUTPUT+="# Domain: $domain\n"
+        OUTPUT+="# $(printf '=%.0s' {1..76})\n"
+        OUTPUT+="\n"
+        
+        domain_settings=0
+        
+        # Parse keys from domain
+        while IFS= read -r line; do
+            # Extract key name
+            if [[ "$line" =~ ^[[:space:]]*\"?([A-Za-z0-9_\.-]+)\"?[[:space:]]*= ]]; then
+                key="${BASH_REMATCH[1]}"
+                
+                # Skip internal keys
+                [[ "$key" =~ ^_ ]] && continue
+                
+                # Try to read value
+                if value=$(defaults read "$domain" "$key" 2>/dev/null); then
+                    detected_type=$(detect_type "$value")
+                    
+                    # Skip complex types
+                    if [[ "$detected_type" == "array" || "$detected_type" == "dict" ]]; then
+                        continue
+                    fi
+                    
+                    formatted_value=$(format_value "$detected_type" "$value")
+                    keywords=$(generate_keywords "$domain" "$key")
+                    
+                    # Add to output (all commented for reference)
+                    OUTPUT+="# $key\n"
+                    OUTPUT+="# Type: $detected_type\n"
+                    OUTPUT+="# Value: $value\n"
+                    OUTPUT+="# Keywords: $keywords\n"
+                    OUTPUT+="# defaults write \"$domain\" \"$key\" -$detected_type $formatted_value\n"
+                    OUTPUT+="\n"
+                    
+                    ((TOTAL_SETTINGS++))
+                    ((domain_settings++))
+                fi
+            fi
+        done <<< "$domain_data"
+        
+        if [ $domain_settings -gt 0 ]; then
+            echo -e "  ${GREEN}✓${RESET} Captured $domain_settings settings"
+        fi
+    fi
+done
+
+# Add footer
+OUTPUT+="\n"
+OUTPUT+="# $(printf '=%.0s' {1..76})\n"
+OUTPUT+="# End of Reference Library\n"
+OUTPUT+="# Total Settings: $TOTAL_SETTINGS\n"
+OUTPUT+="# $(printf '=%.0s' {1..76})\n"
+
+# Write to file
+echo ""
+print_header "Summary"
+echo -e "  ${GREEN}✓${RESET} Total settings dumped: ${BOLD}$TOTAL_SETTINGS${RESET}"
+echo -e "  ${GRAY}Domains scanned: ${#DOMAINS_TO_SCAN[@]}${RESET}"
+
+echo ""
+echo -e "$OUTPUT" > "$OUTPUT_FILE"
+chmod +x "$OUTPUT_FILE"
+
+print_success "Saved to: ${GRAY}$OUTPUT_FILE${RESET}"
+
+echo ""
+echo -e "${BOLD}Next steps:${RESET}"
+echo -e "  1. Browse the reference: ${GRAY}cat $OUTPUT_FILE${RESET}"
+echo -e "  2. Search with LLM or grep for what you need"
+echo -e "  3. Copy settings to your config: ${BOLD}eden os edit${RESET}"
+echo -e "  4. Apply your config: ${BOLD}eden os apply${RESET}"
+
+echo ""
+echo -e "${YELLOW}Pro tip:${RESET} Ask an LLM to search this file:"
+echo -e '  "Find settings in defaults-15-dump.sh related to keyboard shortcuts"'
+
+echo ""
+

@@ -70,6 +70,7 @@ show_help() {
     echo "  doctor                Validate Eden installation health"
     echo "  status                Show Eden system overview and health"
     echo "  diff-file <path>      Compare a file between Eden and your system"
+    echo "  os <cmd>              OS-specific settings (save, load, show, diff, validate)"
     echo ""
     echo -e "${BOLD}Package Management:${RESET}"
     echo "  install --list        List all available packages to install"
@@ -610,6 +611,75 @@ main() {
             ;;
         diff-file)
             run_script "eden-diff-file" "$@"
+            ;;
+        os)
+            # Detect platform and dispatch to appropriate defaults scripts
+            local subcmd="${1:-help}"
+            case "$(uname -s)" in
+                Darwin)
+                    case "$subcmd" in
+                        show)
+                            "$HOME/.eden/libexec/macos-defaults-show"
+                            ;;
+                        diff)
+                            "$HOME/.eden/libexec/macos-defaults-diff"
+                            ;;
+                        dump)
+                            shift  # Remove 'dump'
+                            "$HOME/.eden/libexec/macos-defaults-dump" "$@"
+                            ;;
+                        edit)
+                            "$HOME/.eden/libexec/macos-defaults-edit"
+                            ;;
+                        apply)
+                            shift  # Remove 'apply'
+                            "$HOME/.eden/libexec/macos-defaults-apply" "$@"
+                            ;;
+                        *)
+                            print_header "Eden OS Configuration (macOS)"
+                            echo ""
+                            echo "Usage: eden os <command>"
+                            echo ""
+                            echo "Commands:"
+                            echo "  dump       Generate reference library (all settings)"
+                            echo "  edit       Edit your config (creates if missing)"
+                            echo "  apply      Apply your config to system"
+                            echo "  show       Show current macOS defaults"
+                            echo "  diff       Compare current vs Eden config"
+                            echo ""
+                            echo "Workflow:"
+                            echo "  1. eden os dump           # Generate reference"
+                            echo "  2. eden os edit           # Browse dump, pick settings"
+                            echo "  3. eden os apply          # Apply your config"
+                            echo ""
+                            echo "Examples:"
+                            echo "  eden os dump              # Core settings (fast)"
+                            echo "  eden os dump --all        # Everything (comprehensive)"
+                            echo "  eden os edit              # Edit config"
+                            echo "  eden os apply             # Apply config"
+                            echo "  eden os diff              # See what would change"
+                            echo "  eden os show              # View current settings"
+                            echo ""
+                            echo "TIP: Ask an LLM to search defaults-15-dump.sh:"
+                            echo '  "Find keyboard shortcuts, trackpad, and animation settings"'
+                            ;;
+                    esac
+                    ;;
+                Linux)
+                    print_info "Arch Linux OS defaults not yet implemented"
+                    echo ""
+                    echo "Coming soon: eden os show/diff/apply for Arch"
+                    echo ""
+                    echo "This will manage:"
+                    echo "  • pacman.conf settings"
+                    echo "  • systemd configurations"
+                    echo "  • GNOME/KDE/Hyprland settings"
+                    ;;
+                *)
+                    print_error "Unsupported platform: $(uname -s)"
+                    exit 1
+                    ;;
+            esac
             ;;
         version|--version|-v)
             show_version

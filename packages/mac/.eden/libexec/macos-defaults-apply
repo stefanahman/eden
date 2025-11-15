@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# Apply macOS defaults from Eden configuration
+# Usage: eden os apply [--dry-run]
+
+set -euo pipefail
+
+# Determine Eden root directory
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+EDEN_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+
+CONFIG_DIR="$EDEN_ROOT/packages/mac/.config/macos"
+MACOS_VERSION=$(sw_vers -productVersion | cut -d. -f1)
+MACOS_FULL_VERSION=$(sw_vers -productVersion)
+
+# Color codes
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+GRAY='\033[0;90m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+print_header() {
+    echo -e "${BOLD}${BLUE}$1${RESET}"
+}
+
+print_info() {
+    echo -e "${BLUE}→${RESET} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}✓${RESET} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${RESET} $1"
+}
+
+# Parse arguments
+DRY_RUN=false
+if [[ "${1:-}" == "--dry-run" ]]; then
+    DRY_RUN=true
+fi
+
+# Find config file
+CONFIG_FILE="$CONFIG_DIR/defaults-${MACOS_VERSION}.sh"
+
+print_header "Applying macOS Defaults"
+echo -e "${GRAY}macOS $MACOS_FULL_VERSION${RESET}\n"
+
+# Check if config exists
+if [ ! -f "$CONFIG_FILE" ]; then
+    print_error "Configuration not found: $CONFIG_FILE"
+    echo ""
+    echo "Available options:"
+    echo ""
+    echo "  1. ${BOLD}Capture your current settings:${RESET}"
+    echo "     eden os save"
+    echo ""
+    echo "  2. ${BOLD}Check for other versions:${RESET}"
+    ls -1 "$CONFIG_DIR"/defaults-*.sh 2>/dev/null | while read -r file; do
+        echo "     $(basename "$file")"
+    done || echo "     (none found)"
+    echo ""
+    exit 1
+fi
+
+print_info "Found configuration: ${GRAY}$(basename "$CONFIG_FILE")${RESET}"
+echo ""
+
+if $DRY_RUN; then
+    print_info "Dry run - showing what would be applied:"
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    # Show defaults write commands only
+    grep "^defaults write" "$CONFIG_FILE" | head -20
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    TOTAL_SETTINGS=$(grep -c "^defaults write" "$CONFIG_FILE" || echo "0")
+    echo -e "${GRAY}(showing first 20 of $TOTAL_SETTINGS settings)${RESET}"
+    echo ""
+    print_info "Run without --dry-run to apply:"
+    echo -e "  ${BOLD}eden os apply${RESET}"
+else
+    print_info "Applying settings..."
+    echo ""
+    
+    # Execute the config file
+    # Redirect output to capture success message
+    if bash "$CONFIG_FILE" 2>&1; then
+        echo ""
+        print_header "Summary"
+        
+        TOTAL_SETTINGS=$(grep -c "^defaults write" "$CONFIG_FILE" || echo "0")
+        print_success "Settings applied: ${BOLD}$TOTAL_SETTINGS${RESET}"
+        
+        echo ""
+        echo -e "${BOLD}Note:${RESET} Some changes may require logging out or restarting."
+        echo ""
+        echo -e "${BOLD}Next steps:${RESET}"
+        echo -e "  ${BOLD}eden os show${RESET}  - View current settings"
+        echo -e "  ${BOLD}eden os diff${RESET}  - Compare with Eden config"
+    else
+        echo ""
+        print_error "Some settings failed to apply (may not be available on this macOS version)"
+        exit 1
+    fi
+fi
+
+echo ""
+

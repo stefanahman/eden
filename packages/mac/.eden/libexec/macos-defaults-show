@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Show current macOS defaults settings
+# Usage: eden install macos-defaults-show
+
+set -euo pipefail
+
+# Detect macOS version
+MACOS_VERSION=$(sw_vers -productVersion | cut -d. -f1)
+
+# Color codes
+BOLD='\033[1m'
+BLUE='\033[0;34m'
+GRAY='\033[0;90m'
+RESET='\033[0m'
+
+print_header() {
+    echo -e "\n${BOLD}${BLUE}=== $1 ===${RESET}"
+}
+
+# Show version info
+echo -e "${GRAY}macOS $(sw_vers -productVersion) - Config: defaults-${MACOS_VERSION}.sh${RESET}"
+
+read_default() {
+    local domain="$1"
+    local key="$2"
+    defaults read "$domain" "$key" 2>/dev/null || echo "not set (system default)"
+}
+
+print_header "Keyboard & Input"
+echo "KeyRepeat: $(read_default NSGlobalDomain KeyRepeat)"
+echo "InitialKeyRepeat: $(read_default NSGlobalDomain InitialKeyRepeat)"
+echo "Fn keys as standard: $(read_default NSGlobalDomain com.apple.keyboard.fnState)"
+echo "Press-and-hold disabled: $(read_default NSGlobalDomain ApplePressAndHoldEnabled)"
+
+print_header "Trackpad"
+echo "Tap to click: $(read_default com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking)"
+echo "Natural scrolling: $(read_default NSGlobalDomain com.apple.swipescrolldirection)"
+
+print_header "Finder"
+echo "Show all files: $(read_default com.apple.finder AppleShowAllFiles)"
+echo "Show extensions: $(read_default NSGlobalDomain AppleShowAllExtensions)"
+echo "Show path bar: $(read_default com.apple.finder ShowPathbar)"
+echo "Show status bar: $(read_default com.apple.finder ShowStatusBar)"
+echo "View style: $(read_default com.apple.finder FXPreferredViewStyle)"
+echo "Default search scope: $(read_default com.apple.finder FXDefaultSearchScope)"
+echo "Warn on extension change: $(read_default com.apple.finder FXEnableExtensionChangeWarning)"
+
+print_header "Dock"
+echo "Auto-hide: $(read_default com.apple.dock autohide)"
+echo "Size: $(read_default com.apple.dock tilesize)"
+echo "Minimize effect: $(read_default com.apple.dock mineffect)"
+echo "Show indicators: $(read_default com.apple.dock show-process-indicators)"
+
+print_header "Screenshots"
+echo "Location: $(read_default com.apple.screencapture location)"
+echo "Format: $(read_default com.apple.screencapture type)"
+echo "Disable shadow: $(read_default com.apple.screencapture disable-shadow)"
+
+print_header "Mission Control"
+echo "Auto-rearrange Spaces: $(read_default com.apple.dock mru-spaces)"
+echo "Group by application: $(read_default com.apple.dock expose-group-apps)"
+
+print_header "Other"
+echo "Expand save panel: $(read_default NSGlobalDomain NSNavPanelExpandedStateForSaveMode)"
+echo "Expand print panel: $(read_default NSGlobalDomain PMPrintingExpandedStateForPrint)"
+echo "Auto-capitalize: $(read_default NSGlobalDomain NSAutomaticCapitalizationEnabled)"
+echo "Auto-period: $(read_default NSGlobalDomain NSAutomaticPeriodSubstitutionEnabled)"
+echo "Smart quotes: $(read_default NSGlobalDomain NSAutomaticQuoteSubstitutionEnabled)"
+echo "Smart dashes: $(read_default NSGlobalDomain NSAutomaticDashSubstitutionEnabled)"
+
+echo ""
+
