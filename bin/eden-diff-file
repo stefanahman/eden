@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# Compare a file between Eden and your current system
+# Usage: eden diff-file <path>
+# Example: eden diff-file ~/.zshenv
+
+set -euo pipefail
+
+# Determine Eden root directory
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+EDEN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Color codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+print_error() {
+    echo -e "${RED}✗${RESET} $1" >&2
+}
+
+print_info() {
+    echo -e "${BLUE}→${RESET} $1"
+}
+
+# Check arguments
+if [ $# -eq 0 ]; then
+    echo -e "${BOLD}Usage:${RESET} eden diff-file <path>"
+    echo ""
+    echo "Compare a file between Eden packages and your current system."
+    echo ""
+    echo "Examples:"
+    echo "  eden diff-file ~/.zshenv"
+    echo "  eden diff-file ~/.config/git/config"
+    echo "  eden diff-file .zshenv              # relative to HOME"
+    exit 1
+fi
+
+TARGET_PATH="$1"
+
+# Expand ~ to $HOME if needed
+TARGET_PATH="${TARGET_PATH/#\~/$HOME}"
+
+# If path doesn't start with /, assume it's relative to HOME
+if [[ ! "$TARGET_PATH" =~ ^/ ]]; then
+    TARGET_PATH="$HOME/$TARGET_PATH"
+fi
+
+# Check if target file exists
+if [ ! -f "$TARGET_PATH" ]; then
+    print_error "File does not exist: $TARGET_PATH"
+    exit 1
+fi
+
+# Determine relative path from HOME
+REL_PATH="${TARGET_PATH#$HOME/}"
+
+# Find the file in Eden packages
+# Check in order: platform-specific (mac/arch), common, eden
+PLATFORM_PKG=""
+case "$(uname -s)" in
+    Darwin) PLATFORM_PKG="mac" ;;
+    Linux) PLATFORM_PKG="arch" ;;
+esac
+
+EDEN_FILE=""
+for pkg in "$PLATFORM_PKG" "common" "eden"; do
+    [ -z "$pkg" ] && continue
+    CANDIDATE="$EDEN_ROOT/packages/$pkg/$REL_PATH"
+    if [ -f "$CANDIDATE" ]; then
+        EDEN_FILE="$CANDIDATE"
+        EDEN_PKG="$pkg"
+        break
+    fi
+done
+
+if [ -z "$EDEN_FILE" ]; then
+    print_error "File not found in Eden packages: $REL_PATH"
+    echo ""
+    print_info "Searched in:"
+    [ -n "$PLATFORM_PKG" ] && echo "  - packages/$PLATFORM_PKG/"
+    echo "  - packages/common/"
+    echo "  - packages/eden/"
+    exit 1
+fi
+
+# Show comparison
+echo -e "${BOLD}${BLUE}Comparing: $REL_PATH${RESET}"
+echo ""
+echo -e "${YELLOW}Eden version:${RESET} $EDEN_FILE (from packages/$EDEN_PKG)"
+echo -e "${YELLOW}System version:${RESET} $TARGET_PATH"
+echo ""
+
+# Check if they're identical
+if diff -q "$EDEN_FILE" "$TARGET_PATH" > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ Files are identical${RESET}"
+    exit 0
+fi
+
+# Show the diff
+echo -e "${BOLD}Differences:${RESET}"
+echo ""
+
+# Try to use colordiff if available, otherwise regular diff
+if command -v colordiff &> /dev/null; then
+    diff -u "$EDEN_FILE" "$TARGET_PATH" | colordiff | tail -n +3 || true
+elif command -v delta &> /dev/null; then
+    diff -u "$EDEN_FILE" "$TARGET_PATH" | delta || true
+else
+    diff -u "$EDEN_FILE" "$TARGET_PATH" | tail -n +3 || true
+fi
+
+echo ""
+echo -e "${BOLD}Next steps:${RESET}"
+echo "  1. Keep Eden's version:"
+echo "     eden plant --adopt    # Moves your version into Eden"
+echo ""
+echo "  2. Keep your version:"
+echo "     # Manually merge or leave as-is"
+echo ""
+echo "  3. View side-by-side:"
+echo "     vimdiff \"$EDEN_FILE\" \"$TARGET_PATH\""
+

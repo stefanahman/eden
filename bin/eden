@@ -69,6 +69,7 @@ show_help() {
     echo "  secrets               Manage 1Password secrets (list, validate)"
     echo "  doctor                Validate Eden installation health"
     echo "  status                Show Eden system overview and health"
+    echo "  diff-file <path>      Compare a file between Eden and your system"
     echo ""
     echo -e "${BOLD}Package Management:${RESET}"
     echo "  install --list        List all available packages to install"
@@ -430,16 +431,51 @@ main() {
             fi
             
             cd "$EDEN_ROOT"
+            
+            # Capture stow output and check for errors
+            STOW_OUTPUT=""
+            STOW_EXIT=0
+            
             case "$(uname -s)" in
                 Darwin)
                     print_info "Planting common + eden + mac packages (using GNU Stow)..."
-                    stow -v $ADOPT_FLAG -d packages -t "$HOME" common eden mac
+                    STOW_OUTPUT=$(stow -v $ADOPT_FLAG -d packages -t "$HOME" common eden mac 2>&1) || STOW_EXIT=$?
                     ;;
                 Linux)
                     print_info "Planting common + eden + arch packages (using GNU Stow)..."
-                    stow -v $ADOPT_FLAG -d packages -t "$HOME" common eden arch
+                    STOW_OUTPUT=$(stow -v $ADOPT_FLAG -d packages -t "$HOME" common eden arch 2>&1) || STOW_EXIT=$?
                     ;;
             esac
+            
+            # Check for stow errors and provide helpful messages
+            if [ $STOW_EXIT -ne 0 ]; then
+                echo "$STOW_OUTPUT"
+                echo ""
+                
+                if echo "$STOW_OUTPUT" | grep -q "cannot stow.*over existing target.*--adopt not specified"; then
+                    print_error "Error: Stow conflict - existing files are blocking symlink creation"
+                    echo ""
+                    print_info "You have existing files that conflict with Eden configs."
+                    echo ""
+                    echo "Options:"
+                    echo "  1. ${BOLD}Adopt existing files${RESET} (move them into Eden):"
+                    echo "     eden plant --adopt"
+                    echo ""
+                    echo "  2. ${BOLD}Remove/backup conflicting files${RESET} manually:"
+                    if echo "$STOW_OUTPUT" | grep -o "target [^ ]*" | head -5; then
+                        echo ""
+                    fi
+                    echo "     Then run: eden plant"
+                else
+                    print_error "Error: Stow failed"
+                    echo ""
+                    echo "Check the output above for details."
+                fi
+                exit 1
+            fi
+            
+            # Show stow output on success
+            echo "$STOW_OUTPUT"
             
             if [[ -n "$ADOPT_FLAG" ]]; then
                 print_success "Files adopted into Eden and symlinks created"
@@ -571,6 +607,9 @@ main() {
             ;;
         check-package)
             check_package "$@"
+            ;;
+        diff-file)
+            run_script "eden-diff-file" "$@"
             ;;
         version|--version|-v)
             show_version
