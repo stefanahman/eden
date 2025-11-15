@@ -27,6 +27,9 @@ brew "neovim"
 # Keyboard customization
 cask "karabiner-elements"  # Advanced keyboard modifier and remapping
 
+# Browsers
+cask "ungoogled-chromium"  # Privacy-focused Chromium without Google integration
+
 # System tools
 brew "btop"        # Resource monitor
 brew "jq"          # JSON processor
