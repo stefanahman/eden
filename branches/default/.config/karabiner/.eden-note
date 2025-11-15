@@ -1,0 +1,32 @@
+# Karabiner-Elements Configuration - Omarchy on macOS
+
+## Hardware
+- Keyboard: Filco Ninja Majestouch (Windows ISO layout)
+- Physical keycaps swapped: Windows → Cmd
+
+## Philosophy (Omarchy-inspired)
+Create a conflict-free custom shortcut namespace on macOS by using right-side modifiers.
+
+### Hyper Key (Caps Lock)
+- Maps to: Right Ctrl + Right Alt + Right Cmd
+- Why right-side only: Preserves left-side for native macOS shortcuts
+- Alone: Acts as Escape
+
+### Shortcut Layers
+1. **Left-side modifiers**: Standard macOS (Cmd+C, Cmd+Tab, etc.)
+2. **Hyper + key**: Custom shortcuts (24 combinations)
+3. **Hyper + Shift + key**: Custom shortcut variants (24 more combinations)
+
+Total: ~48 custom shortcuts with zero conflicts
+
+### Device-Specific: Filco Majestouch
+- Swap Left Cmd ↔ Left Option for Mac compatibility
+- ISO keyboard type (tall Enter key)
+- Product ID: 6168, Vendor ID: 1241
+
+## Benefits
+- Native macOS shortcuts untouched
+- Scalable custom shortcut system
+- Can use with Raycast, Keyboard Maestro, or custom automations
+- Shift variants for related actions (e.g., Hyper+T vs Hyper+Shift+T)
+

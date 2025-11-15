@@ -24,6 +24,9 @@ cask "gcloud-cli"  # Google Cloud CLI (gcloud)
 # Editor
 brew "neovim"
 
+# Keyboard customization
+cask "karabiner-elements"  # Advanced keyboard modifier and remapping
+
 # System tools
 brew "btop"        # Resource monitor
 brew "jq"          # JSON processor
