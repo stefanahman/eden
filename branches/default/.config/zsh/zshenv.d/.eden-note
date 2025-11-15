@@ -1,0 +1,13 @@
+# zshenv.d - Modular Environment Configuration
+
+This directory contains modular zsh environment configurations that are
+sourced by ~/.config/zsh/.zshenv.
+
+Files in this directory should:
+- End with .zsh extension
+- Be focused on environment variables (not interactive shell features)
+- Be self-contained and not depend on load order
+
+This pattern allows Eden branches to add their own environment settings
+without modifying the base .zshenv file.
+

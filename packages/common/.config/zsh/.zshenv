@@ -24,3 +24,10 @@ fi
 # Export PATH
 export PATH
 
+# Load additional environment configuration from zshenv.d/
+# This allows branches and user customizations to extend base config
+if [[ -d "${XDG_CONFIG_HOME:-$HOME/.config}/zsh/zshenv.d" ]]; then
+    for file in "${XDG_CONFIG_HOME:-$HOME/.config}/zsh/zshenv.d"/*.zsh(N); do
+        source "$file"
+    done
+fi
