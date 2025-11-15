@@ -3,6 +3,7 @@ README.md
 LICENSE
 manifest.yaml
 .eden-secrets
+.eden-note
 
 # Scripts and build files
 Makefile
