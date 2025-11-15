@@ -1,0 +1,73 @@
+#!/bin/bash
+# graft-zsh - Graft zsh configs from branches (zshenv.d/, zshrc.d/)
+# Part of Eden's pluggable grafter system
+set -e
+
+# Detect Eden root from script location
+if [[ -z "$EDEN_ROOT" ]]; then
+    SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+    EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
+fi
+
+# Expand variables in branch path
+expand_branch_path() {
+    local path="$1"
+    # Expand $EDEN_ROOT
+    path="${path//\$EDEN_ROOT/$EDEN_ROOT}"
+    # Expand tilde
+    path="${path/#\~/$HOME}"
+    echo "$path"
+}
+
+echo "  → Grafting zsh configs from branches"
+
+# Graft zsh configs from each branch
+BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+if [[ ! -f "$BRANCHES_FILE" ]]; then
+    echo "  ⚠ No branches file found"
+    exit 0
+fi
+
+# Ensure zshenv.d directory exists
+ZSHENV_D="${XDG_CONFIG_HOME:-$HOME/.config}/zsh/zshenv.d"
+mkdir -p "$ZSHENV_D"
+
+GRAFTED_COUNT=0
+
+while IFS= read -r branch_path; do
+    [[ -z "$branch_path" ]] && continue
+    [[ "$branch_path" =~ ^[[:space:]]*# ]] && continue
+    
+    # Expand variables and tilde
+    branch_path=$(expand_branch_path "$branch_path")
+    branch_name=$(basename "$branch_path")
+    
+    # Check for zshenv.d in branch
+    BRANCH_ZSHENV_D="$branch_path/.config/zsh/zshenv.d"
+    
+    if [[ -d "$BRANCH_ZSHENV_D" ]]; then
+        echo "  → Grafting zsh from: $branch_name"
+        
+        # Symlink all .zsh files from branch zshenv.d/
+        for file in "$BRANCH_ZSHENV_D"/*.zsh; do
+            [[ -e "$file" ]] || continue
+            
+            filename=$(basename "$file")
+            target="$ZSHENV_D/$filename"
+            
+            # Create or update symlink
+            ln -sf "$file" "$target"
+        done
+        
+        GRAFTED_COUNT=$((GRAFTED_COUNT + 1))
+    fi
+done < "$BRANCHES_FILE"
+
+if [[ $GRAFTED_COUNT -eq 0 ]]; then
+    echo "  → No zsh configs found in branches"
+else
+    echo "  → Grafted zsh from $GRAFTED_COUNT branch(es)"
+fi
+
+exit 0
+

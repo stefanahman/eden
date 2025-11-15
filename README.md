@@ -26,11 +26,14 @@ eden install
 # Plant configurations into your system
 eden plant
 
+# Graft branch configurations (after plant)
+eden graft
+
 # Validate installation
 eden doctor
 ```
 
-Eden grows in stages: first the command wrapper, then tools and packages, then configuration planting. This sequence requires only git at the start.
+Eden grows in stages: first the command wrapper, then tools and packages, then configuration planting, then branch integration. This sequence requires only git at the start.
 
 ## Structure
 
@@ -40,7 +43,21 @@ Eden has three layers:
 2. **Default branch** (`branches/default`) - Opinionated extras (MCP servers, integrations)
 3. **Personal branches** (optional) - Private, context-specific extensions
 
-Core packages are planted into `$HOME` using `eden plant` (a wrapper around GNU Stow). The default branch and any personal branches are integrated via `eden graft`, which merges configurations intelligently.
+### Two Deployment Methods
+
+**Planting** (`eden plant` - runs first):
+- Uses GNU Stow to symlink Eden packages into `$HOME`
+- One-to-one file mapping: each file has one source
+- Installs the base configurations everyone needs
+- Example: `~/.zshrc` → `eden/packages/common/.zshrc`
+
+**Grafting** (`eden graft` - runs after plant):
+- Intelligently merges configurations from multiple branches
+- Multiple sources contribute to shared configs
+- Enables composable, context-specific extensions
+- Example: Work and personal branches both add MCP servers → merged into one `~/.config/mcp/servers.json`
+
+The commands work together: `eden plant` installs the base system and grafter tools, then `eden graft` uses those tools to merge branch configurations. Personal branches can add binaries, environment variables, and configs without conflicts.
 
 Local machine overrides live in `~/.config/eden/` (XDG-compliant), while Eden binaries are managed in `~/.eden/bin/` (like cargo, volta, fnm).
 
