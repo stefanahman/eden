@@ -1,7 +1,8 @@
 # Documentation and metadata
 README.md
 LICENSE
-manifest.yaml
+ARCHITECTURE.md
+CLAUDE.md
 .eden-secrets
 .eden-note
 .eden-graft

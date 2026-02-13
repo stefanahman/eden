@@ -32,7 +32,7 @@ BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
 detect_eden_root() {
     # Check if we're in the Eden repo
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "$script_dir/../manifest.yaml" ]; then
+    if [ -f "$script_dir/../bin/eden" ]; then
         echo "$(cd "$script_dir/.." && pwd)"
     elif [ -d "$HOME/.eden" ]; then
         # Fallback: assume standard location
