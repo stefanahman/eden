@@ -1,9 +1,15 @@
 #!/bin/bash
 # Eden graft - Graft branch configs into Eden
 # Auto-discovers configs from branch repos and grafts them into local configs
+#
+# Usage:
+#   eden graft          Run all grafters
+#   eden graft git      Run only graft-git
+#   eden graft --list   List available grafters
 set -e
 
 # Colors
+RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
@@ -14,6 +20,10 @@ log() {
 
 warn() {
     echo -e "${YELLOW}⚠${NC} $1"
+}
+
+err() {
+    echo -e "${RED}✗${NC} $1" >&2
 }
 
 # Get script directory
@@ -28,36 +38,79 @@ if [ ! -f "$BRANCHES_FILE" ]; then
     exit 1
 fi
 
-
-# =============================================================================
-# PLUGGABLE GRAFTER SYSTEM
-# =============================================================================
-run_pluggable_grafters() {
-    local grafters_dir="$HOME/.eden/libexec/grafters"
-    
-    # Fall back to repo location if not stowed yet
-    if [ ! -d "$grafters_dir" ]; then
-        grafters_dir="$SCRIPT_DIR/../packages/eden/.eden/libexec/grafters"
+# Resolve grafters directory
+resolve_grafters_dir() {
+    local dir="$HOME/.eden/libexec/grafters"
+    if [ ! -d "$dir" ]; then
+        dir="$SCRIPT_DIR/../packages/eden/.eden/libexec/grafters"
     fi
-    
-    if [ ! -d "$grafters_dir" ]; then
+    if [ ! -d "$dir" ]; then
         warn "Grafters directory not found. Run 'eden plant' first."
         return 1
     fi
-    
+    echo "$dir"
+}
+
+# List available grafters
+list_grafters() {
+    local grafters_dir
+    grafters_dir=$(resolve_grafters_dir) || exit 1
+
+    echo "Available grafters:"
+    echo ""
+    for grafter in "$grafters_dir"/graft-*; do
+        [ -e "$grafter" ] || continue
+        [ -x "$grafter" ] || continue
+        local name
+        name=$(basename "$grafter" | sed 's/^graft-//')
+        echo "  $name"
+    done
+}
+
+# Run a single grafter by name
+run_single_grafter() {
+    local name="$1"
+    local grafters_dir
+    grafters_dir=$(resolve_grafters_dir) || exit 1
+
+    local grafter="$grafters_dir/graft-$name"
+    if [ ! -f "$grafter" ]; then
+        err "Unknown grafter: $name"
+        echo ""
+        list_grafters
+        exit 1
+    fi
+    if [ ! -x "$grafter" ]; then
+        err "Grafter not executable: graft-$name"
+        exit 1
+    fi
+
+    log "Running: graft-$name"
+    if bash "$grafter"; then
+        log "graft-$name complete"
+    else
+        warn "graft-$name failed (exit code: $?)"
+        exit 1
+    fi
+}
+
+# Run all grafters
+run_all_grafters() {
+    local grafters_dir
+    grafters_dir=$(resolve_grafters_dir) || exit 1
+
     log "Running pluggable grafters..."
     echo ""
-    
-    # Discover and run all grafters
+
     local grafter_count=0
     for grafter in "$grafters_dir"/graft-*; do
         [ -e "$grafter" ] || continue
         [ -x "$grafter" ] || continue
-        
-        local grafter_name=$(basename "$grafter")
+
+        local grafter_name
+        grafter_name=$(basename "$grafter")
         log "Running: $grafter_name"
-        
-        # Source the grafter (allows it to use return 0)
+
         if bash "$grafter"; then
             grafter_count=$((grafter_count + 1))
         else
@@ -65,12 +118,12 @@ run_pluggable_grafters() {
         fi
         echo ""
     done
-    
+
     if [ $grafter_count -eq 0 ]; then
         warn "No grafters found in $grafters_dir"
         return 1
     fi
-    
+
     return 0
 }
 
@@ -78,18 +131,38 @@ run_pluggable_grafters() {
 # MAIN
 # =============================================================================
 main() {
-    log "Grafting branch configs into Eden..."
-    echo ""
-    
-    # Run all pluggable grafters
-    if run_pluggable_grafters; then
-        echo ""
-        log "Graft complete! 🌳"
-    else
-        echo ""
-        warn "Graft completed with errors"
-        exit 1
-    fi
+    case "${1:-}" in
+        --list|-l)
+            list_grafters
+            ;;
+        --help|-h)
+            echo "Usage: eden graft [name] [--list]"
+            echo ""
+            echo "  eden graft          Run all grafters"
+            echo "  eden graft git      Run only graft-git"
+            echo "  eden graft --list   List available grafters"
+            ;;
+        "")
+            log "Grafting branch configs into Eden..."
+            echo ""
+            if run_all_grafters; then
+                echo ""
+                log "Graft complete!"
+            else
+                echo ""
+                warn "Graft completed with errors"
+                exit 1
+            fi
+            ;;
+        -*)
+            err "Unknown flag: $1"
+            echo "Run 'eden graft --help' for usage"
+            exit 1
+            ;;
+        *)
+            run_single_grafter "$1"
+            ;;
+    esac
 }
 
 main "$@"

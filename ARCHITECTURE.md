@@ -63,10 +63,13 @@ MCP configs, secrets, binaries. Each grafter handles one concern independently.
 
 | Command | Purpose |
 |---------|---------|
+| `eden grow` | Plant configs + run all grafters (the main command) |
+| `eden plant` | Apply symlinks (wraps GNU Stow with smart conflict handling) |
+| `eden unplant` | Remove Eden symlinks |
+| `eden graft [name]` | Run all grafters, or a specific one (e.g., `eden graft git`) |
+| `eden graft --list` | Show available grafters |
 | `eden install [pkg]` | Install platform packages or specific package (e.g., gcloud) |
-| `eden plant` | Apply symlinks (wraps GNU Stow with checks) |
 | `eden update` | Pull from git and re-apply symlinks |
-| `eden graft` | Discover and integrate branch configs |
 | `eden branch` | Manage branch registration (add, list, remove, new) |
 | `eden secrets` | Manage 1Password secrets across branches |
 | `eden doctor` | Validate installation health |

@@ -52,49 +52,39 @@ print_warning() {
 show_help() {
     print_header "Eden - Personal Environment Manager"
     echo ""
-    echo -e "${BOLD}Usage:${RESET}"
-    echo "  eden <command> [options]"
+    echo -e "${BOLD}Usage:${RESET} eden <command> [options]"
     echo ""
-    echo -e "${BOLD}Core Commands:${RESET}"
-    echo "  install [package]     Install packages (no args = all from Brewfile/pacman.txt)"
-    echo "                        Specific packages: gcloud | Use --list to see all"
-    echo "  update                Update Eden from git and re-apply symlinks"
-    echo "  plant [--adopt]       Plant Eden configs (wraps GNU Stow with helpful checks)"
-    echo "                        Use --adopt to pull existing files into Eden"
-    echo "  unplant               Remove Eden symlinks (temporary, keeps ~/.eden/)"
-    echo "  stow / unstow         Direct aliases if you prefer (plant/unplant recommended)"
-    echo "  uninstall             Complete Eden removal (unplant + remove ~/.eden/)"
-    echo "  graft                 Discover and integrate branch configs"
+    echo -e "${BOLD}Getting Started:${RESET}"
+    echo "  grow                  Plant configs + run grafters (the main command)"
+    echo "  install [package]     Install platform packages or a specific tool"
+    echo "  doctor                Validate installation health"
+    echo ""
+    echo -e "${BOLD}Config Management:${RESET}"
+    echo "  plant [--adopt]       Plant Eden configs via GNU Stow [--dry-run to preview]"
+    echo "  unplant               Remove Eden symlinks (keeps ~/.eden/)"
+    echo "  graft [name]          Run all grafters, or just one (e.g., eden graft git)"
+    echo "  graft --list          Show available grafters"
+    echo "  update                Pull from git and re-apply configs"
+    echo "  uninstall             Complete Eden removal"
+    echo ""
+    echo -e "${BOLD}Branches & Secrets:${RESET}"
     echo "  branch                Manage Eden branches (add, list, remove, init)"
     echo "  secrets               Manage 1Password secrets (list, validate)"
-    echo "  doctor                Validate Eden installation health"
+    echo ""
+    echo -e "${BOLD}Inspect & Debug:${RESET}"
     echo "  status                Show Eden system overview and health"
     echo "  diff-file <path>      Compare a file between Eden and your system"
-    echo "  os <cmd>              OS-specific settings (save, load, show, diff, validate)"
-    echo ""
-    echo -e "${BOLD}Package Management:${RESET}"
-    echo "  install --list        List all available packages to install"
-    echo "  check-package <name>  Check if a package exists (official repo, AUR, or brew)"
+    echo "  check-package <name>  Check if a package exists (brew, pacman, AUR)"
     echo "  list-packages         Show platform packages (Brewfile/pacman.txt)"
-    echo "  packages              [deprecated] Use 'eden install' instead"
-    echo ""
-    echo -e "${BOLD}Utility Commands:${RESET}"
-    echo "  eden-mcp-merge        Merge MCP configuration files"
-    echo "  version               Show Eden version and location"
-    echo "  help                  Show this help message"
+    echo "  os <cmd>              OS-specific settings (dump, edit, apply, show, diff)"
     echo ""
     echo -e "${BOLD}Examples:${RESET}"
-    echo "  eden install          # Install all platform packages"
-    echo "  eden install gcloud   # Install Google Cloud CLI"
-    echo "  eden install --list   # See all available packages"
-    echo "  eden update           # Update to latest Eden changes"
-    echo "  eden plant            # Plant Eden configs (apply symlinks)"
-    echo "  eden plant --adopt    # Pull existing configs into Eden"
-    echo "  eden graft            # Integrate branch configurations"
-    echo "  eden secrets list     # List required 1Password secrets"
-    echo "  eden secrets validate # Validate secrets exist in 1Password"
-    echo "  eden doctor           # Check system health"
-    echo "  eden check-package fnm  # Check where a package is available"
+    echo "  eden grow               Plant configs + run all grafters"
+    echo "  eden grow --dry-run     Preview everything without changes"
+    echo "  eden plant --adopt      Pull existing files into Eden"
+    echo "  eden graft git          Run only the git grafter"
+    echo "  eden install gcloud     Install Google Cloud CLI"
+    echo "  eden secrets validate   Check 1Password secrets exist"
     echo ""
     echo -e "${BOLD}Environment:${RESET}"
     echo "  Eden Root: $EDEN_ROOT"
@@ -319,6 +309,171 @@ run_script() {
     "$script_path" "$@"
 }
 
+# Determine stow packages for current platform
+stow_packages() {
+    case "$(uname -s)" in
+        Darwin) echo "common eden mac" ;;
+        Linux)  echo "common eden arch" ;;
+    esac
+}
+
+# Plant Eden configs (shared by plant and grow commands)
+# Returns 0 on success, 1 on failure
+do_plant() {
+    local adopt_flag="" dry_run_flag=""
+    for arg in "$@"; do
+        case "$arg" in
+            --adopt) adopt_flag="--adopt" ;;
+            --dry-run|-n) dry_run_flag="-n" ;;
+        esac
+    done
+
+    if [[ -n "$dry_run_flag" ]]; then
+        print_header "Planting Eden Configs (dry run)"
+        echo ""
+        print_info "Simulating — no changes will be made"
+        echo ""
+    elif [[ -n "$adopt_flag" ]]; then
+        print_header "Planting Eden Configs (with --adopt)"
+        echo ""
+        print_info "This will move existing files into Eden and create symlinks"
+        echo ""
+    else
+        print_header "Planting Eden Configs"
+    fi
+
+    # Check if stow is installed
+    if ! command -v stow &> /dev/null; then
+        print_error "GNU Stow is not installed"
+        echo ""
+        echo "Install stow first:"
+        case "$(uname -s)" in
+            Darwin) echo "  brew install stow" ;;
+            Linux)
+                echo "  sudo pacman -S stow"
+                echo "  # or: yay -S stow"
+                ;;
+        esac
+        echo ""
+        echo "Or run: eden install"
+        return 1
+    fi
+
+    cd "$EDEN_ROOT"
+    local pkgs
+    pkgs=$(stow_packages)
+    print_info "Planting $pkgs packages (using GNU Stow)..."
+
+    # Dry-run mode: just show what would happen
+    if [[ -n "$dry_run_flag" ]]; then
+        stow -v -n $adopt_flag -d packages -t "$HOME" $pkgs 2>&1 || true
+        return 0
+    fi
+
+    # Explicit --adopt: skip conflict detection, run directly
+    if [[ -n "$adopt_flag" ]]; then
+        local output exit_code=0
+        output=$(stow -v --adopt -d packages -t "$HOME" $pkgs 2>&1) || exit_code=$?
+        echo "$output"
+        if [[ $exit_code -ne 0 ]]; then
+            print_error "Stow failed"
+            return 1
+        fi
+        print_success "Files adopted into Eden and symlinks created"
+        echo ""
+        print_info "Next steps:"
+        echo "  1. Review changes: cd $EDEN_ROOT && git status"
+        echo "  2. Check diffs: git diff"
+        echo "  3. Commit if satisfied: git add -A && git commit -m 'Adopt configs from system'"
+        echo "  4. Or revert: git checkout ."
+        return 0
+    fi
+
+    # Smart conflict handling: dry-run first to detect conflicts
+    local scan_output scan_exit=0
+    scan_output=$(stow -n -d packages -t "$HOME" $pkgs 2>&1) || scan_exit=$?
+
+    if [[ $scan_exit -ne 0 ]]; then
+        # Show stow's own conflict output (it knows what to say)
+        echo "$scan_output"
+        echo ""
+
+        if [[ -t 0 ]]; then
+            # Interactive terminal — prompt user
+            echo -n "Existing files found. Adopt into Eden? [y/N] "
+            read -r response
+            if [[ "$response" =~ ^[Yy]$ ]]; then
+                local output exit_code=0
+                output=$(stow -v --adopt -d packages -t "$HOME" $pkgs 2>&1) || exit_code=$?
+                echo "$output"
+                if [[ $exit_code -ne 0 ]]; then
+                    print_error "Stow failed"
+                    return 1
+                fi
+                print_success "Files adopted into Eden and symlinks created"
+                echo ""
+                print_info "Next steps:"
+                echo "  1. Review changes: cd $EDEN_ROOT && git status"
+                echo "  2. Check diffs: git diff"
+                echo "  3. Commit if satisfied: git add -A && git commit -m 'Adopt configs from system'"
+                echo "  4. Or revert: git checkout ."
+                return 0
+            else
+                print_info "Aborted. No changes made."
+                return 1
+            fi
+        else
+            # Non-interactive — fail with guidance
+            print_error "Conflicts detected. Run interactively or use: eden plant --adopt"
+            return 1
+        fi
+    fi
+
+    # No conflicts — run for real
+    local output exit_code=0
+    output=$(stow -v -d packages -t "$HOME" $pkgs 2>&1) || exit_code=$?
+    echo "$output"
+
+    if [[ $exit_code -ne 0 ]]; then
+        print_error "Stow failed"
+        return 1
+    fi
+
+    print_success "Eden configs planted successfully"
+    return 0
+}
+
+# Unplant Eden configs (remove symlinks)
+do_unplant() {
+    print_header "Unplanting Eden Configs"
+
+    if ! command -v stow &> /dev/null; then
+        print_warning "GNU Stow is not installed, cannot unplant cleanly"
+        echo ""
+        print_info "Symlinks remain in place. Install stow first:"
+        case "$(uname -s)" in
+            Darwin) echo "  brew install stow" ;;
+            Linux)  echo "  sudo pacman -S stow" ;;
+        esac
+        return 1
+    fi
+
+    cd "$EDEN_ROOT"
+    local pkgs
+    pkgs=$(stow_packages)
+    print_info "Unplanting $pkgs packages (using GNU Stow)..."
+    stow -D -d packages -t "$HOME" $pkgs 2>/dev/null || true
+
+    # Clean up ~/.eden/ if it's empty or only contains empty directories
+    if [ -d "$HOME/.eden" ]; then
+        find "$HOME/.eden" -type d -empty -delete 2>/dev/null || true
+        rmdir "$HOME/.eden" 2>/dev/null || true
+    fi
+
+    print_success "Eden configs unplanted successfully"
+    [ -d "$HOME/.eden" ] && print_info "~/.eden/ preserved (contains branch configs/binaries)"
+}
+
 # Main command dispatcher
 main() {
     if [ $# -eq 0 ]; then
@@ -330,6 +485,22 @@ main() {
     shift
     
     case "$command" in
+        grow)
+            # Combined plant + graft: the main command for setting up Eden
+            if ! do_plant "$@"; then
+                exit 1
+            fi
+
+            # Dry-run: skip graft
+            for arg in "$@"; do
+                case "$arg" in
+                    --dry-run|-n) exit 0 ;;
+                esac
+            done
+
+            echo ""
+            run_script "eden-graft"
+            ;;
         install)
             # Unified install interface
             case "${1:-all}" in
@@ -361,7 +532,7 @@ main() {
                             fi
                         done
                     else
-                        echo "  (libexec not found - run 'eden stow' first)"
+                        echo "  (libexec not found - run 'eden plant' first)"
                     fi
                     
                     echo ""
@@ -399,150 +570,19 @@ main() {
         update)
             run_script "eden-update" "$@"
             ;;
-        plant|stow)
-            # Check for flags
-            ADOPT_FLAG=""
-            DRY_RUN_FLAG=""
-            for arg in "$@"; do
-                case "$arg" in
-                    --adopt) ADOPT_FLAG="--adopt" ;;
-                    --dry-run|-n) DRY_RUN_FLAG="-n" ;;
-                esac
-            done
-
-            if [[ -n "$DRY_RUN_FLAG" ]]; then
-                print_header "Planting Eden Configs (dry run)"
-                echo ""
-                print_info "Simulating — no changes will be made"
-                echo ""
-            elif [[ -n "$ADOPT_FLAG" ]]; then
-                print_header "Planting Eden Configs (with --adopt)"
-                echo ""
-                print_info "This will move existing files into Eden and create symlinks"
-                echo ""
-            else
-                print_header "Planting Eden Configs"
-            fi
-            
-            # Check if stow is installed
-            if ! command -v stow &> /dev/null; then
-                print_error "GNU Stow is not installed"
-                echo ""
-                echo "Install stow first:"
-                case "$(uname -s)" in
-                    Darwin)
-                        echo "  brew install stow"
-                        ;;
-                    Linux)
-                        echo "  sudo pacman -S stow"
-                        echo "  # or: yay -S stow"
-                        ;;
-                esac
-                echo ""
-                echo "Or run: eden install"
-                exit 1
-            fi
-            
-            cd "$EDEN_ROOT"
-            
-            # Capture stow output and check for errors
-            STOW_OUTPUT=""
-            STOW_EXIT=0
-            
-            case "$(uname -s)" in
-                Darwin)
-                    print_info "Planting common + eden + mac packages (using GNU Stow)..."
-                    STOW_OUTPUT=$(stow -v $DRY_RUN_FLAG $ADOPT_FLAG -d packages -t "$HOME" common eden mac 2>&1) || STOW_EXIT=$?
-                    ;;
-                Linux)
-                    print_info "Planting common + eden + arch packages (using GNU Stow)..."
-                    STOW_OUTPUT=$(stow -v $DRY_RUN_FLAG $ADOPT_FLAG -d packages -t "$HOME" common eden arch 2>&1) || STOW_EXIT=$?
-                    ;;
-            esac
-            
-            # Check for stow errors and provide helpful messages
-            if [ $STOW_EXIT -ne 0 ]; then
-                echo "$STOW_OUTPUT"
-                echo ""
-                
-                if echo "$STOW_OUTPUT" | grep -q "cannot stow.*over existing target.*--adopt not specified"; then
-                    print_error "Error: Stow conflict - existing files are blocking symlink creation"
-                    echo ""
-                    print_info "You have existing files that conflict with Eden configs."
-                    echo ""
-                    echo "Options:"
-                    echo "  1. ${BOLD}Adopt existing files${RESET} (move them into Eden):"
-                    echo "     eden plant --adopt"
-                    echo ""
-                    echo "  2. ${BOLD}Remove/backup conflicting files${RESET} manually:"
-                    if echo "$STOW_OUTPUT" | grep -o "target [^ ]*" | head -5; then
-                        echo ""
-                    fi
-                    echo "     Then run: eden plant"
-                else
-                    print_error "Error: Stow failed"
-                    echo ""
-                    echo "Check the output above for details."
-                fi
-                exit 1
-            fi
-            
-            # Show stow output on success
-            echo "$STOW_OUTPUT"
-            
-            if [[ -n "$ADOPT_FLAG" ]]; then
-                print_success "Files adopted into Eden and symlinks created"
-                echo ""
-                print_info "Next steps:"
-                echo "  1. Review changes: cd $EDEN_ROOT && git status"
-                echo "  2. Check diffs: git diff"
-                echo "  3. Commit if satisfied: git add -A && git commit -m 'Adopt configs from system'"
-                echo "  4. Or revert: git checkout ."
-            else
-                print_success "Eden configs planted successfully"
-            fi
+        plant)
+            do_plant "$@"
             ;;
-        unplant|unstow|clean)
-            print_header "Unplanting Eden Configs"
-            
-            # Check if stow is installed
-            if ! command -v stow &> /dev/null; then
-                print_warning "GNU Stow is not installed, cannot unplant cleanly"
-                echo ""
-                print_info "Symlinks remain in place. Install stow first:"
-                case "$(uname -s)" in
-                    Darwin)
-                        echo "  brew install stow"
-                        ;;
-                    Linux)
-                        echo "  sudo pacman -S stow"
-                        ;;
-                esac
-                exit 1
-            fi
-            
-            cd "$EDEN_ROOT"
-            case "$(uname -s)" in
-                Darwin)
-                    print_info "Unplanting common + eden + mac packages (using GNU Stow)..."
-                    stow -D -d packages -t "$HOME" common eden mac 2>/dev/null || true
-                    ;;
-                Linux)
-                    print_info "Unplanting common + eden + arch packages (using GNU Stow)..."
-                    stow -D -d packages -t "$HOME" common eden arch 2>/dev/null || true
-                    ;;
-            esac
-            
-            # Clean up ~/.eden/ if it's empty or only contains empty directories
-            if [ -d "$HOME/.eden" ]; then
-                # Remove empty subdirectories
-                find "$HOME/.eden" -type d -empty -delete 2>/dev/null || true
-                # Remove ~/.eden if now empty
-                rmdir "$HOME/.eden" 2>/dev/null || true
-            fi
-            
-            print_success "Eden configs unplanted successfully"
-            [ -d "$HOME/.eden" ] && print_info "~/.eden/ preserved (contains branch configs/binaries)"
+        stow)
+            print_warning "'eden stow' is deprecated, use 'eden plant'"
+            do_plant "$@"
+            ;;
+        unstow|clean)
+            print_warning "'eden $command' is deprecated, use 'eden unplant'"
+            do_unplant
+            ;;
+        unplant)
+            do_unplant
             ;;
         uninstall)
             print_header "Uninstalling Eden"
@@ -563,14 +603,9 @@ main() {
             print_info "Unplanting Eden configs..."
             cd "$EDEN_ROOT"
             if command -v stow &> /dev/null; then
-                case "$(uname -s)" in
-                    Darwin)
-                        stow -D -d packages -t "$HOME" common eden mac 2>/dev/null || true
-                        ;;
-                    Linux)
-                        stow -D -d packages -t "$HOME" common eden arch 2>/dev/null || true
-                        ;;
-                esac
+                local pkgs
+                pkgs=$(stow_packages)
+                stow -D -d packages -t "$HOME" $pkgs 2>/dev/null || true
             else
                 print_warning "Stow not found, skipping symlink removal"
             fi
