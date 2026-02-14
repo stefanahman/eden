@@ -1,0 +1,8 @@
+# macOS-specific git configuration
+# Included via [include] path = ~/.config/git/platform
+
+[gpg "ssh"]
+	program = "/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
+
+[credential]
+	helper = osxkeychain
