@@ -400,10 +400,22 @@ main() {
             run_script "eden-update" "$@"
             ;;
         plant|stow)
-            # Check for --adopt flag
+            # Check for flags
             ADOPT_FLAG=""
-            if [[ "$*" == *"--adopt"* ]]; then
-                ADOPT_FLAG="--adopt"
+            DRY_RUN_FLAG=""
+            for arg in "$@"; do
+                case "$arg" in
+                    --adopt) ADOPT_FLAG="--adopt" ;;
+                    --dry-run|-n) DRY_RUN_FLAG="-n" ;;
+                esac
+            done
+
+            if [[ -n "$DRY_RUN_FLAG" ]]; then
+                print_header "Planting Eden Configs (dry run)"
+                echo ""
+                print_info "Simulating — no changes will be made"
+                echo ""
+            elif [[ -n "$ADOPT_FLAG" ]]; then
                 print_header "Planting Eden Configs (with --adopt)"
                 echo ""
                 print_info "This will move existing files into Eden and create symlinks"
@@ -440,11 +452,11 @@ main() {
             case "$(uname -s)" in
                 Darwin)
                     print_info "Planting common + eden + mac packages (using GNU Stow)..."
-                    STOW_OUTPUT=$(stow -v $ADOPT_FLAG -d packages -t "$HOME" common eden mac 2>&1) || STOW_EXIT=$?
+                    STOW_OUTPUT=$(stow -v $DRY_RUN_FLAG $ADOPT_FLAG -d packages -t "$HOME" common eden mac 2>&1) || STOW_EXIT=$?
                     ;;
                 Linux)
                     print_info "Planting common + eden + arch packages (using GNU Stow)..."
-                    STOW_OUTPUT=$(stow -v $ADOPT_FLAG -d packages -t "$HOME" common eden arch 2>&1) || STOW_EXIT=$?
+                    STOW_OUTPUT=$(stow -v $DRY_RUN_FLAG $ADOPT_FLAG -d packages -t "$HOME" common eden arch 2>&1) || STOW_EXIT=$?
                     ;;
             esac
             

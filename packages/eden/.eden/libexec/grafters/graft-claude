@@ -1,0 +1,101 @@
+#!/bin/bash
+# graft-claude - Symlink Claude Code rules and agents from branches to ~/.claude/
+# Part of Eden's pluggable grafter system
+set -e
+
+# Detect Eden root from script location
+if [[ -z "$EDEN_ROOT" ]]; then
+    SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+    EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
+fi
+
+# Expand variables in branch path
+expand_branch_path() {
+    local path="$1"
+    path="${path//\$EDEN_ROOT/$EDEN_ROOT}"
+    path="${path/#\~/$HOME}"
+    echo "$path"
+}
+
+BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+
+if [[ ! -f "$BRANCHES_FILE" ]]; then
+    echo "  → No branches registered (skipping)"
+    exit 0
+fi
+
+CLAUDE_DIR="$HOME/.claude"
+RULES_DIR="$CLAUDE_DIR/rules"
+AGENTS_DIR="$CLAUDE_DIR/agents"
+
+added=0
+skipped=0
+conflicts=()
+
+# Track ownership for conflict detection
+declare -A file_owners
+
+while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do
+    [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
+
+    branch_path=$(expand_branch_path "$branch_path")
+    [[ -d "$branch_path" ]] || continue
+
+    branch_name=$(basename "$branch_path")
+
+    # Process rules and agents directories
+    for kind in rules agents; do
+        source_dir="$branch_path/.claude/$kind"
+        [[ -d "$source_dir" ]] || continue
+
+        target_dir="$CLAUDE_DIR/$kind"
+        mkdir -p "$target_dir"
+
+        for file in "$source_dir"/*.md; do
+            [[ -e "$file" ]] || continue
+
+            filename=$(basename "$file")
+            target="$target_dir/$filename"
+
+            if [[ -L "$target" ]]; then
+                current_target=$(readlink "$target")
+                if [[ "$current_target" != "$file" ]]; then
+                    existing_owner="${file_owners[$kind/$filename]:-unknown}"
+                    conflicts+=("$kind/$filename: $existing_owner vs $branch_name")
+                    continue
+                fi
+                echo "  ✓ $kind/$filename ($branch_name) [already linked]"
+                skipped=$((skipped + 1))
+                file_owners["$kind/$filename"]="$branch_name"
+                continue
+            elif [[ -e "$target" ]]; then
+                conflicts+=("$kind/$filename: file exists (not a symlink)")
+                continue
+            fi
+
+            ln -sf "$file" "$target"
+            echo "  → $kind/$filename ($branch_name)"
+            added=$((added + 1))
+            file_owners["$kind/$filename"]="$branch_name"
+        done
+    done
+done < "$BRANCHES_FILE"
+
+# Report results
+if [[ $added -gt 0 ]]; then
+    echo "  → Grafted $added Claude config(s)"
+fi
+[[ $skipped -gt 0 ]] && echo "  → Skipped $skipped already grafted"
+
+if [[ ${#conflicts[@]} -gt 0 ]]; then
+    echo "  ⚠ Conflicts detected:"
+    for conflict in "${conflicts[@]}"; do
+        echo "    • $conflict"
+    done
+fi
+
+if [[ $added -eq 0 && $skipped -eq 0 && ${#conflicts[@]} -eq 0 ]]; then
+    echo "  → No Claude rules or agents found in branches"
+fi
+
+exit 0
