@@ -18,6 +18,9 @@ yarn.lock          # if using pnpm, don't commit yarn locks
 !.env.example
 !.env.template
 
+# Claude Code
+**/.claude/settings.local.json
+
 # Editor directories
 .vscode/
 .idea/
