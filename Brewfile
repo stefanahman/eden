@@ -18,7 +18,7 @@ brew "tree"
 brew "ripgrep"     # Better grep (rg) - fast code search
 brew "fd"          # Better find
 brew "bat"         # Better cat with syntax highlighting
-brew "fnm"         # Fast Node Manager - multi-version Node.js support
+brew "mise"        # Polyglot runtime/tool manager (node, python, go, etc.)
 brew "pnpm"        # Fast, efficient package manager
 
 # Cloud tools
@@ -47,5 +47,6 @@ cask "1password"      # 1Password desktop app (required for CLI authentication)
 cask "1password-cli"  # 1Password CLI for secret management
 brew "openvpn"        # VPN client for secure connections
 
-# To be added: more tools as Eden grows
+# AI tools
+cask "claude-code"    # Anthropic CLI for agentic coding
 

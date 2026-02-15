@@ -11,9 +11,9 @@ export PATH="$HOME/.eden/bin:$PATH"
 # Platform-specific configuration (Homebrew PATH, etc.) — must come before tool inits
 [ -f "$XDG_CONFIG_HOME/zsh/platform.zsh" ] && source "$XDG_CONFIG_HOME/zsh/platform.zsh"
 
-# fnm (Fast Node Manager) - per-project Node version management
-if command -v fnm >/dev/null 2>&1; then
-    eval "$(fnm env --use-on-cd)"
+# mise runtime/tool manager (node, python, go, etc.)
+if command -v mise >/dev/null 2>&1; then
+    eval "$(mise activate zsh)"
 fi
 
 # fzf fuzzy finder
