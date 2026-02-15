@@ -9,6 +9,7 @@ brew "stow"
 brew "zsh"
 brew "tmux"
 brew "fzf"         # Fuzzy finder
+brew "zoxide"      # Smart directory jumper (z/autojump replacement)
 brew "starship"    # Cross-shell prompt
 cask "ghostty"     # GPU-accelerated native terminal
 
