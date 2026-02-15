@@ -1,0 +1,23 @@
+# Ghostty — macOS terminal
+# https://ghostty.org/docs/config
+
+# Font
+font-family = CaskaydiaMono Nerd Font
+font-size = 14
+
+# Theme
+theme = Everforest Dark Hard
+
+# Window
+window-padding-x = 10
+window-padding-y = 10
+macos-titlebar-style = hidden
+background-opacity = 0.95
+macos-option-as-alt = true
+
+# Tiling WM (yabai) compatibility
+macos-non-native-fullscreen = true
+window-save-state = never
+focus-follows-mouse = true
+quit-after-last-window-closed = true
+confirm-close-surface = false

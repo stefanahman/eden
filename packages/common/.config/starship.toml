@@ -1,0 +1,21 @@
+# Starship prompt — minimal, Everforest-inspired
+# https://starship.rs/config/
+
+format = """$directory$git_branch$git_status$character"""
+
+[character]
+success_symbol = "[>](green)"
+error_symbol = "[>](red)"
+
+[directory]
+style = "bold green"
+truncation_length = 3
+truncate_to_repo = true
+
+[git_branch]
+style = "bold #a7c080"
+format = " [$branch]($style)"
+
+[git_status]
+style = "#d699b6"
+format = "[$all_status$ahead_behind]($style) "

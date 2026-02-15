@@ -1,0 +1,32 @@
+# Alacritty — cross-platform terminal
+# https://alacritty.org/config-alacritty.html
+
+[env]
+TERM = "xterm-256color"
+
+[window]
+padding = { x = 10, y = 10 }
+decorations = "Buttonless"
+opacity = 0.95
+option_as_alt = "Both"
+dynamic_title = true
+
+[font]
+normal = { family = "CaskaydiaMono Nerd Font", style = "Regular" }
+bold   = { family = "CaskaydiaMono Nerd Font", style = "Bold" }
+italic = { family = "CaskaydiaMono Nerd Font", style = "Italic" }
+size = 14.0
+
+[general]
+import = ["~/.config/alacritty/themes/themes/everforest_dark.toml"]
+live_config_reload = true
+
+[keyboard]
+bindings = [
+  { key = "C", mods = "Command", action = "Copy" },
+  { key = "V", mods = "Command", action = "Paste" },
+  { key = "N", mods = "Command", action = "SpawnNewInstance" },
+  { key = "Return", mods = "Command", action = "ToggleFullscreen" },
+  { key = "Left",  mods = "Alt", chars = "\u001bb" },
+  { key = "Right", mods = "Alt", chars = "\u001bf" },
+]

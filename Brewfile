@@ -9,6 +9,8 @@ brew "stow"
 brew "zsh"
 brew "tmux"
 brew "fzf"         # Fuzzy finder
+brew "starship"    # Cross-shell prompt
+cask "ghostty"     # GPU-accelerated native terminal
 
 # Development utilities
 brew "tree"
@@ -25,9 +27,12 @@ cask "gcloud-cli"  # Google Cloud CLI (gcloud)
 brew "neovim"
 
 # Keyboard & window management
+tap "koekeishiya/formulae"
+tap "FelixKratz/formulae"
 cask "karabiner-elements"  # Advanced keyboard modifier and remapping
-brew "koekeishiya/formulae/yabai"  # Tiling window manager
-brew "koekeishiya/formulae/skhd"   # Hotkey daemon
+brew "yabai"               # Tiling window manager
+brew "skhd"                # Hotkey daemon
+brew "borders"             # Active window border highlight
 
 # Browsers
 cask "ungoogled-chromium"  # Privacy-focused Chromium without Google integration
