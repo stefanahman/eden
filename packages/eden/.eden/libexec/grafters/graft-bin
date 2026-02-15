@@ -36,55 +36,62 @@ conflicts=()
 mkdir -p "$eden_bin"
 
 # Track which branch owns which script (for conflict detection)
-declare -A script_owners
+# Uses newline-separated "name=owner" strings (bash 3.2 compatible)
+script_owners=""
+
+_get_owner() {
+    echo "$script_owners" | while IFS='=' read -r k v; do
+        [ "$k" = "$1" ] && echo "$v" && return
+    done
+}
 
 # Read each branch repo path
 while IFS= read -r branch_path || [ -n "$branch_path" ]; do
     # Skip empty lines and comments
     [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
-    
+
     # Expand variables and tilde
     branch_path=$(expand_branch_path "$branch_path")
-    
+
     if [ ! -d "$branch_path" ]; then
         continue
     fi
-    
+
     # Get branch name from path
     branch_name=$(basename "$branch_path")
-    
+
     # Look for .local/bin directory in the branch
     bin_dir="$branch_path/.local/bin"
     if [ -d "$bin_dir" ]; then
         for script in "$bin_dir"/*; do
             [ -e "$script" ] || continue
             [ -f "$script" ] || continue  # Skip directories
-            
+
             script_name=$(basename "$script")
             target="$eden_bin/$script_name"
-            
+
             # Check if script already exists and points elsewhere
             if [ -L "$target" ]; then
                 current_target=$(readlink "$target")
                 if [ "$current_target" != "$script" ]; then
-                    existing_owner="${script_owners[$script_name]:-unknown}"
-                    conflicts+=("$script_name: $existing_owner vs $branch_name")
+                    existing_owner=$(_get_owner "$script_name")
+                    conflicts+=("$script_name: ${existing_owner:-unknown} vs $branch_name")
                     continue
                 fi
                 echo "  ✓ $script_name ($branch_name) [already linked]"
                 skipped=$((skipped + 1))
-                script_owners["$script_name"]="$branch_name"
+                script_owners="${script_owners}${script_name}=${branch_name}"$'\n'
                 continue
             elif [ -e "$target" ]; then
                 conflicts+=("$script_name: file exists (not a symlink)")
                 continue
             fi
-            
+
             # Create symlink
             ln -sf "$script" "$target"
             echo "  → $script_name ($branch_name)"
             added=$((added + 1))
-            script_owners["$script_name"]="$branch_name"
+            script_owners="${script_owners}${script_name}=${branch_name}"$'\n'
         done
     fi
 done < "$BRANCHES_FILE"

@@ -33,7 +33,14 @@ skipped=0
 conflicts=()
 
 # Track ownership for conflict detection
-declare -A file_owners
+# Uses newline-separated "key=owner" strings (bash 3.2 compatible)
+file_owners=""
+
+_get_owner() {
+    echo "$file_owners" | while IFS='=' read -r k v; do
+        [ "$k" = "$1" ] && echo "$v" && return
+    done
+}
 
 while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do
     [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
@@ -60,13 +67,13 @@ while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do
             if [[ -L "$target" ]]; then
                 current_target=$(readlink "$target")
                 if [[ "$current_target" != "$file" ]]; then
-                    existing_owner="${file_owners[$kind/$filename]:-unknown}"
-                    conflicts+=("$kind/$filename: $existing_owner vs $branch_name")
+                    existing_owner=$(_get_owner "$kind/$filename")
+                    conflicts+=("$kind/$filename: ${existing_owner:-unknown} vs $branch_name")
                     continue
                 fi
                 echo "  ✓ $kind/$filename ($branch_name) [already linked]"
                 skipped=$((skipped + 1))
-                file_owners["$kind/$filename"]="$branch_name"
+                file_owners="${file_owners}${kind}/${filename}=${branch_name}"$'\n'
                 continue
             elif [[ -e "$target" ]]; then
                 conflicts+=("$kind/$filename: file exists (not a symlink)")
@@ -76,7 +83,7 @@ while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do
             ln -sf "$file" "$target"
             echo "  → $kind/$filename ($branch_name)"
             added=$((added + 1))
-            file_owners["$kind/$filename"]="$branch_name"
+            file_owners="${file_owners}${kind}/${filename}=${branch_name}"$'\n'
         done
     done
 done < "$BRANCHES_FILE"
