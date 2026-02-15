@@ -4,7 +4,7 @@
 #################################
 
 # --- Launchers ---
-rctrl + ralt + rcmd - return : open -na "Alacritty"          # Super+Return → Terminal
+rctrl + ralt + rcmd - return : open -na "Ghostty"          # Super+Return → Terminal
 rctrl + ralt + rcmd - space  : open -a "Raycast" || open -a "Spotlight.app"  # Super+Space → Launcher
 rctrl + ralt + rcmd + lshift - space : open -a "System Settings.app"            # Super+Alt+Space → Omarchy Menu
 
@@ -12,9 +12,9 @@ rctrl + ralt + rcmd + lshift - space : open -a "System Settings.app"            
 #rctrl + ralt + rcmd - b : open -na "Safari"                  # Super+B → Browser
 rctrl + ralt + rcmd - f : open -a "Finder"                   # Super+F → File Manager
 rctrl + ralt + rcmd - m : open -na "Spotify"                 # Super+M → Music
-rctrl + ralt + rcmd - t : open -na "Alacritty" --args -e btop
+rctrl + ralt + rcmd - t : open -na "Ghostty" --args -e /opt/homebrew/bin/btop
 #rctrl + ralt + rcmd - slash : open -a "1Password"           # Super+/ → Password Manager
-rctrl + ralt + rcmd - n : open -na "Alacritty" --args -e nvim # Super+N → Neovim
+rctrl + ralt + rcmd - n : open -na "Ghostty" --args -e /opt/homebrew/bin/nvim # Super+N → Neovim
 rctrl + ralt + rcmd - c : open -a "Cursor"                 # Super+C → Cursor
 #rctrl + ralt + rcmd - e : open -a "Mail"                     # Super+E → Email
 rctrl + ralt + rcmd - a : $HOME/.local/bin/open-web-browser bardo --new-window https://chatgpt.com         # Super+A → AI

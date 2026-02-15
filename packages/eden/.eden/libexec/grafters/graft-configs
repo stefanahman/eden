@@ -104,6 +104,14 @@ while IFS= read -r branch_path; do
     fi
 done < "$BRANCHES_FILE"
 
+# Create HOME symlinks for tools that don't support XDG
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    if [[ -f "$HOME/.config/skhd/skhdrc" ]] && [[ ! -e "$HOME/.skhdrc" ]]; then
+        ln -sf "$HOME/.config/skhd/skhdrc" "$HOME/.skhdrc"
+        echo "  → Linked: ~/.skhdrc → .config/skhd/skhdrc (skhd has no XDG support)"
+    fi
+fi
+
 if [ "$GRAFTED_COUNT" -gt 0 ]; then
     echo "  → Grafted configs from $GRAFTED_COUNT branch(es)"
 else
