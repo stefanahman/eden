@@ -144,6 +144,29 @@ else
     check_warn "find command not available, skipping symlink check"
 fi
 
+# Check macOS services (yabai, skhd)
+if [ "$(uname -s)" = "Darwin" ]; then
+    section "Services:"
+
+    for svc in yabai skhd; do
+        if command -v "$svc" >/dev/null 2>&1; then
+            if pgrep -x "$svc" >/dev/null 2>&1; then
+                check_pass "$svc running"
+            else
+                check_warn "$svc installed but not running ($svc --start-service)"
+            fi
+        fi
+    done
+
+    if [ -d "/Applications/Karabiner-Elements.app" ]; then
+        if pgrep -f "karabiner_" >/dev/null 2>&1; then
+            check_pass "Karabiner running"
+        else
+            check_warn "Karabiner installed but not running"
+        fi
+    fi
+fi
+
 # Check package counts
 section "Package Statistics:"
 

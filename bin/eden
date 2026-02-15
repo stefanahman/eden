@@ -500,6 +500,36 @@ main() {
 
             echo ""
             run_script "eden-graft"
+
+            # Start platform services if installed but not running
+            if [ "$(uname -s)" = "Darwin" ]; then
+                local needs_permissions=0
+
+                # Start CLI services
+                for svc in skhd yabai; do
+                    if command -v "$svc" &> /dev/null && ! pgrep -x "$svc" > /dev/null 2>&1; then
+                        print_info "Starting $svc service..."
+                        "$svc" --start-service 2>&1 || print_warning "$svc failed to start"
+                        needs_permissions=1
+                    fi
+                done
+
+                # Start Karabiner background daemon
+                if [ -d "/Applications/Karabiner-Elements.app" ] && ! pgrep -f "karabiner_" > /dev/null 2>&1; then
+                    print_info "Starting Karabiner..."
+                    launchctl kickstart -k gui/$(id -u)/org.pqrs.service.agent.karabiner_console_user_server 2>/dev/null \
+                        || open -gj -a "Karabiner-Elements" 2>/dev/null \
+                        || print_warning "Karabiner failed to start"
+                    needs_permissions=1
+                fi
+
+                if [ $needs_permissions -eq 1 ]; then
+                    echo ""
+                    print_info "If prompted, grant permissions in:"
+                    echo "  System Settings → Privacy & Security → Accessibility"
+                    echo "  System Settings → Privacy & Security → Input Monitoring"
+                fi
+            fi
             ;;
         install)
             # Unified install interface
