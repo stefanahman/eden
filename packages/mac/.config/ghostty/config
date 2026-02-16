@@ -4,9 +4,10 @@
 # Font
 font-family = CaskaydiaMono Nerd Font
 font-size = 14
+font-thicken = true
 
-# Theme
-theme = Everforest Dark Hard
+# Theme (also available: Everforest Dark Hard)
+theme = everforest-dark-medium
 
 # Window
 window-padding-x = 10
