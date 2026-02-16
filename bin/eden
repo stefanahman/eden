@@ -317,6 +317,19 @@ stow_packages() {
     esac
 }
 
+# Show a diff between a repo file and a home file, using the best available tool
+# Home is shown as the base (red/-), Eden as incoming (green/+)
+show_file_diff() {
+    local repo_file="$1" home_file="$2"
+    if command -v colordiff &> /dev/null; then
+        diff -u --label "current" --label "eden" "$home_file" "$repo_file" | colordiff || true
+    elif command -v delta &> /dev/null; then
+        diff -u --label "current" --label "eden" "$home_file" "$repo_file" | delta || true
+    else
+        diff -u --label "current" --label "eden" "$home_file" "$repo_file" || true
+    fi
+}
+
 # Plant Eden configs (shared by plant and grow commands)
 # Returns 0 on success, 1 on failure
 do_plant() {
@@ -394,39 +407,130 @@ do_plant() {
     scan_output=$(stow -n -d packages -t "$HOME" $pkgs 2>&1) || scan_exit=$?
 
     if [[ $scan_exit -ne 0 ]]; then
-        # Show stow's own conflict output (it knows what to say)
-        echo "$scan_output"
-        echo ""
-
-        if [[ -t 0 ]]; then
-            # Interactive terminal — prompt user
-            echo -n "Existing files found. Adopt into Eden? [y/N] "
-            read -r response
-            if [[ "$response" =~ ^[Yy]$ ]]; then
-                local output exit_code=0
-                output=$(stow -v --adopt -d packages -t "$HOME" $pkgs 2>&1) || exit_code=$?
-                echo "$output"
-                if [[ $exit_code -ne 0 ]]; then
-                    print_error "Stow failed"
-                    return 1
-                fi
-                print_success "Files adopted into Eden and symlinks created"
-                echo ""
-                print_info "Next steps:"
-                echo "  1. Review changes: cd $EDEN_ROOT && git status"
-                echo "  2. Check diffs: git diff"
-                echo "  3. Commit if satisfied: git add -A && git commit -m 'Adopt configs from system'"
-                echo "  4. Or revert: git checkout ."
-                return 0
-            else
-                print_info "Aborted. No changes made."
-                return 1
+        # Parse conflicts: extract relative paths and owning package names
+        local -a conflict_paths=() conflict_pkgs=()
+        local current_pkg=""
+        while IFS= read -r line; do
+            if [[ "$line" =~ ^WARNING!\ stowing\ ([^ ]+)\ would\ cause\ conflicts: ]]; then
+                current_pkg="${BASH_REMATCH[1]}"
+            elif [[ "$line" =~ existing\ target\ (.+)\ since ]] || \
+                 [[ "$line" =~ existing\ target\ is\ .+:\ (.+) ]]; then
+                conflict_paths+=("${BASH_REMATCH[1]}")
+                conflict_pkgs+=("$current_pkg")
             fi
-        else
-            # Non-interactive — fail with guidance
+        done <<< "$scan_output"
+
+        # If no parseable conflicts, fall back to generic error
+        if [[ ${#conflict_paths[@]} -eq 0 ]]; then
+            echo "$scan_output"
+            echo ""
+            print_error "Stow failed (could not parse conflicts)"
+            return 1
+        fi
+
+        # Non-interactive guard
+        if [[ ! -t 0 ]]; then
+            echo "$scan_output"
+            echo ""
             print_error "Conflicts detected. Run interactively or use: eden plant --adopt"
             return 1
         fi
+
+        # Per-file review
+        print_warning "${#conflict_paths[@]} file(s) differ between Eden and Home:"
+        echo ""
+
+        local -a adopt_rels=() plant_rels=() plant_pkgs=()
+        for i in "${!conflict_paths[@]}"; do
+            local rel="${conflict_paths[$i]}"
+            local pkg="${conflict_pkgs[$i]}"
+            local repo_file="$EDEN_ROOT/packages/$pkg/$rel"
+            local home_file="$HOME/$rel"
+
+            echo -e "${BOLD}~/$rel${RESET} differs from Eden (package: $pkg)"
+            echo ""
+
+            if [[ -f "$repo_file" && -f "$home_file" ]]; then
+                show_file_diff "$repo_file" "$home_file"
+            else
+                print_warning "Cannot diff (file missing on one side)"
+            fi
+            echo ""
+
+            while true; do
+                echo -n "[a]dopt home version into Eden, [p]lant Eden version, [d]iff again? "
+                read -r choice
+                case "$choice" in
+                    a|A|adopt)
+                        adopt_rels+=("$rel")
+                        print_info "Will adopt ~/$rel"
+                        break
+                        ;;
+                    p|P|plant)
+                        plant_rels+=("$rel")
+                        plant_pkgs+=("$pkg")
+                        print_info "Will plant Eden's ~/$rel"
+                        break
+                        ;;
+                    d|D|diff)
+                        if [[ -f "$repo_file" && -f "$home_file" ]]; then
+                            show_file_diff "$repo_file" "$home_file"
+                        fi
+                        ;;
+                    *)
+                        echo "Please enter a, p, or d"
+                        ;;
+                esac
+            done
+            echo ""
+        done
+
+        # Summary
+        echo -e "${BOLD}Summary:${RESET}"
+        if [[ ${#adopt_rels[@]} -gt 0 ]]; then
+            for rel in "${adopt_rels[@]}"; do
+                echo -e "  ${YELLOW}adopt${RESET} ~/$rel → Eden repo"
+            done
+        fi
+        if [[ ${#plant_rels[@]} -gt 0 ]]; then
+            for rel in "${plant_rels[@]}"; do
+                echo -e "  ${GREEN}plant${RESET} Eden → ~/$rel"
+            done
+        fi
+        echo ""
+
+        # Execute: remove home copies for plant files so stow won't adopt them
+        if [[ ${#plant_rels[@]} -gt 0 ]]; then
+            for i in "${!plant_rels[@]}"; do
+                rm "$HOME/${plant_rels[$i]}"
+            done
+        fi
+
+        # Stow with --adopt: adopted files get moved into repo, plant files get fresh symlinks
+        local output exit_code=0
+        output=$(stow -v --adopt -d packages -t "$HOME" $pkgs 2>&1) || exit_code=$?
+        echo "$output"
+        if [[ $exit_code -ne 0 ]]; then
+            print_error "Stow failed"
+            return 1
+        fi
+
+        # Safety restore: ensure plant files in repo are Eden's version
+        if [[ ${#plant_rels[@]} -gt 0 ]]; then
+            for i in "${!plant_rels[@]}"; do
+                git -C "$EDEN_ROOT" checkout -- "packages/${plant_pkgs[$i]}/${plant_rels[$i]}"
+            done
+        fi
+
+        print_success "Conflicts resolved and configs planted"
+
+        if [[ ${#adopt_rels[@]} -gt 0 ]]; then
+            echo ""
+            print_info "Adopted files are now in Eden. Review with:"
+            echo "  cd $EDEN_ROOT && git diff"
+            echo "  git add -A && git commit -m 'Adopt configs from system'"
+        fi
+        return 0
     fi
 
     # No conflicts — run for real
