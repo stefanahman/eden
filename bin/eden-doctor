@@ -202,6 +202,150 @@ if [ -n "$OS" ]; then
     fi
 fi
 
+# Branch coverage - detect ungrafted configs
+section "Branch Coverage:"
+
+BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+
+# Discover covered paths dynamically from grafters (each supports --covers)
+GRAFTER_PATTERNS=()
+GRAFTERS_DIR="$EDEN_DIR/packages/eden/.eden/libexec/grafters"
+if [ -d "$GRAFTERS_DIR" ]; then
+    for grafter in "$GRAFTERS_DIR"/graft-*; do
+        [ -x "$grafter" ] || continue
+        if ! grep -q -- '--covers' "$grafter" 2>/dev/null; then
+            check_warn "$(basename "$grafter"): missing --covers support"
+            continue
+        fi
+        while IFS= read -r pattern; do
+            [ -n "$pattern" ] && GRAFTER_PATTERNS+=("$pattern")
+        done < <("$grafter" --covers 2>/dev/null)
+    done
+fi
+
+is_covered_by_grafter() {
+    local path="$1"
+    for pattern in "${GRAFTER_PATTERNS[@]}"; do
+        # Match exact path or anything under the pattern directory
+        if [[ "$path" == "$pattern" || "$path" == "$pattern/"* ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+is_metadata() {
+    local path="$1"
+    # Skip eden metadata and docs at branch root
+    case "$path" in
+        .eden-*|README.md|ARCHITECTURE.md) return 0 ;;
+    esac
+    return 1
+}
+
+if [ -f "$BRANCHES_FILE" ]; then
+    while IFS= read -r branch_path; do
+        [[ -z "$branch_path" ]] && continue
+        [[ "$branch_path" =~ ^[[:space:]]*# ]] && continue
+
+        # Expand variables
+        branch_path="${branch_path//\$EDEN_ROOT/$EDEN_DIR}"
+        branch_path="${branch_path/#\~/$HOME}"
+
+        branch_name=$(basename "$branch_path")
+
+        if [[ ! -d "$branch_path" ]]; then
+            check_warn "$branch_name: branch directory not found"
+            continue
+        fi
+
+        # Collect graft allowlist entries
+        declare -a graft_entries=()
+        GRAFT_FILE="$branch_path/.eden-graft"
+        if [[ -f "$GRAFT_FILE" ]]; then
+            while IFS= read -r entry; do
+                [[ -z "$entry" ]] && continue
+                [[ "$entry" =~ ^[[:space:]]*# ]] && continue
+                entry=$(echo "$entry" | xargs)
+                graft_entries+=("$entry")
+            done < "$GRAFT_FILE"
+        fi
+
+        is_in_graft_list() {
+            local path="$1"
+            for entry in "${graft_entries[@]}"; do
+                if [[ "$path" == "$entry" || "$path" == "$entry/"* ]]; then
+                    return 0
+                fi
+                # Also check if a parent of path is listed
+                if [[ "$entry" == "$path/"* ]]; then
+                    return 0
+                fi
+            done
+            return 1
+        }
+
+        # Find all top-level config paths in the branch
+        orphans=()
+        # Check .config/ subdirectories
+        if [[ -d "$branch_path/.config" ]]; then
+            for item in "$branch_path/.config"/*; do
+                [[ -e "$item" ]] || continue
+                item_name=$(basename "$item")
+                rel_path=".config/$item_name"
+
+                if is_covered_by_grafter "$rel_path"; then
+                    continue
+                fi
+
+                # For files nested deeper (e.g. .config/pnpm/rc), check individual files
+                if [[ -d "$item" ]]; then
+                    # Check if the directory or any parent path is in graft list
+                    if is_in_graft_list "$rel_path"; then
+                        continue
+                    fi
+                    # Check individual files within
+                    while IFS= read -r subfile; do
+                        sub_rel="${subfile#$branch_path/}"
+                        if ! is_in_graft_list "$sub_rel" && ! is_covered_by_grafter "$sub_rel"; then
+                            orphans+=("$sub_rel")
+                        fi
+                    done < <(find "$item" -type f 2>/dev/null)
+                else
+                    if ! is_in_graft_list "$rel_path"; then
+                        orphans+=("$rel_path")
+                    fi
+                fi
+            done
+        fi
+
+        # Check root-level non-metadata files
+        for item in "$branch_path"/*; do
+            [[ -e "$item" ]] || continue
+            item_name=$(basename "$item")
+            if is_metadata "$item_name"; then
+                continue
+            fi
+            if ! is_covered_by_grafter "$item_name" && ! is_in_graft_list "$item_name"; then
+                orphans+=("$item_name")
+            fi
+        done
+
+        if [ ${#orphans[@]} -eq 0 ]; then
+            check_pass "$branch_name: all configs covered"
+        else
+            check_warn "$branch_name: ungrafted configs found:"
+            for orphan in "${orphans[@]}"; do
+                echo "      $orphan (not in .eden-graft, no dedicated grafter)"
+            done
+        fi
+
+        unset graft_entries
+    done < "$BRANCHES_FILE"
+else
+    echo "  No branches registered (skipping)"
+fi
+
 # Final result
 section ""
 if [ $ERRORS -eq 0 ]; then

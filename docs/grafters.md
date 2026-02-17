@@ -4,6 +4,40 @@
 
 Grafters are pluggable scripts that intelligently merge configurations from multiple branches. Each grafter uses a specific **strategy** to handle conflicts and combine sources.
 
+## Config Deployment: `.eden-graft` vs Dedicated Grafters
+
+Most branch configs are deployed via the **`.eden-graft` allowlist** — a simple file listing paths that `graft-configs` should symlink to `$HOME`. This covers configs that don't need multi-branch merging (editor settings, window managers, etc.).
+
+**Dedicated grafters** exist for configs where multiple branches contribute to the same logical output and need intelligent merging, routing, or aggregation.
+
+### Decision: `.eden-graft` entry vs dedicated grafter
+
+| Use `.eden-graft` when... | Create a grafter when... |
+|---|---|
+| Only one branch provides the config | Multiple branches contribute to the same file |
+| Simple symlink is sufficient | Configs need merging, routing, or conflict detection |
+| Examples: karabiner, nvim, skhd | Examples: MCP servers, git identities, shell env |
+
+### How `graft-configs` works
+
+1. Reads `~/.config/eden/branches` to find registered branches
+2. For each branch, reads its `.eden-graft` file (an allowlist of paths)
+3. Symlinks each listed path from the branch into `$HOME` (directories via `stow`, files via `ln -sf`)
+4. Paths not in `.eden-graft` are **not deployed** — this is intentional to prevent accidental grafting
+
+### The `.eden-graft` file
+
+Located at the root of each branch (e.g., `branches/default/.eden-graft`). Format:
+
+```
+# Comments and blank lines are ignored
+.config/karabiner/karabiner.json
+.config/nvim
+.config/pnpm/rc
+```
+
+The file also documents which paths are auto-handled by dedicated grafters (so you know what NOT to list). `eden doctor` warns about configs that exist in a branch but aren't covered by either mechanism.
+
 ## When to Create a Grafter
 
 Create a grafter when branches need to contribute to the same logical configuration:
@@ -15,7 +49,7 @@ Create a grafter when branches need to contribute to the same logical configurat
 
 ❌ **Don't create a grafter if:**
 - Only one branch will ever provide the file (karabiner, nvim)
-- Files are per-branch and shouldn't merge (use `.d/` pattern instead)
+- Files are per-branch and shouldn't merge (list in `.eden-graft` instead)
 
 ## Grafter Strategies
 
@@ -183,6 +217,8 @@ Do multiple branches contribute?
 ```
 packages/eden/.eden/libexec/grafters/
 ├── graft-bin          # Collection strategy
+├── graft-claude       # Collection strategy
+├── graft-configs      # Allowlist strategy (.eden-graft)
 ├── graft-git          # Generate strategy
 ├── graft-mcp          # Merge strategy
 ├── graft-secrets      # Aggregate strategy
