@@ -16,6 +16,16 @@ macos-titlebar-style = hidden
 background-opacity = 0.95
 macos-option-as-alt = true
 
+# Shell integration (prompt marking, cwd reporting, cursor hints)
+# Injected by Ghostty at launch — only active inside Ghostty, not shell-wide.
+shell-integration = detect
+
+# Behavior
+mouse-hide-while-typing = true
+cursor-click-to-move = true
+copy-on-select = clipboard
+clipboard-paste-protection = true
+
 # Tiling WM (yabai) compatibility
 macos-non-native-fullscreen = true
 window-save-state = never
