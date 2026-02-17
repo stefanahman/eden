@@ -4,15 +4,20 @@
 # One path per line. Comments and blank lines are ignored.
 #
 # This file controls what configs from this branch get grafted by `eden graft`.
+#
+# Paths auto-handled by dedicated grafters (do NOT list here).
+# Each grafter declares what it covers via `graft-<name> --covers`.
+# `eden doctor` uses this to detect ungrafted configs automatically.
+#
+# Everything else needs to be listed below to be deployed.
 
 # Window management & keyboard
 .config/karabiner/karabiner.json
 .config/yabai/yabairc
 .config/skhd/skhdrc
 
-# Add more configs as needed
-# Examples:
-# .config/nvim
-# .config/alacritty
-# .gitconfig
+# Editor
+.config/nvim
 
+# Package managers
+.config/pnpm/rc

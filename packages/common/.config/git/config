@@ -13,7 +13,7 @@
 	gpgsign = true
 
 [core]
-	editor = vim
+	editor = nvim
 	pager = less -FRX
 	autocrlf = input
 
