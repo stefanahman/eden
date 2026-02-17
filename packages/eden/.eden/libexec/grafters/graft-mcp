@@ -77,25 +77,55 @@ mkdir -p "$(dirname "$CANONICAL_CONFIG")"
 # Write merged config to canonical location
 echo "$MERGED_JSON" | jq '.' > "$CANONICAL_CONFIG"
 
-# Create symlinks for MCP clients
-# Cursor
-CURSOR_CONFIG="$HOME/.cursor/mcp.json"
-if [[ -L "$CURSOR_CONFIG" ]] || [[ ! -f "$CURSOR_CONFIG" ]]; then
-    mkdir -p "$(dirname "$CURSOR_CONFIG")"
-    ln -sf "$CANONICAL_CONFIG" "$CURSOR_CONFIG" 2>/dev/null || true
-elif [[ -f "$CURSOR_CONFIG" ]]; then
-    echo "  ⚠ Cursor config exists (not a symlink, skipping symlink)"
-fi
+# Sync MCP config to a client app.
+# Apps do atomic writes that destroy symlinks, so we copy and diff.
+sync_mcp_client() {
+    local client_name="$1" client_config="$2"
+    local client_dir
+    client_dir="$(dirname "$client_config")"
+    [[ -d "$client_dir" ]] || return 0
 
-# Claude Desktop (macOS)
-if [[ "$(uname)" == "Darwin" ]]; then
-    CLAUDE_CONFIG="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
-    CLAUDE_DIR="$(dirname "$CLAUDE_CONFIG")"
-    if [[ -d "$CLAUDE_DIR" ]]; then
-        if [[ -L "$CLAUDE_CONFIG" ]] || [[ ! -f "$CLAUDE_CONFIG" ]]; then
-            ln -sf "$CANONICAL_CONFIG" "$CLAUDE_CONFIG" 2>/dev/null || true
-        fi
+    # No config yet or content matches — just copy
+    if [[ ! -f "$client_config" ]] || diff -q <(jq -S . "$CANONICAL_CONFIG") <(jq -S . "$client_config") &>/dev/null; then
+        cp "$CANONICAL_CONFIG" "$client_config"
+        echo "  → Synced $client_name"
+        return 0
     fi
+
+    # Content differs — prompt with optional diff (like eden plant)
+    echo "  ⚠ $client_name MCP config differs from Eden"
+
+    if [[ -t 0 ]]; then
+        while true; do
+            echo -n "    [p]lant Eden version, [s]kip, [d]iff? "
+            read -r choice
+            case "$choice" in
+                p|P)
+                    cp "$CANONICAL_CONFIG" "$client_config"
+                    echo "  → Planted Eden MCP config to $client_name"
+                    break ;;
+                s|S)
+                    echo "  → Skipped $client_name"
+                    break ;;
+                d|D)
+                    diff -u --label "eden" --label "$client_name" \
+                        <(jq -S . "$CANONICAL_CONFIG") <(jq -S . "$client_config") \
+                        | if command -v delta &>/dev/null; then delta
+                          elif command -v colordiff &>/dev/null; then colordiff
+                          else cat; fi || true
+                    ;;
+                *) echo "    Please enter p, s, or d" ;;
+            esac
+        done
+    else
+        echo "    Skipped (run interactively to resolve)"
+    fi
+}
+
+# Sync to MCP clients
+sync_mcp_client "Cursor" "$HOME/.cursor/mcp.json"
+if [[ "$(uname)" == "Darwin" ]]; then
+    sync_mcp_client "Claude Desktop" "$HOME/Library/Application Support/Claude/claude_desktop_config.json"
 fi
 
 # Show summary
