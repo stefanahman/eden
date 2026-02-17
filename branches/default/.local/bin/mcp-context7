@@ -1,0 +1,9 @@
+#!/bin/bash
+# MCP wrapper: Context7 documentation server
+# Fetches API key from 1Password at runtime — never stored on disk.
+set -euo pipefail
+
+export CONTEXT7_API_KEY=$(op read 'op://Developer/context7-mcp-api-key/credential')
+
+exec npx -y mcp-remote https://mcp.context7.com/mcp \
+    --header "CONTEXT7_API_KEY: $CONTEXT7_API_KEY"

@@ -1,21 +1,12 @@
 {
-  "$comment": "Model Context Protocol (MCP) Configuration - Default Branch",
-  "$comment2": "Eden's opinionated MCP server defaults",
-  "$comment3": "Add more servers in your personal branches: ~/branch-work/.config/mcp/servers.json",
   "mcpServers": {
     "github-eden": {
-      "command": "sh",
-      "args": [
-        "-c",
-        "PATH=\"$HOME/.eden/bin:$HOME/.volta/bin:/usr/local/bin:/usr/bin:/bin\" OP_BIOMETRIC_UNLOCK_ENABLED=true GITHUB_PERSONAL_ACCESS_TOKEN=$(op read 'op://Developer/eden-github-mcp-token/credential' 2>/dev/null || echo '') pnpm dlx @modelcontextprotocol/server-github"
-      ]
+      "command": "mcp-github-eden",
+      "args": []
     },
     "context7": {
-      "command": "sh",
-      "args": [
-        "-c",
-        "CONTEXT7_API_KEY=$(op read 'op://Developer/context7-mcp-api-key/credential' 2>/dev/null || echo '') npx -y mcp-remote https://mcp.context7.com/mcp --header \"CONTEXT7_API_KEY: $CONTEXT7_API_KEY\""
-      ]
+      "command": "mcp-context7",
+      "args": []
     },
     "linear": {
       "url": "https://mcp.linear.app/mcp"
@@ -26,4 +17,3 @@
     }
   }
 }
-

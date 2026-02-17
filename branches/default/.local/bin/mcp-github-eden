@@ -1,0 +1,10 @@
+#!/bin/bash
+# MCP wrapper: GitHub server for Eden
+# Fetches token from 1Password at runtime — never stored on disk.
+set -euo pipefail
+
+export PATH="$HOME/.eden/bin:$HOME/.volta/bin:/usr/local/bin:/usr/bin:/bin"
+export OP_BIOMETRIC_UNLOCK_ENABLED=true
+export GITHUB_PERSONAL_ACCESS_TOKEN=$(op read 'op://Developer/eden-github-mcp-token/credential')
+
+exec pnpm dlx @modelcontextprotocol/server-github
