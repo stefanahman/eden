@@ -111,7 +111,7 @@ if [ -d "$HOME/.eden" ]; then
         check_warn "~/.eden/bin not found (no branch binaries grafted)"
     fi
     
-    if [ -f "$HOME/.eden/config/branches" ]; then
+    if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches" ]; then
         check_pass "Branch tracking file exists"
     else
         check_warn "No branch tracking file (run 'eden graft' to set up)"
