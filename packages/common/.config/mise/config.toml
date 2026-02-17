@@ -2,4 +2,5 @@
 # Project-level .mise.toml files override these defaults
 
 [tools]
+bun = "latest"
 node = "lts"
