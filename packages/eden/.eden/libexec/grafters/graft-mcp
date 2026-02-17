@@ -3,6 +3,12 @@
 # Part of Eden's pluggable grafter system
 set -e
 
+# Report covered paths for eden doctor
+if [[ "${1:-}" == "--covers" ]]; then
+    echo ".config/mcp"
+    exit 0
+fi
+
 # Check if jq is installed
 if ! command -v jq >/dev/null 2>&1; then
     echo "  ⚠ jq required for MCP graft (skipping)"

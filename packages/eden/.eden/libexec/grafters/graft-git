@@ -6,6 +6,12 @@
 # This grafter symlinks them and generates includeIf directives
 set -e
 
+# Report covered paths for eden doctor
+if [[ "${1:-}" == "--covers" ]]; then
+    echo ".config/git"
+    exit 0
+fi
+
 # Detect Eden root from script location
 if [[ -z "$EDEN_ROOT" ]]; then
     SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
