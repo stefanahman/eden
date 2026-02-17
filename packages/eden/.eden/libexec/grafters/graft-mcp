@@ -77,39 +77,49 @@ mkdir -p "$(dirname "$CANONICAL_CONFIG")"
 # Write merged config to canonical location
 echo "$MERGED_JSON" | jq '.' > "$CANONICAL_CONFIG"
 
-# Sync MCP config to a client app.
-# Apps do atomic writes that destroy symlinks, so we copy and diff.
+# Sync MCP servers into a client's config.
+# Merges only .mcpServers — preserves other keys (app preferences, etc.).
 sync_mcp_client() {
     local client_name="$1" client_config="$2"
     local client_dir
     client_dir="$(dirname "$client_config")"
     [[ -d "$client_dir" ]] || return 0
 
-    # No config yet or content matches — just copy
-    if [[ ! -f "$client_config" ]] || diff -q <(jq -S . "$CANONICAL_CONFIG") <(jq -S . "$client_config") &>/dev/null; then
+    # No config yet — just copy
+    if [[ ! -f "$client_config" ]]; then
         cp "$CANONICAL_CONFIG" "$client_config"
         echo "  → Synced $client_name"
         return 0
     fi
 
-    # Content differs — prompt with optional diff (like eden plant)
-    echo "  ⚠ $client_name MCP config differs from Eden"
+    # Merge Eden's mcpServers into the client config, preserving other keys
+    local merged
+    merged=$(jq -S --slurpfile eden "$CANONICAL_CONFIG" \
+        '.mcpServers = $eden[0].mcpServers' "$client_config")
 
+    # Already in sync — nothing to do
+    if diff -q <(echo "$merged") <(jq -S . "$client_config") &>/dev/null; then
+        echo "  → $client_name in sync"
+        return 0
+    fi
+
+    # Differs — prompt with optional diff
+    echo "  ⚠ $client_name MCP servers differ from Eden"
     if [[ -t 0 ]]; then
         while true; do
-            echo -n "    [p]lant Eden version, [s]kip, [d]iff? "
+            echo -n "    [p]lant Eden servers, [s]kip, [d]iff? "
             read -r choice
             case "$choice" in
                 p|P)
-                    cp "$CANONICAL_CONFIG" "$client_config"
-                    echo "  → Planted Eden MCP config to $client_name"
+                    echo "$merged" | jq . > "$client_config"
+                    echo "  → Planted Eden MCP servers to $client_name"
                     break ;;
                 s|S)
                     echo "  → Skipped $client_name"
                     break ;;
                 d|D)
-                    diff -u --label "eden" --label "$client_name" \
-                        <(jq -S . "$CANONICAL_CONFIG") <(jq -S . "$client_config") \
+                    diff -u --label "after (eden merged)" --label "current ($client_name)" \
+                        <(echo "$merged") <(jq -S . "$client_config") \
                         | if command -v delta &>/dev/null; then delta
                           elif command -v colordiff &>/dev/null; then colordiff
                           else cat; fi || true
