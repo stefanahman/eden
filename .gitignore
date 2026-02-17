@@ -9,5 +9,8 @@
 .env
 .env.*
 
+# Claude Code local settings (machine-specific, auto-managed)
+.claude/settings.local.json
+
 # OS artifacts
 .DS_Store
