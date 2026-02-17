@@ -17,13 +17,13 @@ rctrl + ralt + rcmd - t : open -na "Ghostty" --args -e /opt/homebrew/bin/btop
 rctrl + ralt + rcmd - n : open -na "Ghostty" --args -e /opt/homebrew/bin/nvim # Super+N → Neovim
 rctrl + ralt + rcmd - c : open -a "Cursor"                 # Super+C → Cursor
 #rctrl + ralt + rcmd - e : open -a "Mail"                     # Super+E → Email
-rctrl + ralt + rcmd - a : $HOME/.local/bin/open-web-browser bardo --new-window https://chatgpt.com         # Super+A → AI
+rctrl + ralt + rcmd - a : $HOME/.eden/bin/open-web-browser default --new-window https://chatgpt.com         # Super+A → AI
 rctrl + ralt + rcmd - l : open -a "Linear"         # Super+L → Linear
 rctrl + ralt + rcmd - g : /opt/homebrew/bin/lazygit
-#rctrl + ralt + rcmd - g : $HOME/.local/bin/open-web-browser bardo --new-window https://app.graphite.dev         # Super+G → Graphite
+#rctrl + ralt + rcmd - g : $HOME/.eden/bin/open-web-browser default --new-window https://app.graphite.dev         # Super+G → Graphite
 rctrl + ralt + rcmd - s : open -na "Slack"         # Super+A → Slack
-rctrl + ralt + rcmd - b : $HOME/.local/bin/open-web-browser default         # Super+B -> Private browser
-rctrl + ralt + rcmd + lshift - b : $HOME/.local/bin/open-web-browser bardo         # Super+B -> Private browser
+rctrl + ralt + rcmd - b : $HOME/.eden/bin/open-web-browser default         # Super+B → Browser (default profile)
+rctrl + ralt + rcmd + lshift - b : $HOME/.eden/bin/open-web-browser personal   # Super+Shift+B → Browser (personal profile)
 #rctrl + ralt + rcmd - g : open -na "Signal"                  # Super+G → Messenger (Signal)
 rctrl + ralt + rcmd + shift - g : open -na "WhatsApp"        # Super+Shift+G → Messenger (WhatsApp)
 #rctrl + ralt + rcmd + alt - g : open "https://chat.google.com" # Super+Alt+G → Messenger (Google Chat)
