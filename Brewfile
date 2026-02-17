@@ -24,8 +24,12 @@ brew "pnpm"        # Fast, efficient package manager
 # Cloud tools
 cask "gcloud-cli"  # Google Cloud CLI (gcloud)
 
-# Editor
+# Editors
 brew "neovim"
+cask "zed"       # GUI editor with AI assistant
+
+# Modern CLI replacements
+brew "eza"       # Modern ls replacement (used in .zshrc aliases)
 
 # Keyboard & window management
 tap "koekeishiya/formulae"
