@@ -11,6 +11,9 @@ export PATH="$HOME/.eden/bin:$PATH"
 # Platform-specific configuration (Homebrew PATH, etc.) — must come before tool inits
 [ -f "$XDG_CONFIG_HOME/zsh/platform.zsh" ] && source "$XDG_CONFIG_HOME/zsh/platform.zsh"
 
+# Use emacs keybindings (ctrl+a/e/etc.) regardless of $EDITOR
+bindkey -e
+
 # Completion
 autoload -Uz compinit; compinit
 
