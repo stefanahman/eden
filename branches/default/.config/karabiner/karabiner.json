@@ -14,7 +14,6 @@
                                         "modifiers": ["right_option", "right_command"]
                                     }
                                 ],
-                                "to_if_alone": [{ "key_code": "escape" }],
                                 "type": "basic"
                             }
                         ]
