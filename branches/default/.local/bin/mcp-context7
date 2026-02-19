@@ -3,7 +3,11 @@
 # Fetches API key from 1Password at runtime — never stored on disk.
 set -euo pipefail
 
-export CONTEXT7_API_KEY=$(op read 'op://Developer/context7-mcp-api-key/credential')
+export PATH="$HOME/.eden/bin:$HOME/.volta/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export OP_BIOMETRIC_UNLOCK_ENABLED=true
+
+CONTEXT7_API_KEY=$(op read 'op://Developer/context7-mcp-api-key/credential' --account my.1password.com)
+export CONTEXT7_API_KEY
 
 exec npx -y mcp-remote https://mcp.context7.com/mcp \
     --header "CONTEXT7_API_KEY: $CONTEXT7_API_KEY"

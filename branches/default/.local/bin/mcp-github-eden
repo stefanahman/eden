@@ -3,8 +3,9 @@
 # Fetches token from 1Password at runtime — never stored on disk.
 set -euo pipefail
 
-export PATH="$HOME/.eden/bin:$HOME/.volta/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH="$HOME/.eden/bin:$HOME/.volta/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 export OP_BIOMETRIC_UNLOCK_ENABLED=true
-export GITHUB_PERSONAL_ACCESS_TOKEN=$(op read 'op://Developer/eden-github-mcp-token/credential')
+GITHUB_PERSONAL_ACCESS_TOKEN=$(op read 'op://Developer/eden-github-mcp-token/credential' --account my.1password.com)
+export GITHUB_PERSONAL_ACCESS_TOKEN
 
 exec pnpm dlx @modelcontextprotocol/server-github
