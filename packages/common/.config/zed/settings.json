@@ -5,6 +5,7 @@
 //   2. API key for AI: Zed Settings > AI > Anthropic > paste key (stored in OS keychain)
 //   3. Verify: Cmd+Shift+P → "theme" → Everforest Dark should be active
 {
+  "base_keymap": "Emacs",
   "theme": {
     "mode": "dark",
     "dark": "Everforest Dark",
