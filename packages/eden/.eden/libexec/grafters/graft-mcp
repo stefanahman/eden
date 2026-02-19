@@ -77,6 +77,25 @@ mkdir -p "$(dirname "$CANONICAL_CONFIG")"
 # Write merged config to canonical location
 echo "$MERGED_JSON" | jq '.' > "$CANONICAL_CONFIG"
 
+# Resolve bare command names to absolute paths.
+# GUI clients (Claude Desktop, Cursor) don't inherit shell PATH, so bare
+# commands like "mcp-foo" or "npx" won't be found. The graft runs from a
+# terminal with the full PATH, so we resolve here at plant time.
+resolve_commands() {
+    local json="$1" server cmd full_path
+    while IFS= read -r server; do
+        cmd=$(printf '%s' "$json" | jq -r --arg s "$server" '.mcpServers[$s].command // empty')
+        [[ -z "$cmd" || "$cmd" == /* ]] && continue
+        full_path=$(command -v "$cmd" 2>/dev/null) || {
+            echo "  ⚠ Cannot resolve command '$cmd' for server '$server'" >&2
+            continue
+        }
+        json=$(printf '%s' "$json" | jq --arg s "$server" --arg p "$full_path" \
+            '.mcpServers[$s].command = $p')
+    done < <(printf '%s' "$json" | jq -r '.mcpServers | keys[]')
+    printf '%s' "$json"
+}
+
 # Sync MCP servers into a client's config.
 # Merges only .mcpServers — preserves other keys (app preferences, etc.).
 sync_mcp_client() {
@@ -85,17 +104,21 @@ sync_mcp_client() {
     client_dir="$(dirname "$client_config")"
     [[ -d "$client_dir" ]] || return 0
 
-    # No config yet — just copy
+    # Resolve bare commands to absolute paths for GUI clients
+    local resolved_json
+    resolved_json=$(resolve_commands "$(cat "$CANONICAL_CONFIG")")
+
+    # No config yet — just write resolved config
     if [[ ! -f "$client_config" ]]; then
-        cp "$CANONICAL_CONFIG" "$client_config"
+        printf '%s' "$resolved_json" | jq '.' > "$client_config"
         echo "  → Synced $client_name"
         return 0
     fi
 
     # Merge Eden's mcpServers into the client config, preserving other keys
     local merged
-    merged=$(jq -S --slurpfile eden "$CANONICAL_CONFIG" \
-        '.mcpServers = $eden[0].mcpServers' "$client_config")
+    merged=$(jq -S --argjson eden "$resolved_json" \
+        '.mcpServers = $eden.mcpServers' "$client_config")
 
     # Already in sync — nothing to do
     if diff -q <(echo "$merged") <(jq -S . "$client_config") &>/dev/null; then
@@ -132,11 +155,31 @@ sync_mcp_client() {
     fi
 }
 
+# Sync MCP servers into Claude Code's ~/.claude.json.
+# Union merge: preserves user-added global servers, Eden servers win on conflicts.
+sync_claude_code() {
+    local client_config="$HOME/.claude.json"
+    [[ -f "$client_config" ]] || return 0
+
+    local merged
+    merged=$(jq -S --slurpfile eden "$CANONICAL_CONFIG" \
+        '.mcpServers = ((.mcpServers // {}) + $eden[0].mcpServers)' "$client_config")
+
+    if diff -q <(echo "$merged") <(jq -S . "$client_config") &>/dev/null; then
+        echo "  → Claude Code in sync"
+        return 0
+    fi
+
+    echo "$merged" | jq . > "$client_config"
+    echo "  → Synced Claude Code"
+}
+
 # Sync to MCP clients
 sync_mcp_client "Cursor" "$HOME/.cursor/mcp.json"
 if [[ "$(uname)" == "Darwin" ]]; then
     sync_mcp_client "Claude Desktop" "$HOME/Library/Application Support/Claude/claude_desktop_config.json"
 fi
+sync_claude_code
 
 # Show summary
 SERVER_COUNT=$(echo "$MERGED_JSON" | jq '.mcpServers | length')
