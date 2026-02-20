@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# op-mcp-warmup — shared helper for MCP wrapper scripts
+# Serializes 1Password biometric auth across concurrent MCP server starts.
+#
+# Source this file, then use op_read instead of op read:
+#   source op-mcp-warmup
+#   VALUE=$(op_read 'op://vault/item/field' account.1password.com 'My MCP Server')
+#
+# Benefits:
+#   - One Touch ID prompt per 1Password account (not per MCP server)
+#   - Descriptive --reason text in the Touch ID dialog
+#   - Portable: uses mkdir for locking (works on macOS and Linux)
+
+[[ -n "${_OP_MCP_WARMUP:-}" ]] && return 0
+_OP_MCP_WARMUP=1
+
+export OP_BIOMETRIC_UNLOCK_ENABLED=true
+
+# Read a 1Password secret with serialized biometric auth.
+# Usage: op_read <op-path> <account> <reason>
+op_read() {
+  local path="$1" account="$2" reason="$3"
+  local slug
+  slug=$(printf '%s' "$account" | tr -cd 'a-zA-Z0-9')
+  local lockdir="${TMPDIR:-/tmp}/op-mcp-auth-${slug}"
+
+  # Serialize auth per 1Password account.
+  # First caller triggers Touch ID; others wait for the session to warm.
+  local i=0
+  while ! mkdir "$lockdir" 2>/dev/null; do
+    sleep 0.2
+    if (( ++i >= 150 )); then  # 30s timeout — stale lock
+      rmdir "$lockdir" 2>/dev/null || true
+      break
+    fi
+  done
+
+  local rc=0
+  op read "$path" --account "$account" --reason "$reason" || rc=$?
+  rmdir "$lockdir" 2>/dev/null || true
+  return "$rc"
+}

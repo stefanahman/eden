@@ -4,9 +4,9 @@
 set -euo pipefail
 
 export PATH="$HOME/.eden/bin:$HOME/.volta/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-export OP_BIOMETRIC_UNLOCK_ENABLED=true
+source op-mcp-warmup
 
-CONTEXT7_API_KEY=$(op read 'op://Developer/context7-mcp-api-key/credential' --account my.1password.com)
+CONTEXT7_API_KEY=$(op_read 'op://Developer/context7-mcp-api-key/credential' my.1password.com 'Eden: Context7 MCP')
 export CONTEXT7_API_KEY
 
 exec npx -y mcp-remote https://mcp.context7.com/mcp \

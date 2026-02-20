@@ -4,8 +4,9 @@
 set -euo pipefail
 
 export PATH="$HOME/.eden/bin:$HOME/.volta/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-export OP_BIOMETRIC_UNLOCK_ENABLED=true
-GITHUB_PERSONAL_ACCESS_TOKEN=$(op read 'op://Developer/eden-github-mcp-token/credential' --account my.1password.com)
+source op-mcp-warmup
+
+GITHUB_PERSONAL_ACCESS_TOKEN=$(op_read 'op://Developer/eden-github-mcp-token/credential' my.1password.com 'Eden: GitHub MCP')
 export GITHUB_PERSONAL_ACCESS_TOKEN
 
 exec pnpm dlx @modelcontextprotocol/server-github
