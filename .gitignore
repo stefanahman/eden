@@ -12,6 +12,9 @@
 # Claude Code local settings (machine-specific, auto-managed)
 .claude/settings.local.json
 
+# Runtime databases
+*.mdb
+
 # OS artifacts
 .DS_Store
 
