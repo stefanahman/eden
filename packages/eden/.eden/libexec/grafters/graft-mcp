@@ -1,5 +1,11 @@
 #!/bin/bash
 # graft-mcp - Merge MCP servers from trunk and branches
+#
+# Two scopes:
+#   1. Global: branch/.config/mcp/servers.json → merged into ~/.config/mcp/servers.json
+#   2. Project: branch/projects/<path>/.mcp/servers.json → <target>/.mcp.json (+ client variants)
+#      where <target> is read from projects/<path>/.eden-target
+#
 # Part of Eden's pluggable grafter system
 set -e
 trap 'echo "  !! graft-mcp failed at line $LINENO" >&2' ERR
@@ -182,9 +188,65 @@ if [[ "$(uname)" == "Darwin" ]]; then
 fi
 sync_claude_code
 
+# =============================================================================
+# Project scope: place .mcp.json in target directories
+# =============================================================================
+
+# Write project MCP config to a target directory's client-specific files.
+# Resolves bare commands and writes .mcp.json (Claude Code) + .cursor/mcp.json.
+sync_project_mcp() {
+    local project_servers="$1" target_dir="$2" project_name="$3"
+
+    # Resolve bare commands for all clients
+    local resolved
+    resolved=$(resolve_commands "$project_servers")
+
+    # Claude Code: .mcp.json in project root
+    printf '%s' "$resolved" | jq '.' > "$target_dir/.mcp.json"
+
+    # Cursor: .cursor/mcp.json (only if .cursor/ exists)
+    if [[ -d "$target_dir/.cursor" ]]; then
+        printf '%s' "$resolved" | jq '.' > "$target_dir/.cursor/mcp.json"
+    fi
+
+    local count
+    count=$(printf '%s' "$project_servers" | jq '.mcpServers | length')
+    echo "  → projects/$project_name: $count server(s)"
+}
+
+project_count=0
+if [[ -f "$BRANCHES_FILE" ]]; then
+    while IFS= read -r branch_path; do
+        [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
+        branch_path=$(expand_branch_path "$branch_path")
+        [[ -d "$branch_path" ]] || continue
+
+        projects_dir="$branch_path/projects"
+        [[ -d "$projects_dir" ]] || continue
+
+        while IFS= read -r target_file || [[ -n "$target_file" ]]; do
+            project_dir=$(dirname "$target_file")
+            local_name="${project_dir#"$projects_dir"/}"
+            project_mcp="$project_dir/.mcp/servers.json"
+
+            [[ -f "$project_mcp" ]] || continue
+
+            project_target=$(expand_branch_path "$(head -1 "$target_file" | tr -d '[:space:]')")
+            if [[ ! -d "$project_target" ]]; then
+                echo "  ⚠ projects/$local_name: target $project_target not found (skipping MCP)"
+                continue
+            fi
+
+            sync_project_mcp "$(cat "$project_mcp")" "$project_target" "$local_name"
+            project_count=$((project_count + 1))
+        done < <(find "$projects_dir" -name .eden-target -type f || true)
+    done < "$BRANCHES_FILE"
+fi
+
 # Show summary
 SERVER_COUNT=$(echo "$MERGED_JSON" | jq '.mcpServers | length')
-echo "  → Configured $SERVER_COUNT MCP server(s)"
+echo "  → Configured $SERVER_COUNT global MCP server(s)"
+[[ $project_count -gt 0 ]] && echo "  → Configured $project_count project MCP scope(s)"
 
 exit 0
 
