@@ -2,15 +2,16 @@
 # Eden test runner - convenience wrapper
 # Runs all validation tests from tests/ directory
 
-set -e
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+any_failed=0
 
 # Run all test scripts in tests/
 echo "Running Eden validation tests..."
 echo ""
 
-"$SCRIPT_DIR/tests/validate-setup.sh"
+if ! "$SCRIPT_DIR/tests/validate-setup.sh"; then
+    any_failed=1
+fi
 
 # Optional: Check 1Password secrets (informational, doesn't fail)
 if [[ "${SKIP_SECRETS:-}" != "1" ]]; then
@@ -18,5 +19,13 @@ if [[ "${SKIP_SECRETS:-}" != "1" ]]; then
     "$SCRIPT_DIR/tests/validate-secrets.sh"
 fi
 
-exit $?
+# Run grafter integration tests (sandboxed)
+for test_file in "$SCRIPT_DIR"/tests/grafter/test-*.sh; do
+    [ -f "$test_file" ] || continue
+    echo ""
+    if ! bash "$test_file"; then
+        any_failed=1
+    fi
+done
 
+exit $any_failed
