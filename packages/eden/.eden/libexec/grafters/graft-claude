@@ -3,8 +3,9 @@
 #
 # Grafts two scopes:
 #   1. Global: .claude/{rules,agents,skills}/ → ~/.claude/
-#   2. Project: projects/<name>/.claude/{rules,agents,skills}/ → <target>/.claude/
-#      where <target> is read from projects/<name>/.eden-target
+#   2. Project: projects/<path>/.claude/{rules,agents,skills}/ → <target>/.claude/
+#      where <target> is read from projects/<path>/.eden-target
+#      Any directory nesting is allowed (e.g. projects/games/greenwash/)
 #
 # Part of Eden's pluggable grafter system
 set -e
@@ -152,19 +153,12 @@ while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do
     # 1. Global scope: branch/.claude/ → ~/.claude/
     _graft_claude_dir "$branch_path/.claude" "$HOME/.claude" "$branch_name"
 
-    # 2. Project scope: branch/projects/<name>/.claude/ → <target>/.claude/
+    # 2. Project scope: discover all .eden-target files under projects/
     projects_dir="$branch_path/projects"
     if [[ -d "$projects_dir" ]]; then
-        for project_dir in "$projects_dir"/*/; do
-            [[ -d "$project_dir" ]] || continue
-
-            local_name=$(basename "$project_dir")
-            target_file="$project_dir/.eden-target"
-
-            if [[ ! -f "$target_file" ]]; then
-                echo "  ⚠ projects/$local_name: missing .eden-target (skipping)"
-                continue
-            fi
+        while IFS= read -r target_file; do
+            project_dir=$(dirname "$target_file")
+            local_name="${project_dir#"$projects_dir"/}"
 
             project_target=$(expand_path "$(head -1 "$target_file" | tr -d '[:space:]')")
 
@@ -174,7 +168,7 @@ while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do
             fi
 
             _graft_claude_dir "$project_dir/.claude" "$project_target/.claude" "$branch_name:$local_name"
-        done
+        done < <(find "$projects_dir" -name .eden-target -type f)
     fi
 done < "$BRANCHES_FILE"
 

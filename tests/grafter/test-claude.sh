@@ -170,19 +170,83 @@ assert_is_symlink "$project_target/.claude/rules/proj.md"
 sandbox_teardown
 
 # =============================================================================
-# Test 10: Missing .eden-target
+# Test 10: Nested project scope (e.g. projects/games/greenwash/)
 # =============================================================================
 sandbox_setup
 
 branch=$(create_test_branch "test-branch")
-mkdir -p "$branch/projects/nofile/.claude/rules"
-echo "# Rule" > "$branch/projects/nofile/.claude/rules/rule.md"
-# No .eden-target file
+project_target="$SANDBOX/nested-target"
+mkdir -p "$project_target"
+
+mkdir -p "$branch/projects/games/greenwash/.claude/rules"
+echo "# Nested rule" > "$branch/projects/games/greenwash/.claude/rules/nested.md"
+echo "$project_target" > "$branch/projects/games/greenwash/.eden-target"
 register_branch "$branch"
 
-describe "missing .eden-target shows warning"
+describe "nested project scope creates symlink"
 output=$("$GRAFTER" 2>&1)
-assert_output_contains "$output" "missing .eden-target"
+assert_is_symlink "$project_target/.claude/rules/nested.md"
+
+describe "nested project uses relative path as owner"
+assert_output_contains "$output" "test-branch:games/greenwash"
+
+sandbox_teardown
+
+# =============================================================================
+# Test 10b: Dirs without .eden-target are silently skipped (organizational)
+# =============================================================================
+sandbox_setup
+
+branch=$(create_test_branch "test-branch")
+mkdir -p "$branch/projects/just-a-folder/.claude/rules"
+echo "# Rule" > "$branch/projects/just-a-folder/.claude/rules/rule.md"
+# No .eden-target file — this is just an organizational directory
+register_branch "$branch"
+
+describe "dir without .eden-target is silently skipped"
+output=$("$GRAFTER" 2>&1)
+assert_output_not_contains "$output" "just-a-folder"
+
+sandbox_teardown
+
+# =============================================================================
+# Test 10c: Multiple projects at mixed depths
+# =============================================================================
+sandbox_setup
+
+branch=$(create_test_branch "test-branch")
+target_a="$SANDBOX/target-a"
+target_b="$SANDBOX/target-b"
+target_c="$SANDBOX/target-c"
+mkdir -p "$target_a" "$target_b" "$target_c"
+
+# Flat project
+mkdir -p "$branch/projects/flat/.claude/rules"
+echo "# Flat" > "$branch/projects/flat/.claude/rules/flat.md"
+echo "$target_a" > "$branch/projects/flat/.eden-target"
+
+# Nested project
+mkdir -p "$branch/projects/games/deep/.claude/rules"
+echo "# Deep" > "$branch/projects/games/deep/.claude/rules/deep.md"
+echo "$target_b" > "$branch/projects/games/deep/.eden-target"
+
+# Deeper project
+mkdir -p "$branch/projects/work/clients/acme/.claude/rules"
+echo "# Acme" > "$branch/projects/work/clients/acme/.claude/rules/acme.md"
+echo "$target_c" > "$branch/projects/work/clients/acme/.eden-target"
+
+register_branch "$branch"
+
+output=$("$GRAFTER" 2>&1)
+
+describe "flat project discovered"
+assert_is_symlink "$target_a/.claude/rules/flat.md"
+
+describe "nested project discovered"
+assert_is_symlink "$target_b/.claude/rules/deep.md"
+
+describe "deeply nested project discovered"
+assert_is_symlink "$target_c/.claude/rules/acme.md"
 
 sandbox_teardown
 
