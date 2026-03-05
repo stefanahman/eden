@@ -86,10 +86,12 @@ run_single_grafter() {
     fi
 
     log "Running: graft-$name"
-    if bash "$grafter"; then
+    local rc=0
+    bash "$grafter" || rc=$?
+    if [ $rc -eq 0 ]; then
         log "graft-$name complete"
     else
-        warn "graft-$name failed (exit code: $?)"
+        warn "graft-$name failed (exit code: $rc)"
         exit 1
     fi
 }
