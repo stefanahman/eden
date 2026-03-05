@@ -108,6 +108,30 @@ assert_output_contains "$output" "already linked"
 sandbox_teardown
 
 # =============================================================================
+# Test 6b: Symlink with // in path recognized as already linked
+# =============================================================================
+sandbox_setup
+
+branch=$(create_test_branch "test-branch")
+mkdir -p "$branch/.claude/skills/my-skill"
+echo "# Skill" > "$branch/.claude/skills/my-skill/SKILL.md"
+register_branch "$branch"
+
+# Pre-create a symlink with double-slash (as old grafter versions would)
+mkdir -p "$HOME/.claude/skills"
+ln -sf "$branch/.claude//skills/my-skill" "$HOME/.claude/skills/my-skill"
+
+describe "symlink with // in path is recognized as already linked"
+output=$("$GRAFTER" 2>&1)
+if echo "$output" | grep -q "already linked" && ! echo "$output" | grep -q "Conflicts"; then
+    pass
+else
+    fail "expected 'already linked' without conflicts"
+fi
+
+sandbox_teardown
+
+# =============================================================================
 # Test 7: Cross-branch conflict
 # =============================================================================
 sandbox_setup

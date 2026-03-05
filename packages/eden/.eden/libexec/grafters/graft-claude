@@ -67,8 +67,10 @@ _graft_flat_dir() {
 
         if [[ -L "$target" ]]; then
             local current_target
-            current_target=$(readlink "$target")
-            if [[ "$current_target" != "$file" ]]; then
+            current_target=$(readlink -f "$target" 2>/dev/null || readlink "$target")
+            local expected
+            expected=$(readlink -f "$file" 2>/dev/null || echo "$file")
+            if [[ "$current_target" != "$expected" ]]; then
                 local existing_owner
                 existing_owner=$(_get_owner "$kind/$filename")
                 conflicts+=("$kind/$filename: ${existing_owner:-unknown} vs $owner")
@@ -107,8 +109,10 @@ _graft_skills_dir() {
 
         if [[ -L "$target" ]]; then
             local current_target
-            current_target=$(readlink "$target")
-            if [[ "$current_target" != "${skill_dir%/}" ]]; then
+            current_target=$(readlink -f "$target" 2>/dev/null || readlink "$target")
+            local expected
+            expected=$(readlink -f "${skill_dir%/}" 2>/dev/null || echo "${skill_dir%/}")
+            if [[ "$current_target" != "$expected" ]]; then
                 local existing_owner
                 existing_owner=$(_get_owner "$key")
                 conflicts+=("$key: ${existing_owner:-unknown} vs $owner")
@@ -132,7 +136,7 @@ _graft_skills_dir() {
 
 # Graft all Claude configs from a source .claude/ dir into a target .claude/ dir
 _graft_claude_dir() {
-    local source_claude="$1" target_claude="$2" owner="$3"
+    local source_claude="${1%/}" target_claude="${2%/}" owner="$3"
 
     [[ -d "$source_claude" ]] || return 0
 
@@ -156,7 +160,7 @@ while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do
     # 2. Project scope: discover all .eden-target files under projects/
     projects_dir="$branch_path/projects"
     if [[ -d "$projects_dir" ]]; then
-        while IFS= read -r target_file; do
+        while IFS= read -r target_file || [[ -n "$target_file" ]]; do
             project_dir=$(dirname "$target_file")
             local_name="${project_dir#"$projects_dir"/}"
 
@@ -168,7 +172,7 @@ while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do
             fi
 
             _graft_claude_dir "$project_dir/.claude" "$project_target/.claude" "$branch_name:$local_name"
-        done < <(find "$projects_dir" -name .eden-target -type f)
+        done < <(find "$projects_dir" -name .eden-target -type f || true)
     fi
 done < "$BRANCHES_FILE"
 
