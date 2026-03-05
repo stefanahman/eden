@@ -2,6 +2,7 @@
 # graft-mcp - Merge MCP servers from trunk and branches
 # Part of Eden's pluggable grafter system
 set -e
+trap 'echo "  !! graft-mcp failed at line $LINENO" >&2' ERR
 
 # Report covered paths for eden doctor
 if [[ "${1:-}" == "--covers" ]]; then

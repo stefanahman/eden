@@ -3,6 +3,7 @@
 # This handles standard dotfiles and configs that don't need special merging logic
 
 set -euo pipefail
+trap 'echo "  !! graft-configs failed at line $LINENO" >&2' ERR
 
 # graft-configs uses .eden-graft allowlists — no fixed --covers patterns
 if [[ "${1:-}" == "--covers" ]]; then

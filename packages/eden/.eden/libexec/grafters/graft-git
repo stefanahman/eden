@@ -5,6 +5,7 @@
 # Branches provide identities at .config/git/identities/<name>
 # This grafter symlinks them and generates includeIf directives
 set -e
+trap 'echo "  !! graft-git failed at line $LINENO" >&2' ERR
 
 # Report covered paths for eden doctor
 if [[ "${1:-}" == "--covers" ]]; then

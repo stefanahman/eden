@@ -2,6 +2,7 @@
 # graft-zsh - Graft zsh configs from branches (zshenv.d/, zshrc.d/)
 # Part of Eden's pluggable grafter system
 set -e
+trap 'echo "  !! graft-zsh failed at line $LINENO" >&2' ERR
 
 # Report covered paths for eden doctor
 if [[ "${1:-}" == "--covers" ]]; then

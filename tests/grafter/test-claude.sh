@@ -346,6 +346,27 @@ assert_symlink "$HOME/.claude/rules/real.md" "$branch/.claude/rules/real.md"
 sandbox_teardown
 
 # =============================================================================
+# Test 14: ERR trap reports line number on failure
+# =============================================================================
+sandbox_setup
+
+# Create a grafter wrapper that will fail at a known point
+failing_grafter="$SANDBOX/fail-grafter"
+cat > "$failing_grafter" <<'SCRIPT'
+#!/bin/bash
+set -e
+trap 'echo "  !! test-grafter failed at line $LINENO" >&2' ERR
+false  # line 4: guaranteed failure
+SCRIPT
+chmod +x "$failing_grafter"
+
+describe "ERR trap reports script name and line number"
+output=$(bash "$failing_grafter" 2>&1) || true
+assert_output_contains "$output" "failed at line 4"
+
+sandbox_teardown
+
+# =============================================================================
 # Results
 # =============================================================================
 
