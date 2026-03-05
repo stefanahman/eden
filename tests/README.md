@@ -71,10 +71,30 @@ eden-secrets validate
 
 Requirements are tracked in `.eden-secrets` file at repo root.
 
+### Grafter Integration Tests (`grafter/`)
+
+Sandboxed tests that exercise grafters against a temporary `$HOME`. Each test
+file creates a temp directory, overrides `HOME`/`XDG_CONFIG_HOME`/`EDEN_ROOT`,
+and validates symlinks, generated files, and conflict detection.
+
+**Run a single grafter test:**
+```bash
+bash tests/grafter/test-claude.sh
+```
+
+**Available tests:**
+- `test-claude.sh` — graft-claude (symlinks, project scope, conflicts, idempotency)
+- `test-mcp.sh` — graft-mcp (JSON merge, project scope, client sync, isolation)
+
+Shared helpers are in `tests/helpers.sh` (sandbox lifecycle, assertions).
+
 ## Adding Tests
 
 Add new validation scripts to this directory as Eden grows. Keep them:
 - Fast (< 5 seconds)
 - Focused (one concern per script)
 - Informative (clear pass/fail output)
+
+For grafter tests, add `tests/grafter/test-<name>.sh` — they're picked up
+automatically by `test.sh`.
 

@@ -56,8 +56,14 @@ Eden is the trunk (public); branches are extensions (private, context-specific).
 
 ## Pluggable Grafter System
 
-`eden graft` uses pluggable grafters in `bin/grafters/` to integrate branch content:
-MCP configs, secrets, binaries. Each grafter handles one concern independently.
+`eden graft` uses pluggable grafters in `packages/eden/.eden/libexec/grafters/` to
+integrate branch content: MCP configs, secrets, binaries, Claude Code skills.
+Each grafter handles one concern independently.
+
+Grafters support two scopes:
+- **Global**: branch configs merged into `$HOME` (e.g. `~/.config/mcp/servers.json`)
+- **Project**: configs placed in external project directories via `.eden-target` markers
+  (e.g. `projects/games/greenwash/.mcp/servers.json` → `~/Development/.../greenwash/.mcp.json`)
 
 ## Eden CLI Commands
 

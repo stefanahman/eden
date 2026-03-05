@@ -53,6 +53,33 @@ Create a grafter when branches need to contribute to the same logical configurat
 
 ## Grafter Strategies
 
+### Project Scope
+
+Some grafters support **project scope** in addition to global scope. Project-scoped
+configs are placed in external project directories rather than `$HOME`.
+
+Projects are discovered by `.eden-target` marker files anywhere under `projects/`:
+
+```
+branch/
+├── .claude/rules/           # global → ~/.claude/rules/
+├── .config/mcp/servers.json # global → ~/.config/mcp/servers.json
+└── projects/
+    ├── my-app/
+    │   ├── .eden-target     # contains: ~/Development/my-app
+    │   ├── .claude/skills/  # → ~/Development/my-app/.claude/skills/ (symlinked)
+    │   └── .mcp/servers.json# → ~/Development/my-app/.mcp.json (generated)
+    └── games/my-game/       # any nesting depth allowed
+        ├── .eden-target
+        └── .mcp/servers.json
+```
+
+Directories without `.eden-target` are organizational folders (silently skipped).
+
+**Grafters with project scope:**
+- `graft-claude` — symlinks `.claude/{rules,agents,skills}` into target
+- `graft-mcp` — generates `.mcp.json` (Claude Code) and `.cursor/mcp.json` in target
+
 ### 1. Collection (Symlink)
 
 **When to use:** Multiple branches contribute individual items to a collection
@@ -62,6 +89,7 @@ Create a grafter when branches need to contribute to the same logical configurat
 **Examples:**
 - `graft-bin`: Binaries from branches → `~/.eden/bin/`
 - `graft-zsh`: Env files from branches → `~/.config/zsh/zshenv.d/`
+- `graft-claude`: Claude rules/agents/skills from branches → `~/.claude/` + project targets
 
 **Pattern:**
 ```bash
@@ -92,7 +120,7 @@ done
 **How it works:** Parse, merge, and write combined output
 
 **Examples:**
-- `graft-mcp`: MCP servers from branches → `~/.config/mcp/servers.json`
+- `graft-mcp`: MCP servers from branches → `~/.config/mcp/servers.json` (global) + `.mcp.json` per project
 
 **Pattern:**
 ```bash
@@ -236,6 +264,7 @@ packages/eden/.eden/libexec/grafters/
 # graft-<name> - <description>
 # Part of Eden's pluggable grafter system
 set -e
+trap 'echo "  !! graft-<name> failed at line $LINENO" >&2' ERR
 
 # 1. Detect Eden root
 # 2. Load branches file
@@ -243,10 +272,12 @@ set -e
 # 4. For each branch:
 #    - Check if relevant files exist
 #    - Apply strategy (symlink/merge/generate)
+#    - (Optional) Discover projects via .eden-target for project scope
 # 5. Report results
 ```
 
 ### Error Handling
+- ERR trap reports script name and line number on `set -e` failures
 - Exit 0 if nothing to do (not an error)
 - Warn but continue on conflicts
 - Report summary (added/skipped/conflicts)
