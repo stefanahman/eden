@@ -137,24 +137,24 @@ sync_mcp_client() {
     echo "  ⚠ $client_name MCP servers differ from Eden"
     if [[ -t 0 ]]; then
         while true; do
-            echo -n "    [p]lant Eden servers, [s]kip, [d]iff? "
+            echo -n "    [a]pply, [s]kip, [d]iff? "
             read -r choice
             case "$choice" in
-                p|P)
+                a|A)
                     echo "$merged" | jq . > "$client_config"
-                    echo "  → Planted Eden MCP servers to $client_name"
+                    echo "  → Applied Eden MCP servers to $client_name"
                     break ;;
                 s|S)
                     echo "  → Skipped $client_name"
                     break ;;
                 d|D)
-                    diff -u --label "after (eden merged)" --label "current ($client_name)" \
-                        <(echo "$merged") <(jq -S . "$client_config") \
+                    diff -u --label "current ($client_name)" --label "after (eden merged)" \
+                        <(jq -S . "$client_config") <(echo "$merged") \
                         | if command -v delta &>/dev/null; then delta
                           elif command -v colordiff &>/dev/null; then colordiff
                           else cat; fi || true
                     ;;
-                *) echo "    Please enter p, s, or d" ;;
+                *) echo "    Please enter a, s, or d" ;;
             esac
         done
     else
@@ -183,9 +183,7 @@ sync_claude_code() {
 
 # Sync to MCP clients
 sync_mcp_client "Cursor" "$HOME/.cursor/mcp.json"
-if [[ "$(uname)" == "Darwin" ]]; then
-    sync_mcp_client "Claude Desktop" "$HOME/Library/Application Support/Claude/claude_desktop_config.json"
-fi
+# Claude Desktop: MCP servers managed via Settings → Connectors (not config file)
 sync_claude_code
 
 # =============================================================================
