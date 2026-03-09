@@ -16,6 +16,12 @@ if [[ "${1:-}" == "--covers" ]]; then
     exit 0
 fi
 
+# --force: apply without prompting (for non-interactive / agent use)
+FORCE=false
+if [[ "${1:-}" == "--force" ]]; then
+    FORCE=true
+fi
+
 # Check if jq is installed
 if ! command -v jq >/dev/null 2>&1; then
     echo "  ⚠ jq required for MCP graft (skipping)"
@@ -133,8 +139,13 @@ sync_mcp_client() {
         return 0
     fi
 
-    # Differs — prompt with optional diff
+    # Differs — force-apply or prompt
     echo "  ⚠ $client_name MCP servers differ from Eden"
+    if [[ "$FORCE" == "true" ]]; then
+        echo "$merged" | jq . > "$client_config"
+        echo "  → Applied Eden MCP servers to $client_name"
+        return 0
+    fi
     if [[ -t 0 ]]; then
         while true; do
             echo -n "    [a]pply, [s]kip, [d]iff? "

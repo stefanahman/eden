@@ -235,6 +235,59 @@ assert_not_exists "$project_target/.cursor/mcp.json"
 sandbox_teardown
 
 # =============================================================================
+# Test 10: Claude Desktop config is never modified
+# =============================================================================
+sandbox_setup
+
+branch=$(create_test_branch "test-branch")
+mkdir -p "$branch/.config/mcp"
+cat > "$branch/.config/mcp/servers.json" <<'JSON'
+{"mcpServers": {"srv": {"command": "/usr/bin/srv", "args": []}}}
+JSON
+register_branch "$branch"
+
+# Create Claude Desktop config dir with existing config
+mkdir -p "$HOME/Library/Application Support/Claude"
+cat > "$HOME/Library/Application Support/Claude/claude_desktop_config.json" <<'JSON'
+{"mcpServers": {}, "preferences": {"sidebarMode": "chat"}}
+JSON
+
+describe "Claude Desktop config is not modified by graft"
+output=$("$GRAFTER" 2>&1)
+servers=$(jq '.mcpServers | length' "$HOME/Library/Application Support/Claude/claude_desktop_config.json")
+if [[ "$servers" == "0" ]]; then pass; else fail "expected 0 servers in Desktop, got $servers"; fi
+
+describe "Claude Desktop preferences are preserved"
+mode=$(jq -r '.preferences.sidebarMode' "$HOME/Library/Application Support/Claude/claude_desktop_config.json")
+if [[ "$mode" == "chat" ]]; then pass; else fail "preferences lost"; fi
+
+sandbox_teardown
+
+# =============================================================================
+# Test 11: Remote (non-stdio) servers are included in global config
+# =============================================================================
+sandbox_setup
+
+branch=$(create_test_branch "test-branch")
+mkdir -p "$branch/.config/mcp"
+cat > "$branch/.config/mcp/servers.json" <<'JSON'
+{
+    "mcpServers": {
+        "local-srv": {"command": "/usr/bin/local", "args": []},
+        "remote-srv": {"type": "http", "url": "https://example.com/mcp"}
+    }
+}
+JSON
+register_branch "$branch"
+
+describe "global config includes remote servers"
+output=$("$GRAFTER" 2>&1)
+count=$(jq '.mcpServers | length' "$HOME/.config/mcp/servers.json")
+if [[ "$count" == "2" ]]; then pass; else fail "expected 2 servers, got $count"; fi
+
+sandbox_teardown
+
+# =============================================================================
 # Results
 # =============================================================================
 
