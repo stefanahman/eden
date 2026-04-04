@@ -1,8 +1,16 @@
 {
   "permissions": {
+    "allow": [
+      "Read(**/.env.example)",
+      "Bash(claude-afk)",
+      "Bash(claude-back)"
+    ],
     "deny": [
       "Read(**/.env)",
-      "Read(**/.env.*)"
+      "Read(**/.env.local)",
+      "Read(**/.env.production)",
+      "Read(**/.env.development)",
+      "Read(/Users/stefan/Documents/Private/**)"
     ]
   },
   "enabledPlugins": {
