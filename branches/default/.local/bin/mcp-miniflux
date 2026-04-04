@@ -1,0 +1,16 @@
+#!/bin/bash
+# MCP wrapper: Miniflux RSS reader
+# Fetches API key from 1Password at runtime — never stored on disk.
+set -euo pipefail
+
+export PATH="$HOME/.eden/bin:$HOME/.volta/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+source op-mcp-warmup
+
+MINIFLUX_API_KEY=$(op_read 'op://Developer/miniflux-api-key/credential' my.1password.com)
+export MINIFLUX_API_KEY
+export MINIFLUX_URL="https://news.steflix.net"
+
+exec docker run -i --rm --platform linux/amd64 \
+    -e MINIFLUX_URL \
+    -e MINIFLUX_API_KEY \
+    jwonder/miniflux-mcp:latest
