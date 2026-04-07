@@ -42,6 +42,26 @@ conflicts=()
 # Ensure ~/.eden/bin exists
 mkdir -p "$eden_bin"
 
+# Clean up broken symlinks (e.g. scripts moved between branches or removed)
+for link in "$eden_bin"/*; do
+    [ -L "$link" ] && [ ! -e "$link" ] && {
+        name=$(basename "$link")
+        if [[ "$FORCE" == "true" ]]; then
+            echo "  × $name [removing broken link]"
+            rm "$link"
+        elif [[ -t 0 ]]; then
+            echo -n "  ⚠ $name is a broken link → [r]emove, [s]kip? "
+            read -r choice
+            case "$choice" in
+                r|R) rm "$link"; echo "  × $name removed" ;;
+                *)   echo "  → $name skipped" ;;
+            esac
+        else
+            echo "  ⚠ $name is a broken link (run interactively to resolve)"
+        fi
+    }
+done
+
 # Track which branch owns which script (for conflict detection)
 # Uses newline-separated "name=owner" strings (bash 3.2 compatible)
 script_owners=""

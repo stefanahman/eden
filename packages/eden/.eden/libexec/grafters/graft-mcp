@@ -87,9 +87,6 @@ fi
 # Ensure canonical directory exists
 mkdir -p "$(dirname "$CANONICAL_CONFIG")"
 
-# Write merged config to canonical location
-echo "$MERGED_JSON" | jq '.' > "$CANONICAL_CONFIG"
-
 # Resolve bare command names to absolute paths.
 # GUI clients (Claude Desktop, Cursor) don't inherit shell PATH, so bare
 # commands like "mcp-foo" or "npx" won't be found. The graft runs from a
@@ -108,6 +105,10 @@ resolve_commands() {
     done < <(printf '%s' "$json" | jq -r '.mcpServers | keys[]')
     printf '%s' "$json"
 }
+
+# Resolve commands and write to canonical location
+MERGED_JSON=$(resolve_commands "$MERGED_JSON")
+echo "$MERGED_JSON" | jq '.' > "$CANONICAL_CONFIG"
 
 # Sync MCP servers into a client's config.
 # Merges only .mcpServers — preserves other keys (app preferences, etc.).
