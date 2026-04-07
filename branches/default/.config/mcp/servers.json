@@ -15,10 +15,6 @@
     "graphite": {
       "command": "gt",
       "args": ["mcp"]
-    },
-    "saga": {
-      "command": "mcp-saga",
-      "args": []
     }
   }
 }
