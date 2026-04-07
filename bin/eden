@@ -48,48 +48,192 @@ print_warning() {
     echo -e "${YELLOW}⚠${RESET} $1"
 }
 
-# Show help
+# Command registry: summary and detailed help in one place
+# Usage: cmd_help <command> [--full]
+cmd_help() {
+    local cmd="$1" full="${2:-}"
+    case "$cmd" in
+        grow)
+            echo "Plant configs + run grafters (the main command)"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden grow [options]
+
+Options:
+  --dry-run, -n     Preview changes without applying
+  --adopt           Pull existing home files into Eden
+HELP
+            ;;
+        plant)
+            echo "Plant Eden configs via GNU Stow"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden plant [options]
+
+Options:
+  --dry-run, -n     Preview changes without applying
+  --adopt           Pull existing home files into Eden
+HELP
+            ;;
+        unplant)
+            echo "Remove Eden symlinks (keeps ~/.eden/)"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden unplant
+HELP
+            ;;
+        graft)
+            echo "Run all grafters, or a specific one"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden graft [name]
+
+Options:
+  --list            Show available grafters
+  --force           Apply without prompting
+
+Examples:
+  eden graft        Run all grafters
+  eden graft git    Run only the git grafter
+  eden graft mcp    Run only the MCP grafter
+HELP
+            ;;
+        update)
+            echo "Pull from git and re-apply configs"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden update
+HELP
+            ;;
+        uninstall)
+            echo "Complete Eden removal"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden uninstall
+HELP
+            ;;
+        install)
+            echo "Install platform packages or a specific tool"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden install [package]
+
+Options:
+  --list            Show available packages
+
+Examples:
+  eden install          Install all platform packages
+  eden install gcloud   Install Google Cloud CLI
+HELP
+            ;;
+        branch)
+            echo "Manage Eden branches (add, list, remove, new)"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden branch <subcommand>
+
+Subcommands:
+  add <path>        Register a branch
+  list              List registered branches
+  remove <path>     Unregister a branch
+  new <path>        Create and register a new branch
+HELP
+            ;;
+        secrets)
+            echo "Manage 1Password secrets (list, validate)"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden secrets <subcommand>
+
+Subcommands:
+  list              List all declared secrets
+  validate          Check that secrets exist in 1Password
+  lookup <id>       Look up a specific secret
+HELP
+            ;;
+        doctor)
+            echo "Validate installation health"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden doctor
+HELP
+            ;;
+        status)
+            echo "Show Eden system overview and health"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden status
+HELP
+            ;;
+        diff-file)
+            echo "Compare a file between Eden and your system"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden diff-file <path>
+HELP
+            ;;
+        check-package)
+            echo "Check if a package exists (brew, pacman, AUR)"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden check-package <name>
+HELP
+            ;;
+        list-packages)
+            echo "Show platform packages (Brewfile/pacman.txt)"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden list-packages
+HELP
+            ;;
+        os)
+            echo "OS-specific settings (dump, edit, apply, show, diff)"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden os <command>
+
+Run 'eden os' for full usage.
+HELP
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+# Show overview help
 show_help() {
     print_header "Eden - Personal Environment Manager"
     echo ""
     echo -e "${BOLD}Usage:${RESET} eden <command> [options]"
     echo ""
-    echo -e "${BOLD}Getting Started:${RESET}"
-    echo "  grow                  Plant configs + run grafters (the main command)"
-    echo "  install [package]     Install platform packages or a specific tool"
-    echo "  doctor                Validate installation health"
-    echo ""
-    echo -e "${BOLD}Config Management:${RESET}"
-    echo "  plant [--adopt]       Plant Eden configs via GNU Stow [--dry-run to preview]"
-    echo "  unplant               Remove Eden symlinks (keeps ~/.eden/)"
-    echo "  graft [name]          Run all grafters, or just one (e.g., eden graft git)"
-    echo "  graft --list          Show available grafters"
-    echo "  update                Pull from git and re-apply configs"
-    echo "  uninstall             Complete Eden removal"
-    echo ""
-    echo -e "${BOLD}Branches & Secrets:${RESET}"
-    echo "  branch                Manage Eden branches (add, list, remove, init)"
-    echo "  secrets               Manage 1Password secrets (list, validate)"
-    echo ""
-    echo -e "${BOLD}Inspect & Debug:${RESET}"
-    echo "  status                Show Eden system overview and health"
-    echo "  diff-file <path>      Compare a file between Eden and your system"
-    echo "  check-package <name>  Check if a package exists (brew, pacman, AUR)"
-    echo "  list-packages         Show platform packages (Brewfile/pacman.txt)"
-    echo "  os <cmd>              OS-specific settings (dump, edit, apply, show, diff)"
-    echo ""
-    echo -e "${BOLD}Examples:${RESET}"
-    echo "  eden grow               Plant configs + run all grafters"
-    echo "  eden grow --dry-run     Preview everything without changes"
-    echo "  eden plant --adopt      Pull existing files into Eden"
-    echo "  eden graft git          Run only the git grafter"
-    echo "  eden install gcloud     Install Google Cloud CLI"
-    echo "  eden secrets validate   Check 1Password secrets exist"
-    echo ""
+
+    _section() {
+        echo -e "${BOLD}$1:${RESET}"
+        shift
+        for cmd in "$@"; do
+            printf "  %-22s %s\n" "$cmd" "$(cmd_help "$cmd")"
+        done
+        echo ""
+    }
+
+    _section "Getting Started"    grow install doctor
+    _section "Config Management"  plant unplant graft update uninstall
+    _section "Branches & Secrets" branch secrets
+    _section "Inspect & Debug"    status diff-file check-package list-packages os
+
     echo -e "${BOLD}Environment:${RESET}"
     echo "  Eden Root: $EDEN_ROOT"
     echo ""
-    echo "For more information, see the README at $EDEN_ROOT/README.md"
+    echo "Run 'eden <command> --help' for detailed usage."
+}
+
+# Show detailed help for a specific subcommand
+show_command_help() {
+    local cmd="$1"
+    if ! cmd_help "$cmd" --full; then
+        print_error "Unknown command: $cmd"
+        echo ""
+        show_help
+    fi
 }
 
 # Show version
@@ -587,9 +731,32 @@ main() {
     
     local command="$1"
     shift
-    
+
+    # Handle --help for any subcommand
+    for arg in "$@"; do
+        case "$arg" in
+            --help|-h)
+                show_command_help "$command"
+                exit 0
+                ;;
+        esac
+    done
+
     case "$command" in
         grow)
+            # Validate arguments
+            for arg in "$@"; do
+                case "$arg" in
+                    --dry-run|-n|--adopt) ;;
+                    *)
+                        print_error "Unknown option: $arg"
+                        echo ""
+                        show_command_help "grow"
+                        exit 1
+                        ;;
+                esac
+            done
+
             # Combined plant + graft: the main command for setting up Eden
             if ! do_plant "$@"; then
                 exit 1
@@ -866,7 +1033,11 @@ main() {
             show_version
             ;;
         help|--help|-h)
-            show_help
+            if [[ $# -gt 0 ]]; then
+                show_command_help "$1"
+            else
+                show_help
+            fi
             ;;
         *)
             print_error "Unknown command: $command"
