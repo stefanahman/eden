@@ -11,10 +11,6 @@
     "linear": {
       "type": "http",
       "url": "https://mcp.linear.app/mcp"
-    },
-    "graphite": {
-      "command": "gt",
-      "args": ["mcp"]
     }
   }
 }
