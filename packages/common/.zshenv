@@ -4,4 +4,4 @@
 if [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/zsh/.zshenv" ]]; then
     source "${XDG_CONFIG_HOME:-$HOME/.config}/zsh/.zshenv"
 fi
-. "$HOME/.cargo/env"
+[[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
