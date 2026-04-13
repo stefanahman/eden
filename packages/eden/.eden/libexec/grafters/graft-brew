@@ -1,0 +1,65 @@
+#!/bin/bash
+# graft-brew - Install Homebrew packages from branch Brewfiles
+# Part of Eden's pluggable grafter system
+set -e
+trap 'echo "  !! graft-brew failed at line $LINENO" >&2' ERR
+
+# Report covered paths for eden doctor
+if [[ "${1:-}" == "--covers" ]]; then
+    echo "Brewfile"
+    exit 0
+fi
+
+# macOS only
+if [[ "$(uname)" != "Darwin" ]]; then
+    exit 0
+fi
+
+# Require brew
+if ! command -v brew &>/dev/null; then
+    echo "  ⚠ Homebrew not installed (skipping)"
+    exit 0
+fi
+
+# Detect Eden root from script location
+if [[ -z "$EDEN_ROOT" ]]; then
+    SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+    EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
+fi
+
+expand_branch_path() {
+    local path="$1"
+    path="${path//\$EDEN_ROOT/$EDEN_ROOT}"
+    path="${path/#\~/$HOME}"
+    echo "$path"
+}
+
+BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+if [[ ! -f "$BRANCHES_FILE" ]]; then
+    exit 0
+fi
+
+GRAFTED_COUNT=0
+
+while IFS= read -r branch_path; do
+    [[ -z "$branch_path" ]] && continue
+    [[ "$branch_path" =~ ^[[:space:]]*# ]] && continue
+
+    branch_path=$(expand_branch_path "$branch_path")
+    branch_name=$(basename "$branch_path")
+    branch_brewfile="$branch_path/Brewfile"
+
+    if [[ -f "$branch_brewfile" ]]; then
+        echo "  → Installing brew packages from: $branch_name"
+        HOMEBREW_NO_AUTO_UPDATE=1 brew bundle --file="$branch_brewfile" --no-upgrade --quiet
+        GRAFTED_COUNT=$((GRAFTED_COUNT + 1))
+    fi
+done < "$BRANCHES_FILE"
+
+if [[ $GRAFTED_COUNT -eq 0 ]]; then
+    echo "  → No Brewfiles found in branches"
+else
+    echo "  → Installed brew packages from $GRAFTED_COUNT branch(es)"
+fi
+
+exit 0

@@ -245,6 +245,7 @@ Do multiple branches contribute?
 ```
 packages/eden/.eden/libexec/grafters/
 ├── graft-bin          # Collection strategy
+├── graft-brew         # Aggregate strategy (macOS only)
 ├── graft-claude       # Collection strategy
 ├── graft-configs      # Allowlist strategy (.eden-graft)
 ├── graft-git          # Generate strategy
