@@ -7,7 +7,7 @@
 
 [core]
 	editor = nvim
-	pager = less -FRX
+	pager = delta --dark
 	autocrlf = input
 
 [init]
@@ -29,6 +29,26 @@
 [color]
 	ui = auto
 
+[interactive]
+	diffFilter = delta --color-only
+
+[delta]
+	navigate = true
+	line-numbers = true
+	syntax-theme = Everforest Dark Medium
+
+[merge]
+	tool = vimdiff
+
+[sequence]
+	editor = rebase-editor
+
+[filter "lfs"]
+	process = git-lfs filter-process
+	required = true
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+
 [alias]
 	s = status
 	co = checkout
@@ -36,6 +56,9 @@
 	ci = commit
 	unstage = reset HEAD --
 	gone = "!git fetch -p && git for-each-ref --format '%(refname:short) %(upstream:track)' | awk '$2 == \"[gone]\" {print $1}' | xargs -r git branch -D"
+	gg = "!gitgg() { git log -n 20 --pretty=format:'%h %s' --no-merges | fzf | cut -c -7 | xargs -o -I {} sh -c 'git commit --fixup {}; git -c sequence.editor=: rebase -i --autosquash {}~1'; };gitgg"
+	rbi = "!gitrebaseinteractive() { git log -n 20 --pretty=format:'%h %s' --no-merges | fzf | cut -c -7 | xargs -o -I {} git rebase -i {}~1; };gitrebaseinteractive"
+	fixup = "!gitfixup() { git log -n 20 --pretty=format:'%h %s' --no-merges | fzf | cut -c -7 | xargs -o git commit --fixup; };gitfixup"
 
 # Include platform-specific config (binary paths, credential helpers)
 [include]
