@@ -132,7 +132,7 @@ if [ -f "$GIT_IDENTITY_DIR/_default" ]; then
         check_warn "Default git identity is a placeholder (edit _default or add one via a branch)"
     fi
 else
-    check_warn "No default git identity (create .config/git/identities/_default in a branch)"
+    check_warn "No default git identity — add .config/git/identities/_default to a branch (see docs/branches-and-secrets.md)"
 fi
 
 IDENTITY_COUNT=$(find "$GIT_IDENTITY_DIR" -type f -o -type l 2>/dev/null | grep -cv '_default' 2>/dev/null || echo 0)
