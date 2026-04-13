@@ -1,16 +1,9 @@
 # Git configuration - shared across platforms
 # This is symlinked to ~/.config/git/config
-
-[user]
-	name = Stefan Åhman
-	email = stefan.ahman@gmail.com
-	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPhkiSXSYiJCPOl8fE0YvAtQmEKaopoZ9Ir21Z+lt9u8
-
-[gpg]
-	format = ssh
-
-[commit]
-	gpgsign = true
+#
+# Identity (user.name, user.email, signingkey) is NOT set here.
+# It comes from branch git identities via graft-git includeIf directives.
+# See: ~/.config/eden/local/gitconfig
 
 [core]
 	editor = nvim

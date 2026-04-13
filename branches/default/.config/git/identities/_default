@@ -1,0 +1,19 @@
+# Default git identity — TEMPLATE
+# Replace with your own name, email, and signing key.
+#
+# Option 1: Edit this file directly (if using Eden's default branch as-is)
+# Option 2: Create a _default identity in your personal branch (recommended)
+#
+# Your personal branch's _default will override this one via graft-git.
+# See: docs/branches-and-secrets.md
+
+[user]
+	name = Your Name
+	email = you@example.com
+	# signingkey = ssh-ed25519 AAAA...
+
+# Uncomment to enable commit signing:
+# [gpg]
+# 	format = ssh
+# [commit]
+# 	gpgsign = true

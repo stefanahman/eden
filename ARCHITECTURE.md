@@ -136,7 +136,7 @@ Provider: 1Password CLI (`op`). Secrets are fetched at runtime, never stored in 
 
 | Category | What |
 |----------|------|
-| MCP servers | GitHub, Context7, Linear (with 1Password wrappers) |
+| MCP servers | GitHub, Context7 (with 1Password wrappers) |
 | Editor | Neovim/LazyVim configuration |
 | Window management | yabai, skhd, karabiner (macOS) |
 | Shell | Claude AFK mode, default tool env vars (Docker, Bat, Volta) |
@@ -144,7 +144,7 @@ Provider: 1Password CLI (`op`). Secrets are fetched at runtime, never stored in 
 
 **Personal branches (private, `eden graft`)** -- context-specific extensions:
 
-MCP servers, git identities, secrets, Brewfiles, Claude skills, binaries.
+Git identity (`_default` + directory-scoped), MCP servers, secrets, Brewfiles, Claude skills, binaries.
 See [docs/branches-and-secrets.md](docs/branches-and-secrets.md).
 
 ## Non-Goals

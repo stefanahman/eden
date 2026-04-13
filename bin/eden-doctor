@@ -120,6 +120,26 @@ else
     check_warn "~/.eden directory not found (may not be stowed yet)"
 fi
 
+# Check git identity
+section "Git Identity:"
+
+GIT_IDENTITY_DIR="$HOME/.config/git/identities"
+if [ -f "$GIT_IDENTITY_DIR/_default" ]; then
+    GIT_NAME=$(git config --file "$GIT_IDENTITY_DIR/_default" user.name 2>/dev/null)
+    if [ -n "$GIT_NAME" ] && [ "$GIT_NAME" != "Your Name" ]; then
+        check_pass "Default git identity configured ($GIT_NAME)"
+    else
+        check_warn "Default git identity is a placeholder (edit _default or add one via a branch)"
+    fi
+else
+    check_warn "No default git identity (create .config/git/identities/_default in a branch)"
+fi
+
+IDENTITY_COUNT=$(find "$GIT_IDENTITY_DIR" -type f -o -type l 2>/dev/null | grep -cv '_default' 2>/dev/null || echo 0)
+if [ "$IDENTITY_COUNT" -gt 0 ]; then
+    check_pass "$IDENTITY_COUNT directory-scoped git identity(ies) configured"
+fi
+
 # Check symlinks
 section "Symlinks:"
 
@@ -236,9 +256,9 @@ is_covered_by_grafter() {
 
 is_metadata() {
     local path="$1"
-    # Skip eden metadata and docs at branch root
+    # Skip eden metadata, docs, and root-level config files at branch root
     case "$path" in
-        .eden-*|README.md|ARCHITECTURE.md) return 0 ;;
+        .eden-*|README.md|ARCHITECTURE.md|Brewfile) return 0 ;;
     esac
     return 1
 }
