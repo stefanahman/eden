@@ -4,6 +4,19 @@
 
 Grafters are pluggable scripts that intelligently merge configurations from multiple branches. Each grafter uses a specific **strategy** to handle conflicts and combine sources.
 
+## Quick Reference
+
+| Grafter | Strategy | What it does | Branch path |
+|---------|----------|-------------|-------------|
+| `graft-bin` | Collection | Symlinks binaries into `~/.eden/bin/` | `.local/bin/*` |
+| `graft-brew` | Aggregate | Runs `brew bundle` on branch Brewfiles (macOS only) | `Brewfile` |
+| `graft-claude` | Collection | Symlinks Claude rules/agents/skills (global + project) | `.claude/{rules,agents,skills}/` |
+| `graft-configs` | Allowlist | Symlinks paths listed in `.eden-graft` | Varies (per allowlist) |
+| `graft-git` | Generate | Creates `includeIf` directives for branch git identities | `.config/git/identities/*` |
+| `graft-mcp` | Merge | Merges MCP server JSON from all branches (global + project) | `.config/mcp/servers.json` |
+| `graft-secrets` | Aggregate | Collects 1Password secret definitions for `eden secrets` | `.eden-secrets` |
+| `graft-zsh` | Collection | Symlinks zsh env files into `~/.config/zsh/zshenv.d/` | `.config/zsh/zshenv.d/*.zsh` |
+
 ## Config Deployment: `.eden-graft` vs Dedicated Grafters
 
 Most branch configs are deployed via the **`.eden-graft` allowlist** — a simple file listing paths that `graft-configs` should symlink to `$HOME`. This covers configs that don't need multi-branch merging (editor settings, window managers, etc.).

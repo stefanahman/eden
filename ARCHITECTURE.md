@@ -57,13 +57,25 @@ Eden is the trunk (public); branches are extensions (private, context-specific).
 ## Pluggable Grafter System
 
 `eden graft` uses pluggable grafters in `packages/eden/.eden/libexec/grafters/` to
-integrate branch content: MCP configs, secrets, binaries, Claude Code skills.
-Each grafter handles one concern independently.
+integrate branch content. Each grafter handles one concern independently.
+
+| Grafter | What it does |
+|---------|-------------|
+| `graft-bin` | Symlinks branch binaries into `~/.eden/bin/` |
+| `graft-brew` | Runs `brew bundle` on branch Brewfiles (macOS only) |
+| `graft-claude` | Symlinks Claude rules, agents, and skills |
+| `graft-configs` | Symlinks paths listed in branch `.eden-graft` allowlists |
+| `graft-git` | Creates git `includeIf` directives for branch identities |
+| `graft-mcp` | Merges MCP server JSON from all branches |
+| `graft-secrets` | Collects 1Password secret definitions |
+| `graft-zsh` | Symlinks zsh env files into `zshenv.d/` |
 
 Grafters support two scopes:
 - **Global**: branch configs merged into `$HOME` (e.g. `~/.config/mcp/servers.json`)
 - **Project**: configs placed in external project directories via `.eden-target` markers
   (e.g. `projects/games/greenwash/.mcp/servers.json` → `~/Development/.../greenwash/.mcp.json`)
+
+See [docs/grafters.md](docs/grafters.md) for strategies, patterns, and how to create new grafters.
 
 ## Eden CLI Commands
 
@@ -109,10 +121,31 @@ Provider: 1Password CLI (`op`). Secrets are fetched at runtime, never stored in 
 **Required:** git, GNU Stow >= 2.3
 **Optional:** 1Password CLI (`op`), fnm, pnpm
 
-## AI Integration
+## What Ships Where
 
-MCP servers configured via `eden graft` with 1Password for tokens.
-Branch repos can provide MCP server configs in `.config/mcp/servers.json`.
+**Packages (core, `eden plant`)** -- minimal foundation that works without branches:
+
+| Package | Contents |
+|---------|----------|
+| `common` | zsh/bash config, git config, starship prompt, editor settings, Claude Code rules |
+| `mac` | Ghostty terminal, macOS defaults system, platform shell/git overrides |
+| `arch` | Platform shell/git overrides |
+| `eden` | Grafters, setup helpers (`node-setup`, `gcloud-setup`) |
+
+**Default branch (opinionated, `eden graft`)** -- practical extras, opt-out by removing from branches file:
+
+| Category | What |
+|----------|------|
+| MCP servers | GitHub, Context7, Linear (with 1Password wrappers) |
+| Editor | Neovim/LazyVim configuration |
+| Window management | yabai, skhd, karabiner (macOS) |
+| Shell | Claude AFK mode, default tool env vars (Docker, Bat, Volta) |
+| Tools | pnpm config, `op-mcp-warmup` helper |
+
+**Personal branches (private, `eden graft`)** -- context-specific extensions:
+
+MCP servers, git identities, secrets, Brewfiles, Claude skills, binaries.
+See [docs/branches-and-secrets.md](docs/branches-and-secrets.md).
 
 ## Non-Goals
 
