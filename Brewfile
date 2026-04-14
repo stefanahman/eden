@@ -52,5 +52,6 @@ cask "1password-cli"  # 1Password CLI for secret management
 brew "openvpn"        # VPN client for secure connections
 
 # AI tools
-cask "claude-code"    # Anthropic CLI for agentic coding
+# claude-code: Install via `curl -fsSL https://claude.ai/install.sh | bash` (official installer)
+cask "gitbutler"      # Git client for virtual branches + AI agent hooks (includes `but` CLI)
 

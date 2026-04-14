@@ -122,8 +122,9 @@ Options:
   --list            Show available packages
 
 Examples:
-  eden install          Install all platform packages
-  eden install gcloud   Install Google Cloud CLI
+  eden install              Install all platform packages
+  eden install claude-code  Install Claude Code (official installer)
+  eden install gcloud       Install Google Cloud CLI
 HELP
             ;;
         branch)
