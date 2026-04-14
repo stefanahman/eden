@@ -32,7 +32,7 @@ cask "zed"       # GUI editor with AI assistant
 brew "eza"       # Modern ls replacement (used in .zshrc aliases)
 
 # Keyboard & window management
-tap "koekeishiya/formulae"
+tap "asmvik/formulae"
 tap "FelixKratz/formulae"
 cask "karabiner-elements"  # Advanced keyboard modifier and remapping
 brew "yabai"               # Tiling window manager

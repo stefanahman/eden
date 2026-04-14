@@ -4,7 +4,7 @@ Automatic window tiling for macOS, inspired by bspwm and i3.
 
 ## Setup
 
-1. Install: `brew install koekeishiya/formulae/yabai`
+1. Install: `brew install asmvik/formulae/yabai`
 2. Start service: `yabai --start-service`
 3. Grant accessibility permissions (System Settings → Privacy & Security → Accessibility)
 
