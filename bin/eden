@@ -251,6 +251,18 @@ show_version() {
 }
 
 # Install packages based on platform
+# Opt out of gcloud usage reporting. Env vars don't cover it — gcloud reads
+# its own config key. Safe to run repeatedly; no-ops if gcloud isn't installed.
+disable_gcloud_telemetry() {
+    command -v gcloud >/dev/null 2>&1 || return 0
+    local current
+    current=$(gcloud config get-value disable_usage_reporting --quiet 2>/dev/null)
+    if [ "$current" != "True" ]; then
+        gcloud config set disable_usage_reporting true --quiet >/dev/null 2>&1 \
+            && print_success "gcloud usage reporting disabled"
+    fi
+}
+
 install_packages() {
     print_header "Installing Platform Packages"
     
@@ -265,6 +277,7 @@ install_packages() {
             if [ -f "Brewfile" ]; then
                 brew bundle
                 print_success "Packages installed from Brewfile"
+                disable_gcloud_telemetry
             else
                 print_error "Brewfile not found"
                 exit 1
