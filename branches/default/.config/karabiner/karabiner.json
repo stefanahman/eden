@@ -19,7 +19,7 @@
                         ]
                     },
                     {
-                        "description": "Hyper + 1-9 → Switch to Desktop 1-9 (Mission Control)",
+                        "description": "Hyper + 1-9,0 → Switch to Desktop 1-10 (Mission Control)",
                         "manipulators": [
                             {
                                 "from": {
@@ -133,6 +133,19 @@
                                 "to": [
                                     {
                                         "key_code": "9",
+                                        "modifiers": ["control"]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "from": {
+                                    "key_code": "0",
+                                    "modifiers": { "mandatory": ["right_control", "right_option", "right_command"] }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "0",
                                         "modifiers": ["control"]
                                     }
                                 ],
