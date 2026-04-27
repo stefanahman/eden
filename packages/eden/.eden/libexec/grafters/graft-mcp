@@ -211,12 +211,28 @@ sync_project_mcp() {
     local resolved
     resolved=$(resolve_commands "$project_servers")
 
-    # Claude Code: .mcp.json in project root
-    printf '%s' "$resolved" | jq '.' > "$target_dir/.mcp.json"
+    # Union merge into existing target file (eden wins on name conflicts).
+    # Preserves project-tracked servers; never clobbers user-managed entries.
+    _merge_into() {
+        local target_file="$1"
+        if [[ -f "$target_file" ]]; then
+            local merged
+            merged=$(jq -S --argjson eden "$resolved" \
+                '.mcpServers = ((.mcpServers // {}) + $eden.mcpServers)' "$target_file")
+            if diff -q <(echo "$merged") <(jq -S . "$target_file") &>/dev/null; then
+                return 0
+            fi
+            echo "$merged" | jq '.' > "$target_file"
+        else
+            printf '%s' "$resolved" | jq '.' > "$target_file"
+        fi
+    }
+
+    _merge_into "$target_dir/.mcp.json"
 
     # Cursor: .cursor/mcp.json (only if .cursor/ exists)
     if [[ -d "$target_dir/.cursor" ]]; then
-        printf '%s' "$resolved" | jq '.' > "$target_dir/.cursor/mcp.json"
+        _merge_into "$target_dir/.cursor/mcp.json"
     fi
 
     local count
