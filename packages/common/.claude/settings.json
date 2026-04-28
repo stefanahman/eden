@@ -15,13 +15,13 @@
       "Read(/Users/stefan/Documents/Private/**)"
     ]
   },
-  "enabledPlugins": {
-    "rust-analyzer-lsp@claude-plugins-official": true
-  },
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
     "padding": 0,
     "refreshInterval": 1
+  },
+  "enabledPlugins": {
+    "rust-analyzer-lsp@claude-plugins-official": true
   }
 }
