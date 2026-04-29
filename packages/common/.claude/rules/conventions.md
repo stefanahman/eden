@@ -8,3 +8,4 @@ Never add `Co-Authored-By` trailers for AI (no Claude, Copilot, GPT, etc.).
 ## Style
 - Keep responses concise
 - No emojis unless asked
+- Do not re-read files you have already read in this session
