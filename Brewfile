@@ -35,12 +35,15 @@ brew "eza"       # Modern ls replacement (used in .zshrc aliases)
 tap "asmvik/formulae"
 tap "FelixKratz/formulae"
 cask "karabiner-elements"  # Advanced keyboard modifier and remapping
-brew "yabai"               # Tiling window manager
-brew "skhd"                # Hotkey daemon
+brew "asmvik/formulae/yabai"  # Tiling window manager (asmvik fork)
+brew "asmvik/formulae/skhd"   # Hotkey daemon (asmvik fork)
 brew "borders"             # Active window border highlight
 
 # Browsers
 cask "ungoogled-chromium"  # Privacy-focused Chromium without Google integration
+
+# Communication
+cask "signal"      # End-to-end encrypted messenger
 
 # System tools
 brew "btop"        # Resource monitor
@@ -53,5 +56,3 @@ brew "openvpn"        # VPN client for secure connections
 
 # AI tools
 # claude-code: Install via `curl -fsSL https://claude.ai/install.sh | bash` (official installer)
-cask "gitbutler"      # Git client for virtual branches + AI agent hooks (includes `but` CLI)
-
