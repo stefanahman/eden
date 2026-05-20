@@ -2,8 +2,6 @@
   "permissions": {
     "allow": [
       "Read(**/.env.example)",
-      "Bash(gh api repos/bardo-technology/bardo-system/actions/runs:*)",
-      "Bash(gh api repos/bardo-technology/bardo-system/actions/jobs:*)",
       "Bash(claude-afk)",
       "Bash(claude-back)",
       "Bash(timeout:*)"
