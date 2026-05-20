@@ -94,8 +94,25 @@ MODEL_SHORT="${MODEL%% (*}"
 
 LEFT="${C_BOLD}${C_CYAN}[${MODEL_SHORT}]${C_RESET}"
 LEFT+=" ${C_MAGENTA}${DIR}${C_RESET}"
-[ -n "$WORKTREE" ] && LEFT+=" ${C_DIM}⌥${C_RESET} ${WORKTREE}"
-[ -n "$BRANCH" ]   && LEFT+=" ${C_DIM}⎇${C_RESET} ${C_BLUE}${BRANCH}${C_RESET}"
+WT_BARE=0; BR_BARE=0
+WT_NAME=""; BR_NAME=""
+if [ -n "$WORKTREE" ]; then
+  wt=$(basename "$WORKTREE")
+  if [ "$wt" = "$DIR" ]; then WT_BARE=1; else WT_NAME=$wt; fi
+fi
+if [ -n "$BRANCH" ]; then
+  if [ "${BRANCH##*/}" = "$DIR" ]; then BR_BARE=1; else BR_NAME=$BRANCH; fi
+fi
+if (( WT_BARE && BR_BARE )); then
+  LEFT+=" ${C_DIM}⌥⎇${C_RESET}"
+else
+  [ -n "$WORKTREE" ] && {
+    if (( WT_BARE )); then LEFT+=" ${C_DIM}⌥${C_RESET}"; else LEFT+=" ${C_DIM}⌥${C_RESET} ${WT_NAME}"; fi
+  }
+  [ -n "$BRANCH" ] && {
+    if (( BR_BARE )); then LEFT+=" ${C_DIM}⎇${C_RESET}"; else LEFT+=" ${C_DIM}⎇${C_RESET} ${C_BLUE}${BR_NAME}${C_RESET}"; fi
+  }
+fi
 [ "$THINKING" = "true" ] && LEFT+=" ${C_YELLOW}●${C_RESET}"
 if [ -n "$EFFORT" ] && [ "$EFFORT" != "default" ] && [ "$EFFORT" != "null" ]; then
   LEFT+=" ${C_DIM}${EFFORT}${C_RESET}"
