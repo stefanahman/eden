@@ -11,6 +11,8 @@ NC='\033[0m' # No Color
 # Options
 VERBOSE=false
 INSTALL_PACKAGES=false
+TRACK=""              # latest | main | vX.Y.Z (empty = use existing if present, else "latest")
+TRACK_EXPLICIT=false  # true if --latest/--main/vX.Y.Z was passed
 
 # Parse arguments
 for arg in "$@"; do
@@ -21,13 +23,30 @@ for arg in "$@"; do
         --packages|-p)
             INSTALL_PACKAGES=true
             ;;
+        --latest)
+            TRACK="latest"; TRACK_EXPLICIT=true
+            ;;
+        --main)
+            TRACK="main"; TRACK_EXPLICIT=true
+            ;;
+        v[0-9]*)
+            TRACK="$arg"; TRACK_EXPLICIT=true
+            ;;
         --help|-h)
-            echo "Usage: ./install.sh [OPTIONS]"
+            echo "Usage: ./install.sh [OPTIONS] [REF]"
             echo ""
             echo "Options:"
+            echo "  --latest          Pin to the latest release tag (default)"
+            echo "  --main            Follow main branch (maintainer/dev mode)"
+            echo "  vX.Y.Z            Pin to a specific release tag"
             echo "  --packages, -p    Install packages from Brewfile/pacman.txt"
             echo "  --verbose, -v     Show detailed output"
             echo "  --help, -h        Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  ./install.sh                  # latest release"
+            echo "  ./install.sh v0.1.0           # pinned release"
+            echo "  ./install.sh --main           # bleeding edge"
             echo ""
             echo "Bootstrap workflow:"
             echo "  1. ./install.sh           # Install eden wrapper (no dependencies)"
@@ -92,17 +111,67 @@ verbose "Eden directory: $EDEN_DIR"
 
 cd "$EDEN_DIR" || error "Failed to cd to Eden directory"
 
+# Resolve track: if not explicitly passed, respect existing track or default to "latest"
+EDEN_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/eden"
+if ! $TRACK_EXPLICIT; then
+    if [ -f "$EDEN_CONFIG/track" ]; then
+        TRACK="$(tr -d '[:space:]' < "$EDEN_CONFIG/track")"
+        verbose "Using existing track: $TRACK"
+    else
+        TRACK="latest"
+    fi
+fi
+
+# Switch to the requested ref (default: latest release tag)
+resolve_ref() {
+    case "$TRACK" in
+        main)
+            echo "main"
+            ;;
+        latest)
+            git fetch --tags --quiet 2>/dev/null || true
+            local latest
+            latest=$(git tag -l 'v*' --sort=-version:refname 2>/dev/null | head -n 1)
+            if [ -z "$latest" ]; then
+                warn "No release tags found — falling back to main"
+                echo "main"
+            else
+                echo "$latest"
+            fi
+            ;;
+        v*)
+            git fetch --tags --quiet 2>/dev/null || true
+            echo "$TRACK"
+            ;;
+    esac
+}
+
+REF=$(resolve_ref)
+CURRENT_REF=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+
+if [ "$REF" != "$CURRENT_REF" ]; then
+    if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+        error "Working tree is dirty — cannot switch to $REF. Commit/stash first, or use --main."
+    fi
+    log "Checking out $REF"
+    git checkout --quiet "$REF" || error "Failed to checkout $REF"
+fi
+verbose "✓ On ref: $REF (track: $TRACK)"
+
 # Create Eden directory structure (not stowed, user-specific)
 log "Setting up Eden directories..."
 
-# Configs in ~/.config/eden (XDG-compliant)
-EDEN_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/eden"
+# Configs in ~/.config/eden (XDG-compliant). EDEN_CONFIG was set earlier.
 mkdir -p "$EDEN_CONFIG/local"
 verbose "✓ Created $EDEN_CONFIG/"
 
 # Store repo path for the wrapper to find
 echo "$EDEN_DIR" > "$EDEN_CONFIG/repo"
 verbose "✓ Stored repo path: $EDEN_DIR"
+
+# Store track mode so eden update knows what to follow
+echo "$TRACK" > "$EDEN_CONFIG/track"
+verbose "✓ Stored track mode: $TRACK"
 
 # Binaries in ~/.eden/bin (for branch-managed scripts via graft)
 # Note: This directory is ONLY for automated branch integration, not manual use

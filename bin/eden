@@ -240,8 +240,12 @@ show_command_help() {
 # Show version
 show_version() {
     print_header "Eden Environment Manager"
+
+    if [ -f "$EDEN_ROOT/VERSION" ]; then
+        echo "Version: $(tr -d '[:space:]' < "$EDEN_ROOT/VERSION")"
+    fi
     echo "Location: $EDEN_ROOT"
-    
+
     if [ -d "$EDEN_ROOT/.git" ]; then
         local commit=$(cd "$EDEN_ROOT" && git rev-parse --short HEAD 2>/dev/null || echo "unknown")
         local branch=$(cd "$EDEN_ROOT" && git branch --show-current 2>/dev/null || echo "unknown")

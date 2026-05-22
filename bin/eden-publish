@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+# eden-publish — Maintainer-only release tool for Eden.
+#
+# Bumps semver in VERSION, prepends a CHANGELOG.md section from conventional
+# commits since the last tag, commits, tags, pushes, and creates a GitHub
+# release.
+#
+# Usage:
+#   bin/eden-publish [--major|--minor|--patch|--set X.Y.Z] [--dry-run] [--yes]
+#
+# Defaults to --patch. Refuses to run on a dirty tree, a non-main branch,
+# a non-canonical remote, or a local main that doesn't match origin/main
+# (push your work first, then publish from what's shared).
+#
+# Exit codes:
+#   0  Success
+#   1  Aborted or runtime failure
+#   2  Preflight or usage error
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EDEN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$EDEN_ROOT"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+RESET='\033[0m'
+
+log()  { echo -e "${BLUE}→${RESET} $1"; }
+ok()   { echo -e "${GREEN}✓${RESET} $1"; }
+warn() { echo -e "${YELLOW}⚠${RESET} $1"; }
+err()  { echo -e "${RED}✗${RESET} $1" >&2; }
+
+CANONICAL_REMOTE_PATTERN='stefanahman/eden(\.git)?$'
+
+BUMP="patch"
+SET_VERSION=""
+DRY_RUN=false
+ASSUME_YES=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --major)   BUMP="major"; shift ;;
+        --minor)   BUMP="minor"; shift ;;
+        --patch)   BUMP="patch"; shift ;;
+        --set)     SET_VERSION="${2:-}"; shift 2 ;;
+        --dry-run) DRY_RUN=true; shift ;;
+        --yes|-y)  ASSUME_YES=true; shift ;;
+        -h|--help)
+            sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
+            exit 0
+            ;;
+        *) err "Unknown arg: $1"; exit 2 ;;
+    esac
+done
+
+log "Running pre-flight checks…"
+
+if [[ -n "$(git status --porcelain)" ]]; then
+    err "Working tree is dirty. Commit or stash first."
+    git status --short
+    exit 2
+fi
+ok "Working tree clean"
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$BRANCH" != "main" ]]; then
+    err "Not on main branch (currently: $BRANCH). Switch to main first."
+    exit 2
+fi
+ok "On main branch"
+
+REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+if ! [[ "$REMOTE_URL" =~ $CANONICAL_REMOTE_PATTERN ]]; then
+    err "Origin remote is $REMOTE_URL — refusing to publish from non-canonical fork."
+    err "If this is intentional, edit CANONICAL_REMOTE_PATTERN in $0."
+    exit 2
+fi
+ok "Remote is canonical ($REMOTE_URL)"
+
+git fetch --quiet origin main
+LOCAL=$(git rev-parse HEAD)
+REMOTE=$(git rev-parse origin/main)
+BASE=$(git merge-base HEAD origin/main)
+if [[ "$LOCAL" == "$REMOTE" ]]; then
+    ok "In sync with origin/main"
+elif [[ "$LOCAL" == "$BASE" ]]; then
+    err "Local main is behind origin/main. Pull first:"
+    err "  git pull --ff-only origin main"
+    exit 2
+elif [[ "$REMOTE" == "$BASE" ]]; then
+    AHEAD=$(git rev-list --count "$REMOTE..HEAD")
+    err "Local main is ahead of origin/main by $AHEAD commit(s). Push first:"
+    err "  git push origin main"
+    exit 2
+else
+    err "Local main has diverged from origin/main. Rebase first:"
+    err "  git fetch origin && git rebase origin/main"
+    exit 2
+fi
+
+if [[ ! -f VERSION ]]; then
+    err "No VERSION file at repo root."
+    exit 2
+fi
+CURRENT=$(tr -d '[:space:]' < VERSION)
+if [[ ! "$CURRENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    err "VERSION does not contain a semver: '$CURRENT'"
+    exit 2
+fi
+ok "Current version: v$CURRENT"
+
+if [[ -n "$SET_VERSION" ]]; then
+    NEW="$SET_VERSION"
+    if [[ ! "$NEW" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        err "--set requires a semver (e.g. 0.2.0); got '$NEW'"
+        exit 2
+    fi
+else
+    IFS=. read -r MAJ MIN PAT <<< "$CURRENT"
+    case "$BUMP" in
+        major) NEW="$((MAJ+1)).0.0" ;;
+        minor) NEW="$MAJ.$((MIN+1)).0" ;;
+        patch) NEW="$MAJ.$MIN.$((PAT+1))" ;;
+    esac
+fi
+log "New version: v$NEW"
+
+LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+if [[ -z "$LAST_TAG" ]]; then
+    log "No prior tag — first release"
+    NOTES="Initial release."
+else
+    log "Generating CHANGELOG from $LAST_TAG..HEAD"
+    NOTES=$(git log "$LAST_TAG..HEAD" --pretty=format:'- %s' \
+        | grep -E '^- (feat|fix|perf|refactor)(\(.+\))?!?:' \
+        || true)
+    if [[ -z "$NOTES" ]]; then
+        NOTES="- (no user-visible changes; see git log for details)"
+    fi
+fi
+
+DATE=$(date +%Y-%m-%d)
+ENTRY="## [v$NEW] - $DATE
+
+$NOTES"
+
+log "Changelog entry:"
+echo
+echo "$ENTRY" | sed 's/^/    /'
+echo
+
+if ! $ASSUME_YES && ! $DRY_RUN; then
+    read -r -p "Proceed with v$NEW publish? [y/N] " REPLY
+    if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+        warn "Aborted."
+        exit 1
+    fi
+fi
+
+if $DRY_RUN; then
+    warn "Dry run — no changes made."
+    exit 0
+fi
+
+echo "$NEW" > VERSION
+ok "Updated VERSION → $NEW"
+
+if [[ -f CHANGELOG.md ]] && grep -q '^<!-- releases -->' CHANGELOG.md; then
+    awk -v entry="$ENTRY" '
+        /^<!-- releases -->/ { print; print ""; print entry; next }
+        { print }
+    ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+    ok "Updated CHANGELOG.md"
+else
+    warn "No CHANGELOG.md with <!-- releases --> marker — skipping changelog update"
+fi
+
+git add VERSION CHANGELOG.md 2>/dev/null || git add VERSION
+git commit -m "chore(release): v$NEW"
+ok "Committed release"
+
+git tag -a "v$NEW" -m "Release v$NEW"
+ok "Tagged v$NEW"
+
+log "Pushing to origin…"
+git push origin main
+git push origin "v$NEW"
+ok "Pushed commit + tag"
+
+NOTES_FILE=$(mktemp)
+printf '%s\n' "$NOTES" > "$NOTES_FILE"
+gh release create "v$NEW" --title "v$NEW" --notes-file "$NOTES_FILE"
+rm -f "$NOTES_FILE"
+ok "Created GitHub release"
+
+echo
+ok "Published v$NEW"

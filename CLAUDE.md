@@ -18,3 +18,10 @@ that doesn't require biometric auth.
 ## Testing
 
 Validate changes with: `eden doctor`
+
+## Versioning
+
+- Semver in `VERSION` at repo root; `eden --version` prints it.
+- Cut releases via `bin/eden-publish [--major|--minor|--patch]` (maintainer-only). Defaults to `--patch`. Generates `CHANGELOG.md` entries from conventional commits (`feat:`, `fix:`, `perf:`, `refactor:`) since the last tag; tags, pushes, and creates a GitHub release.
+- Use conventional commits (`type(scope): description`) so the changelog generates cleanly.
+- Grafter contract version (`EDEN_GRAFTER_API` in `bin/eden-graft`) is **separate** from the CLI version. Bump it on breaking changes to how grafters are invoked, discovered, or what env vars they may rely on — not on optional additions.
