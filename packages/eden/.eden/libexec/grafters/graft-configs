@@ -5,6 +5,11 @@
 set -euo pipefail
 trap 'echo "  !! graft-configs failed at line $LINENO" >&2' ERR
 
+if [[ "${1:-}" == "--api-version" ]]; then
+    echo 1
+    exit 0
+fi
+
 # graft-configs uses .eden-graft allowlists — no fixed --covers patterns
 if [[ "${1:-}" == "--covers" ]]; then
     exit 0

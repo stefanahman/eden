@@ -11,6 +11,11 @@
 set -e
 trap 'echo "  !! graft-claude failed at line $LINENO" >&2' ERR
 
+if [[ "${1:-}" == "--api-version" ]]; then
+    echo 1
+    exit 0
+fi
+
 # Report covered paths for eden doctor
 if [[ "${1:-}" == "--covers" ]]; then
     echo ".claude"

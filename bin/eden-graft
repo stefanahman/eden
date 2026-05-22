@@ -31,6 +31,29 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
 
+# Grafter contract version. Bump when changing how grafters are invoked,
+# discovered, or what env vars they may rely on — not for optional additions.
+# See CLAUDE.md "Versioning" section.
+EDEN_GRAFTER_API_CURRENT=1
+
+# Get the API version a grafter declares (defaults to 1 if no --api-version handler).
+get_grafter_api() {
+    local declared
+    declared=$(bash "$1" --api-version 2>/dev/null || echo 1)
+    echo "${declared:-1}"
+}
+
+# Refuse to run a grafter that declares a different API version.
+check_grafter_compat() {
+    local grafter="$1" declared
+    declared=$(get_grafter_api "$grafter")
+    if [[ "$declared" != "$EDEN_GRAFTER_API_CURRENT" ]]; then
+        err "$(basename "$grafter") declares API v$declared; runner is v$EDEN_GRAFTER_API_CURRENT"
+        err "Update the grafter or pin Eden to a compatible version."
+        return 1
+    fi
+}
+
 # Check if branches file exists
 if [ ! -f "$BRANCHES_FILE" ]; then
     warn "No branches file found at $BRANCHES_FILE"
@@ -85,6 +108,8 @@ run_single_grafter() {
         exit 1
     fi
 
+    check_grafter_compat "$grafter" || exit 1
+
     log "Running: graft-$name"
     local rc=0
     bash "$grafter" || rc=$?
@@ -111,6 +136,12 @@ run_all_grafters() {
 
         local grafter_name
         grafter_name=$(basename "$grafter")
+
+        if ! check_grafter_compat "$grafter"; then
+            echo ""
+            continue
+        fi
+
         log "Running: $grafter_name"
 
         if bash "$grafter"; then
