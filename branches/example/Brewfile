@@ -1,0 +1,11 @@
+# Eden Brewfile (example branch)
+#
+# Homebrew packages this branch wants installed on macOS. `eden graft` (on
+# macOS) runs `brew bundle` against this file via graft-brew. Brewfile syntax:
+#
+#   brew "package-name"
+#   cask "app-name"
+#   tap "user/repo"
+#   mas "App Store App Name", id: 123456
+
+brew "tree"

@@ -1,0 +1,7 @@
+This file is symlinked from branches/example via graft-configs.
+
+graft-configs reads `.eden-graft` (the allowlist at the branch root) and uses
+GNU Stow to symlink each listed path into $HOME. Anything not in the allowlist
+stays in the branch and is not deployed.
+
+Edit `.eden-graft` to add or remove paths.

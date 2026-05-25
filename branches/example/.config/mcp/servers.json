@@ -1,0 +1,9 @@
+{
+  "_comment": "Example MCP servers. graft-mcp merges this with all registered branches' servers.json into ~/.config/mcp/servers.json. Replace with your real servers.",
+  "mcpServers": {
+    "example-memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    }
+  }
+}

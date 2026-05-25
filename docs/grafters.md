@@ -40,7 +40,7 @@ Most branch configs are deployed via the **`.eden-graft` allowlist** — a simpl
 
 ### The `.eden-graft` file
 
-Located at the root of each branch (e.g., `branches/default/.eden-graft`). Format:
+Located at the root of each branch (e.g., `branches/example/.eden-graft`). Format:
 
 ```
 # Comments and blank lines are ignored
@@ -369,5 +369,5 @@ done
 ## See Also
 
 - [branches-and-secrets.md](branches-and-secrets.md) - Branch system overview
-- [ARCHITECTURE.md](../branches/default/ARCHITECTURE.md) - Three-layer design
+- [../ARCHITECTURE.md](../ARCHITECTURE.md) - Eden's layered design
 

@@ -121,8 +121,18 @@ add_branch() {
     
     # Add to branches file
     echo "$branch_path" >> "$BRANCHES_FILE"
-    
+
     log "Branch registered: $branch_path"
+
+    # Auto-deactivate the example branch when the user adds their own branch —
+    # the example is a starter; it shouldn't keep shadowing real configs.
+    if grep -qE '^\$EDEN_ROOT/branches/example[[:space:]]*$' "$BRANCHES_FILE"; then
+        # Portable in-place edit (works on BSD and GNU sed)
+        sed -i.bak -E 's|^\$EDEN_ROOT/branches/example[[:space:]]*$|# $EDEN_ROOT/branches/example  (auto-deactivated — you have your own branches now)|' "$BRANCHES_FILE"
+        rm -f "$BRANCHES_FILE.bak"
+        info "Example branch deactivated in $BRANCHES_FILE"
+    fi
+
     echo ""
     info "Next steps:"
     echo "  1. Add configs to the branch (see docs/branches-and-secrets.md)"

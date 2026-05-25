@@ -1,0 +1,7 @@
+# Eden Graft Allowlist
+#
+# Lists paths (relative to branch root) that graft-configs should symlink
+# into $HOME. Paths handled by dedicated grafters (mcp, zsh, secrets, bin,
+# brew, claude, git) are auto-detected and don't need to be listed here.
+
+.config/example-branch

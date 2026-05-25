@@ -39,9 +39,10 @@ Eden grows in stages: first the command wrapper, then tools and packages, then c
 
 Eden has three layers:
 
-1. **Packages** (`common`, `arch`, `mac`) - Minimal, cross-platform core
-2. **Default branch** (`branches/default`) - Opinionated extras (MCP servers, integrations)
-3. **Personal branches** (optional) - Private, context-specific extensions
+1. **Packages** (`common`, `arch`, `mac`) - Minimal, cross-platform core (deployed via `eden plant`)
+2. **Branches** - Private, context-specific extensions you supply (composed via `eden graft`)
+
+A functional starter template lives in `branches/example` — fork it into your own private branches repo to get going.
 
 ### Two Deployment Methods
 

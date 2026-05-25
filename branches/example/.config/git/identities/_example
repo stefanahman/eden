@@ -1,0 +1,21 @@
+# Example git identity. Named `_example` (not `_default`) so it stays
+# directory-scoped via `includeIf "gitdir:~/Development/example/"` and never
+# becomes your unconditional fallback identity. To make YOUR identity the
+# default, create `_default` alongside this file in your own private branch.
+#
+# graft-git generates includeIf directives for each filename:
+#   .config/git/identities/_default — unconditional fallback
+#   .config/git/identities/work     — used in ~/Development/work/
+#   .config/git/identities/oss      — used in ~/Development/oss/
+
+[user]
+    name = Example User
+    email = example@example.com
+
+# Commit signing (uncomment and provide your key):
+# [user]
+#     signingkey = ~/.ssh/id_ed25519.pub
+# [commit]
+#     gpgsign = true
+# [gpg]
+#     format = ssh

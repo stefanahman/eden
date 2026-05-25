@@ -19,14 +19,15 @@ Eden packages        Default Branch       Personal Branches
 ```
 
 **Eden packages**: Minimal, cross-platform foundations (stowed via `eden plant`)
-**Default branch**: Opinionated extras shipped with Eden (MCP servers, neovim, window management)
+**Example branch**: A functional starter template that demonstrates each grafter (auto-loaded on fresh install, auto-deactivated when you register your own)
 **Personal branches**: Private extensions for specific contexts (work, personal, clients)
 
-### Three Layers
+### Two Layers + a Starter
 
 1. **Eden Packages** (`packages/`) -- Minimal core, deployed via `eden plant` (stow)
-2. **Default Branch** (`branches/default`) -- Opinionated defaults, grafted automatically
-3. **Personal Branches** (e.g., `~/eden-private-branches/work`) -- Your private configs, grafted on demand
+2. **Branches** -- Your real configs, grafted via `eden graft`
+   - `branches/example` -- starter template; safe to graft as-is to see Eden working. Auto-deactivated by `eden branch add` when you register your own.
+   - Personal branches (e.g., `~/eden-private-branches/work`) -- where your real configs live
 
 ## Managing Branches
 
@@ -143,11 +144,11 @@ Branches enable clean context separation:
 | Personal laptop | Eden + branch-personal | Personal API keys, home server access |
 | Client machine | Eden + branch-client | Client-specific tokens and configs |
 
-Opt out of defaults by removing `$EDEN_ROOT/branches/default` from `~/.config/eden/branches`.
+The example branch deactivates automatically when you run `eden branch add` for any other branch. To remove it manually, comment out or delete the `$EDEN_ROOT/branches/example` line in `~/.config/eden/branches`.
 
 ## Philosophy
 
 - **Packages** are the foundation everyone needs (shell, git, editor basics)
-- **Default branch** has practical extras most users want (MCP servers, neovim, window management)
-- **Personal branches** add your private, context-specific configs
-- **Secrets** are centralized in 1Password, documented in `.eden-secrets`, fetched at runtime
+- **Example branch** is a functional starter that demonstrates each grafter (replace, don't extend)
+- **Personal branches** are where your real configs live (your private repos)
+- **Secrets** are declared in `.eden-secrets`, fetched at runtime via `EDEN_SECRET_GET` (default: `op read` for 1Password)

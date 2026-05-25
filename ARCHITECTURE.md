@@ -132,17 +132,11 @@ Provider: 1Password CLI (`op`). Secrets are fetched at runtime, never stored in 
 | `arch` | Platform shell/git overrides |
 | `eden` | Grafters, setup helpers (`node-setup`, `gcloud-setup`) |
 
-**Default branch (opinionated, `eden graft`)** -- practical extras, opt-out by removing from branches file:
+**Example branch (`branches/example`)** -- starter template, not auto-loaded:
 
-| Category | What |
-|----------|------|
-| MCP servers | GitHub, Context7 (with 1Password wrappers) |
-| Editor | Neovim/LazyVim configuration |
-| Window management | yabai, skhd, karabiner (macOS) |
-| Shell | Claude AFK mode, default tool env vars (Docker, Bat, Volta) |
-| Tools | pnpm config, `op-mcp-warmup` helper |
+A minimal but functional branch demonstrating each grafter (configs, mcp, zsh, git, claude, bin, brew, secrets). Fork into your own private branches repo and replace placeholders with real content, or uncomment in `~/.config/eden/branches` to graft as-is.
 
-**Personal branches (private, `eden graft`)** -- context-specific extensions:
+**Personal branches (private, `eden graft`)** -- where your real configs live:
 
 Git identity (`_default` + directory-scoped), MCP servers, secrets, Brewfiles, Claude skills, binaries.
 See [docs/branches-and-secrets.md](docs/branches-and-secrets.md).

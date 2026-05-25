@@ -186,21 +186,23 @@ cp -f "$EDEN_DIR/eden" "$HOME/.local/bin/eden"
 chmod +x "$HOME/.local/bin/eden"
 verbose "✓ eden wrapper installed to ~/.local/bin/eden"
 
-# Create branches file with default branch
+# Create branches file with example branch (commented out — opt-in starter)
 if [ ! -f "$EDEN_CONFIG/branches" ]; then
     cat > "$EDEN_CONFIG/branches" << EOF
 # Eden Branch Registry
 # List branch repository paths here (one per line)
 # Branches extend Eden with private, context-specific configurations
 
-# Eden's opinionated default branch (comment out to opt out)
-\$EDEN_ROOT/branches/default
+# Eden's example branch — a functional starter you can graft as-is. Adding
+# any other branch (via 'eden branch add') auto-deactivates this line so it
+# doesn't shadow your real configs.
+\$EDEN_ROOT/branches/example
 
 # Add your private branches below:
 # ~/branch-work
 # ~/branch-personal
 EOF
-    verbose "✓ Created $EDEN_CONFIG/branches with default branch"
+    verbose "✓ Created $EDEN_CONFIG/branches with example branch"
 else
     verbose "✓ $EDEN_CONFIG/branches already exists (not modified)"
 fi

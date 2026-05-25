@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Demonstrates graft-bin: anything in a branch's .local/bin/ gets symlinked
+# into ~/.eden/bin/ (which is on $PATH), making it available as a command.
+echo "Hello from the Eden example branch."
+echo "This script lives in branches/example/.local/bin/eden-example-helper."
