@@ -28,4 +28,13 @@ for test_file in "$SCRIPT_DIR"/tests/grafter/test-*.sh; do
     fi
 done
 
+# Run bats integration tests if bats is installed
+if command -v bats >/dev/null 2>&1 && [ -d "$SCRIPT_DIR/tests/bats" ]; then
+    echo ""
+    echo "Running bats tests..."
+    if ! bats "$SCRIPT_DIR/tests/bats/"; then
+        any_failed=1
+    fi
+fi
+
 exit $any_failed

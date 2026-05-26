@@ -1,0 +1,47 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  bats:
+    name: Bats (${{ matrix.os }}, umask ${{ matrix.umask }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        umask: ['022', '002']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bats + stow (macOS)
+        if: runner.os == 'macOS'
+        run: brew install bats-core stow
+
+      - name: Install bats + stow (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats stow
+
+      - name: Run bats tests with umask ${{ matrix.umask }}
+        run: |
+          umask ${{ matrix.umask }}
+          bats tests/bats/
+
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck on shell scripts
+        run: |
+          # Lint scripts but don't fail on warnings (yet); just report.
+          shopt -s globstar nullglob
+          shellcheck --severity=error \
+            bin/eden bin/eden-* install.sh get-eden.sh \
+            packages/eden/.eden/libexec/grafters/graft-*
