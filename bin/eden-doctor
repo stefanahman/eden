@@ -1,29 +1,68 @@
 #!/bin/bash
 # Eden doctor - Health check and validation
+#
+# Usage: eden doctor [--format=pretty|plain]
+#
+# Exit codes:
+#   0  All checks passed
+#   1  Warnings only
+#   2  Errors found
 set -e
 
-# Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
 ERRORS=0
+WARNINGS=0
+FORMAT="pretty"
+
+for arg in "$@"; do
+    case "$arg" in
+        --format=plain)  FORMAT="plain" ;;
+        --format=pretty) FORMAT="pretty" ;;
+        -h|--help)
+            sed -n '2,9p' "${BASH_SOURCE[0]}" | sed -E 's/^# ?//'
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg" >&2
+            echo "See: eden doctor --help" >&2
+            exit 2
+            ;;
+    esac
+done
 
 check_pass() {
-    echo -e "  ${GREEN}✓${NC} $1"
+    if [[ "$FORMAT" == "plain" ]]; then
+        echo "ok|$1"
+    else
+        echo -e "  ${GREEN}✓${NC} $1"
+    fi
 }
 
 check_fail() {
-    echo -e "  ${RED}✗${NC} $1"
+    if [[ "$FORMAT" == "plain" ]]; then
+        echo "error|$1"
+    else
+        echo -e "  ${RED}✗${NC} $1"
+    fi
     ((ERRORS++))
 }
 
 check_warn() {
-    echo -e "  ${YELLOW}⚠${NC} $1"
+    if [[ "$FORMAT" == "plain" ]]; then
+        echo "warn|$1"
+    else
+        echo -e "  ${YELLOW}⚠${NC} $1"
+    fi
+    ((WARNINGS++))
 }
 
 section() {
+    # Skip section headers in plain mode (machine-parseable output)
+    [[ "$FORMAT" == "plain" ]] && return
     echo ""
     echo "$1"
 }
@@ -368,11 +407,26 @@ fi
 
 # Final result
 section ""
-if [ $ERRORS -eq 0 ]; then
-    echo -e "${GREEN}✓ Eden is healthy!${NC}"
-    exit 0
-else
-    echo -e "${RED}✗ Found $ERRORS issue(s)${NC}"
+if [ $ERRORS -gt 0 ]; then
+    if [[ "$FORMAT" == "plain" ]]; then
+        echo "summary|$ERRORS error(s), $WARNINGS warning(s)"
+    else
+        echo -e "${RED}✗ Found $ERRORS error(s), $WARNINGS warning(s)${NC}"
+    fi
+    exit 2
+elif [ $WARNINGS -gt 0 ]; then
+    if [[ "$FORMAT" == "plain" ]]; then
+        echo "summary|0 errors, $WARNINGS warning(s)"
+    else
+        echo -e "${YELLOW}⚠ $WARNINGS warning(s) found${NC}"
+    fi
     exit 1
+else
+    if [[ "$FORMAT" == "plain" ]]; then
+        echo "summary|all checks passed"
+    else
+        echo -e "${GREEN}✓ Eden is healthy!${NC}"
+    fi
+    exit 0
 fi
 

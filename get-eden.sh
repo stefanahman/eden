@@ -32,7 +32,7 @@ while [ $# -gt 0 ]; do
         --latest) REF="--latest"; shift ;;
         v[0-9]*)  REF="$1"; shift ;;
         -h|--help)
-            sed -n '2,11p' "$0" | sed 's/^# \?//'
+            sed -n '2,11p' "$0" | sed -E 's/^# ?//'
             exit 0
             ;;
         *) err "Unknown arg: $1" ;;

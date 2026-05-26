@@ -50,7 +50,7 @@ while [[ $# -gt 0 ]]; do
         --dry-run) DRY_RUN=true; shift ;;
         --yes|-y)  ASSUME_YES=true; shift ;;
         -h|--help)
-            sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
+            sed -n '2,18p' "${BASH_SOURCE[0]}" | sed -E 's/^# ?//'
             exit 0
             ;;
         *) err "Unknown arg: $1"; exit 2 ;;

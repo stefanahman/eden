@@ -156,7 +156,16 @@ HELP
             echo "Validate installation health"
             [[ "$full" ]] && cat <<'HELP'
 
-Usage: eden doctor
+Usage: eden doctor [--format=pretty|plain]
+
+Options:
+  --format=pretty   Human-readable output (default)
+  --format=plain    Machine-parseable: severity|message lines, no ANSI
+
+Exit codes:
+  0  All checks passed
+  1  Warnings only
+  2  Errors found
 HELP
             ;;
         status)

@@ -41,7 +41,7 @@ for arg in "$@"; do
         --main) SWITCH_TO="main" ;;
         v[0-9]*) SWITCH_TO="$arg" ;;
         -h|--help)
-            sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
+            sed -n '2,14p' "${BASH_SOURCE[0]}" | sed -E 's/^# ?//'
             exit 0
             ;;
         *) err "Unknown arg: $arg" ;;
