@@ -16,10 +16,10 @@ setup() {
 @test "doctor --format=plain emits parseable severity|message lines" {
     run "$EDEN_ROOT/bin/eden-doctor" --format=plain
     [[ "$output" =~ ^ok\| ]] || [[ "$output" =~ ok\|.* ]]
-    # Every non-empty line must start with ok|, warn|, error|, or summary|
+    # Every non-empty line must start with ok|, warn|, error|, info|, or summary|
     while IFS= read -r line; do
         [ -z "$line" ] && continue
-        [[ "$line" =~ ^(ok|warn|error|summary)\| ]] || {
+        [[ "$line" =~ ^(ok|warn|error|info|summary)\| ]] || {
             echo "Unparseable line: $line"
             return 1
         }

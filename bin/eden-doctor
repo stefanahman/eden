@@ -48,7 +48,9 @@ check_fail() {
     else
         echo -e "  ${RED}✗${NC} $1"
     fi
-    ((ERRORS++))
+    # ((var++)) returns the OLD value (0 on first call), which trips set -e.
+    # Use arithmetic assignment which always exits 0.
+    ERRORS=$((ERRORS + 1))
 }
 
 check_warn() {
@@ -57,7 +59,7 @@ check_warn() {
     else
         echo -e "  ${YELLOW}⚠${NC} $1"
     fi
-    ((WARNINGS++))
+    WARNINGS=$((WARNINGS + 1))
 }
 
 section() {
@@ -65,6 +67,17 @@ section() {
     [[ "$FORMAT" == "plain" ]] && return
     echo ""
     echo "$1"
+}
+
+# Informational sub-output that doesn't fit ok/warn/error severity (e.g.,
+# package counts, orphan lists nested under a warn). In plain mode it
+# becomes 'info|message'; in pretty mode, just an indented line.
+info_line() {
+    if [[ "$FORMAT" == "plain" ]]; then
+        echo "info|$1"
+    else
+        echo "  $1"
+    fi
 }
 
 # Get Eden directory (parent of bin/)
@@ -234,7 +247,7 @@ EDEN_COUNT=$(find "$EDEN_DIR/packages/eden" -type f 2>/dev/null | wc -l)
 ARCH_COUNT=$(find "$EDEN_DIR/packages/arch" -type f 2>/dev/null | wc -l)
 MAC_COUNT=$(find "$EDEN_DIR/packages/mac" -type f 2>/dev/null | wc -l)
 
-echo "  Files: $COMMON_COUNT in common, $EDEN_COUNT in eden, $ARCH_COUNT in arch, $MAC_COUNT in mac"
+info_line "Files: $COMMON_COUNT in common, $EDEN_COUNT in eden, $ARCH_COUNT in arch, $MAC_COUNT in mac"
 
 # Platform parity check
 section "Platform Parity:"
@@ -395,14 +408,14 @@ if [ -f "$BRANCHES_FILE" ]; then
         else
             check_warn "$branch_name: ungrafted configs found:"
             for orphan in "${orphans[@]}"; do
-                echo "      $orphan (not in .eden-graft, no dedicated grafter)"
+                info_line "  $orphan (not in .eden-graft, no dedicated grafter)"
             done
         fi
 
         unset graft_entries
     done < "$BRANCHES_FILE"
 else
-    echo "  No branches registered (skipping)"
+    info_line "No branches registered (skipping)"
 fi
 
 # Final result
