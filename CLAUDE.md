@@ -17,7 +17,18 @@ that doesn't require biometric auth.
 
 ## Testing
 
-Validate changes with: `eden doctor`
+Validate changes with: `eden doctor`. Run the bats integration suite with `./test.sh` (requires `bats-core` — see Dev dependencies below).
+
+## Dev dependencies
+
+Maintainer-only toolchain — not installed by `eden install`. Install manually:
+
+- `bats-core` — runs `tests/bats/` integration suite via `./test.sh`
+- `shellcheck` — lints shell scripts (CI runs this; install for local lint)
+- `gh` — used by `bin/eden-publish` to create GitHub releases
+
+macOS: `brew install bats-core shellcheck gh`
+Arch:  `sudo pacman -S bats shellcheck github-cli`
 
 ## Versioning
 
