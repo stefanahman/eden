@@ -168,6 +168,19 @@ Exit codes:
   2  Errors found
 HELP
             ;;
+        init)
+            echo "First-run interactive setup"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden init [--yes|--no-prompt]
+
+Walks through registering an existing private branches repo or scaffolding
+a new one, then verifies the setup with eden doctor.
+
+Options:
+  --yes, --no-prompt  Non-interactive: skip prompts (CI/Docker use)
+HELP
+            ;;
         status)
             echo "Show Eden system overview and health"
             [[ "$full" ]] && cat <<'HELP'
@@ -960,6 +973,9 @@ main() {
             ;;
         doctor)
             run_script "eden-doctor" "$@"
+            ;;
+        init)
+            run_script "eden-init" "$@"
             ;;
         secrets)
             run_script "eden-secrets" "$@"

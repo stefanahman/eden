@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# eden-init — Interactive first-run setup.
+#
+# Walks through registering an existing private branches repo or scaffolding
+# a new one, then verifies the setup with eden doctor.
+#
+# Usage: eden init [--yes|--no-prompt]
+#
+# Exit codes:
+#   0  Setup complete (or cleanly skipped)
+#   2  Preflight or unknown arg
+
+set -e
+
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+log()  { echo -e "${BLUE}→${NC} $1"; }
+ok()   { echo -e "${GREEN}✓${NC} $1"; }
+warn() { echo -e "${YELLOW}⚠${NC} $1"; }
+err()  { echo -e "${RED}✗${NC} $1" >&2; }
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EDEN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+
+NO_PROMPT=false
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --yes|--no-prompt|-y) NO_PROMPT=true; shift ;;
+        -h|--help)
+            sed -n '2,11p' "${BASH_SOURCE[0]}" | sed -E 's/^# ?//'
+            exit 0
+            ;;
+        *) err "Unknown arg: $1"; exit 2 ;;
+    esac
+done
+
+# Auto-detect non-interactive context (stdin not a tty)
+[ -t 0 ] || NO_PROMPT=true
+
+log "Eden init — first-run setup"
+echo ""
+
+if [ ! -f "$BRANCHES_FILE" ]; then
+    err "No branches file at $BRANCHES_FILE."
+    err "Run ./install.sh from the Eden repo first."
+    exit 2
+fi
+
+if $NO_PROMPT; then
+    log "Non-interactive mode — skipping prompts."
+    log "Use 'eden branch add <path>' or 'eden branch new <path>' to register branches later."
+    ok "Init complete."
+    exit 0
+fi
+
+# Q1: existing private branches?
+echo "Do you have an existing private branches repo? [y/N]"
+read -r reply
+if [[ "$reply" =~ ^[Yy]$ ]]; then
+    echo "Path to the branch (or a subdirectory inside it, e.g. ~/eden-branches/personal):"
+    read -r path
+    path="${path/#\~/$HOME}"
+    if [ -z "$path" ]; then
+        warn "No path provided; skipping."
+    elif [ ! -d "$path" ]; then
+        warn "Directory does not exist: $path"
+        warn "Run 'eden branch add $path' once it exists."
+    else
+        log "Registering branch: $path"
+        "$EDEN_ROOT/bin/eden-branch" add "$path"
+    fi
+else
+    echo ""
+    echo "Create a new private branch now? [y/N]"
+    read -r reply2
+    if [[ "$reply2" =~ ^[Yy]$ ]]; then
+        echo "Path for the new branch (e.g. ~/eden-branches/personal):"
+        read -r newpath
+        newpath="${newpath/#\~/$HOME}"
+        if [ -n "$newpath" ]; then
+            "$EDEN_ROOT/bin/eden-branch" new "$newpath"
+        else
+            warn "No path provided; skipping."
+        fi
+    else
+        log "Skipped. You can register or create branches later with:"
+        echo "    eden branch add <path>"
+        echo "    eden branch new <path>"
+    fi
+fi
+
+echo ""
+log "Verifying setup with 'eden doctor'…"
+set +e
+"$EDEN_ROOT/bin/eden-doctor"
+doctor_status=$?
+set -e
+if [ $doctor_status -gt 0 ]; then
+    warn "Doctor reported issues; review the output above."
+fi
+
+echo ""
+ok "Init complete!"
+echo "Next steps:"
+echo "  - eden graft   — apply your branch configs"
+echo "  - eden help    — full command list"
