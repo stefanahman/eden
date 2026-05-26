@@ -170,10 +170,15 @@ echo "$NEW" > VERSION
 ok "Updated VERSION → $NEW"
 
 if [[ -f CHANGELOG.md ]] && grep -q '^<!-- releases -->' CHANGELOG.md; then
-    awk -v entry="$ENTRY" '
-        /^<!-- releases -->/ { print; print ""; print entry; next }
-        { print }
-    ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+    # Insert the entry after the marker. BSD awk doesn't accept newlines in
+    # -v variables, so split the file at the marker with two awks and let
+    # bash interpolate $ENTRY between them.
+    {
+        awk '/^<!-- releases -->/{print; exit} {print}' CHANGELOG.md
+        echo ""
+        echo "$ENTRY"
+        awk '/^<!-- releases -->/{found=1; next} found{print}' CHANGELOG.md
+    } > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
     ok "Updated CHANGELOG.md"
 else
     warn "No CHANGELOG.md with <!-- releases --> marker — skipping changelog update"
