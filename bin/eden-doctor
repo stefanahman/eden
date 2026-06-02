@@ -187,7 +187,9 @@ else
     check_warn "No default git identity — add .config/git/identities/_default to a branch (see docs/branches-and-secrets.md)"
 fi
 
-IDENTITY_COUNT=$(find "$GIT_IDENTITY_DIR" -type f -o -type l 2>/dev/null | grep -cv '_default' 2>/dev/null || echo 0)
+# grep -c already prints "0" for no matches; `|| echo 0` would have appended
+# a second "0", producing a multi-line value that breaks `[ -gt ]` below.
+IDENTITY_COUNT=$(find "$GIT_IDENTITY_DIR" -type f -o -type l 2>/dev/null | grep -cv '_default' 2>/dev/null || true)
 if [ "$IDENTITY_COUNT" -gt 0 ]; then
     check_pass "$IDENTITY_COUNT directory-scoped git identity(ies) configured"
 fi
