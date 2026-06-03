@@ -93,21 +93,29 @@ while IFS= read -r branch_path; do
                 mkdir -p "$target_dir"
             fi
             
-            # Directories: use stow (it handles tree structures intelligently)
-            # Files: stow expects directories as packages, so we use direct symlinks
-            if [[ -d "$source_path" ]]; then
-                cd "$source_dir"
-                if stow --adopt -t "$target_dir" "$item_name" 2>&1 | grep -q "(CONFLICT|WARNING|ERROR)"; then
-                    echo "    ⚠ Stow reported issues for $config_path"
-                else
-                    echo "    → Linked: $config_path"
-                fi
-            else
-                # Direct symlink for individual files
-                target_path="$target_dir/$item_name"
-                ln -sf "$source_path" "$target_path"
-                echo "    → Linked: $config_path"
+            # Symlink the whole entry (dir or file) at $target_path → $source_path.
+            # Stow is the wrong tool here: with `stow PKG`, the package name is
+            # stripped and the package's *contents* land in the target, not the
+            # package itself. We want the dir name preserved (e.g. ~/.config/nvim
+            # → branch/.config/nvim), so plain ln -sfn does the right thing and
+            # is idempotent across re-grafts.
+            target_path="$target_dir/$item_name"
+
+            if [[ -d "$source_path" && ! -L "$target_path" && -d "$target_path" ]]; then
+                # Real directory already lives at the target (e.g. an app's
+                # local data dir). Don't clobber — ask the user to graft the
+                # specific files inside it via .eden-graft instead.
+                echo "    ⚠ Skipped: $config_path ($target_path is a real directory; list its files individually in .eden-graft)"
+                continue
             fi
+
+            if [[ -e "$target_path" && ! -L "$target_path" ]]; then
+                echo "    ⚠ Skipped: $config_path ($target_path exists and is not a symlink)"
+                continue
+            fi
+
+            ln -sfn "$source_path" "$target_path"
+            echo "    → Linked: $config_path"
             
         done < "$GRAFT_FILE"
         
