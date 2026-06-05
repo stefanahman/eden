@@ -2,8 +2,9 @@
 # graft-claude - Symlink Claude Code configs from branches
 #
 # Grafts two scopes:
-#   1. Global: .claude/{rules,agents,skills}/ → ~/.claude/
-#   2. Project: projects/<path>/.claude/{rules,agents,skills}/ → <target>/.claude/
+#   1. Global: .claude/{rules,agents,commands,skills}/ + .claude/{settings.json,
+#      statusline.sh} → ~/.claude/
+#   2. Project: projects/<path>/.claude/{...same shape...} → <target>/.claude/
 #      where <target> is read from projects/<path>/.eden-target
 #      Any directory nesting is allowed (e.g. projects/games/greenwash/)
 #
@@ -140,16 +141,50 @@ _graft_skills_dir() {
     done
 }
 
+# Graft a single top-level file inside .claude/ (e.g. settings.json, statusline.sh)
+_graft_top_file() {
+    local source_file="$1" target_file="$2" owner="$3" name="$4"
+
+    [[ -e "$source_file" ]] || return 0
+
+    if [[ -L "$target_file" ]]; then
+        local current_target expected
+        current_target=$(readlink -f "$target_file" 2>/dev/null || readlink "$target_file")
+        expected=$(readlink -f "$source_file" 2>/dev/null || echo "$source_file")
+        if [[ "$current_target" != "$expected" ]]; then
+            local existing_owner
+            existing_owner=$(_get_owner "$name")
+            conflicts+=("$name: ${existing_owner:-unknown} vs $owner")
+            return
+        fi
+        echo "  ✓ $name ($owner) [already linked]"
+        skipped=$((skipped + 1))
+        file_owners="${file_owners}${name}=${owner}"$'\n'
+        return
+    elif [[ -e "$target_file" ]]; then
+        conflicts+=("$name: file exists (not a symlink) — remove it to graft")
+        return
+    fi
+
+    ln -sf "$source_file" "$target_file"
+    echo "  → $name ($owner)"
+    added=$((added + 1))
+    file_owners="${file_owners}${name}=${owner}"$'\n'
+}
+
 # Graft all Claude configs from a source .claude/ dir into a target .claude/ dir
 _graft_claude_dir() {
     local source_claude="${1%/}" target_claude="${2%/}" owner="$3"
 
     [[ -d "$source_claude" ]] || return 0
+    mkdir -p "$target_claude"
 
-    for kind in rules agents; do
+    for kind in rules agents commands; do
         _graft_flat_dir "$source_claude/$kind" "$target_claude/$kind" "$kind" "$owner"
     done
     _graft_skills_dir "$source_claude/skills" "$target_claude/skills" "$owner"
+    _graft_top_file "$source_claude/settings.json" "$target_claude/settings.json" "$owner" "settings.json"
+    _graft_top_file "$source_claude/statusline.sh" "$target_claude/statusline.sh" "$owner" "statusline.sh"
 }
 
 while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do
