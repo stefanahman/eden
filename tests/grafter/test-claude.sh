@@ -89,6 +89,54 @@ assert_symlink "$HOME/.claude/skills/my-skill" "$branch/.claude/skills/my-skill"
 sandbox_teardown
 
 # =============================================================================
+# Test 5b: Top-level CLAUDE.md and *.local.md grafting
+# =============================================================================
+sandbox_setup
+
+branch=$(create_test_branch "test-branch")
+mkdir -p "$branch/.claude"
+echo "# Instructions" > "$branch/.claude/CLAUDE.md"
+echo "enabled: true" > "$branch/.claude/my-plugin.local.md"
+echo "{}" > "$branch/.claude/settings.local.json"
+echo "# Notes" > "$branch/.claude/NOTES.md"
+register_branch "$branch"
+
+describe "top-level CLAUDE.md creates symlink"
+output=$("$GRAFTER" 2>&1)
+assert_symlink "$HOME/.claude/CLAUDE.md" "$branch/.claude/CLAUDE.md"
+
+describe "top-level *.local.md creates symlink"
+assert_symlink "$HOME/.claude/my-plugin.local.md" "$branch/.claude/my-plugin.local.md"
+
+describe "settings.local.json is not grafted"
+assert_not_exists "$HOME/.claude/settings.local.json"
+
+describe "other top-level .md files are not grafted"
+assert_not_exists "$HOME/.claude/NOTES.md"
+
+sandbox_teardown
+
+# =============================================================================
+# Test 5c: Project-scope *.local.md grafting
+# =============================================================================
+sandbox_setup
+
+branch=$(create_test_branch "test-branch")
+project_target="$SANDBOX/project-target"
+mkdir -p "$project_target"
+
+mkdir -p "$branch/projects/myapp/.claude"
+echo "modules: [linear]" > "$branch/projects/myapp/.claude/pr-review.local.md"
+echo "$project_target" > "$branch/projects/myapp/.eden-target"
+register_branch "$branch"
+
+describe "project-scope *.local.md creates symlink in target dir"
+output=$("$GRAFTER" 2>&1)
+assert_symlink "$project_target/.claude/pr-review.local.md" "$branch/projects/myapp/.claude/pr-review.local.md"
+
+sandbox_teardown
+
+# =============================================================================
 # Test 6: Idempotency
 # =============================================================================
 sandbox_setup

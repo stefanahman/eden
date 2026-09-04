@@ -3,7 +3,7 @@
 #
 # Grafts two scopes:
 #   1. Global: .claude/{rules,agents,commands,skills}/ + .claude/{settings.json,
-#      statusline.sh} → ~/.claude/
+#      statusline.sh,CLAUDE.md,*.local.md} → ~/.claude/
 #   2. Project: projects/<path>/.claude/{...same shape...} → <target>/.claude/
 #      where <target> is read from projects/<path>/.eden-target
 #      Any directory nesting is allowed (e.g. projects/games/greenwash/)
@@ -185,6 +185,14 @@ _graft_claude_dir() {
     _graft_skills_dir "$source_claude/skills" "$target_claude/skills" "$owner"
     _graft_top_file "$source_claude/settings.json" "$target_claude/settings.json" "$owner" "settings.json"
     _graft_top_file "$source_claude/statusline.sh" "$target_claude/statusline.sh" "$owner" "statusline.sh"
+    _graft_top_file "$source_claude/CLAUDE.md" "$target_claude/CLAUDE.md" "$owner" "CLAUDE.md"
+    # `.claude/<plugin>.local.md` is Claude Code's per-project plugin-settings
+    # convention (gitignored in the target, so a branch is where it lives).
+    # settings.local.json is deliberately NOT grafted: Claude Code writes to it.
+    local local_md
+    for local_md in "$source_claude"/*.local.md; do
+        _graft_top_file "$local_md" "$target_claude/${local_md##*/}" "$owner" "${local_md##*/}"
+    done
 }
 
 while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do

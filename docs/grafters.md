@@ -10,7 +10,7 @@ Grafters are pluggable scripts that intelligently merge configurations from mult
 |---------|----------|-------------|-------------|
 | `graft-bin` | Collection | Symlinks binaries into `~/.eden/bin/` | `.local/bin/*` |
 | `graft-brew` | Aggregate | Runs `brew bundle` on branch Brewfiles (macOS only) | `Brewfile` |
-| `graft-claude` | Collection | Symlinks Claude rules/agents/skills (global + project) | `.claude/{rules,agents,skills}/` |
+| `graft-claude` | Collection | Symlinks Claude rules/agents/commands/skills + top-level files (global + project) | `.claude/{rules,agents,commands,skills}/`, `.claude/{settings.json,statusline.sh,CLAUDE.md,*.local.md}` |
 | `graft-configs` | Allowlist | Symlinks paths listed in `.eden-graft` | Varies (per allowlist) |
 | `graft-git` | Generate | Creates `includeIf` directives for branch git identities | `.config/git/identities/*` |
 | `graft-mcp` | Merge | Merges MCP server JSON from all branches (global + project) | `.config/mcp/servers.json` |
@@ -90,7 +90,7 @@ branch/
 Directories without `.eden-target` are organizational folders (silently skipped).
 
 **Grafters with project scope:**
-- `graft-claude` — symlinks `.claude/{rules,agents,skills}` into target
+- `graft-claude` — symlinks `.claude/{rules,agents,commands,skills}` and top-level `settings.json`, `statusline.sh`, `CLAUDE.md`, `*.local.md` into target (`*.local.md` = Claude Code's per-project plugin-settings files; `settings.local.json` is never grafted because Claude Code writes to it)
 - `graft-mcp` — generates `.mcp.json` (Claude Code) and `.cursor/mcp.json` in target
 
 ### 1. Collection (Symlink)
@@ -102,7 +102,7 @@ Directories without `.eden-target` are organizational folders (silently skipped)
 **Examples:**
 - `graft-bin`: Binaries from branches → `~/.eden/bin/`
 - `graft-zsh`: Env files from branches → `~/.config/zsh/zshenv.d/`
-- `graft-claude`: Claude rules/agents/skills from branches → `~/.claude/` + project targets
+- `graft-claude`: Claude rules/agents/commands/skills + top-level files from branches → `~/.claude/` + project targets
 
 **Pattern:**
 ```bash
