@@ -2,8 +2,8 @@
 # graft-claude - Symlink Claude Code configs from branches
 #
 # Grafts two scopes:
-#   1. Global: .claude/{rules,agents,commands,skills}/ + .claude/{settings.json,
-#      statusline.sh,CLAUDE.md,*.local.md} → ~/.claude/
+#   1. Global: .claude/{rules,agents,commands,output-styles,skills}/ +
+#      .claude/{settings.json,statusline.sh,CLAUDE.md,*.local.md} → ~/.claude/
 #   2. Project: projects/<path>/.claude/{...same shape...} → <target>/.claude/
 #      where <target> is read from projects/<path>/.eden-target
 #      Any directory nesting is allowed (e.g. projects/games/greenwash/)
@@ -58,7 +58,7 @@ _get_owner() {
     done
 }
 
-# Graft flat markdown files (rules/, agents/)
+# Graft flat markdown files (rules/, agents/, commands/, output-styles/)
 _graft_flat_dir() {
     local source_dir="$1" target_dir="$2" kind="$3" owner="$4"
 
@@ -179,7 +179,7 @@ _graft_claude_dir() {
     [[ -d "$source_claude" ]] || return 0
     mkdir -p "$target_claude"
 
-    for kind in rules agents commands; do
+    for kind in rules agents commands output-styles; do
         _graft_flat_dir "$source_claude/$kind" "$target_claude/$kind" "$kind" "$owner"
     done
     _graft_skills_dir "$source_claude/skills" "$target_claude/skills" "$owner"

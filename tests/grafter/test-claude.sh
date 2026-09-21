@@ -73,6 +73,22 @@ assert_symlink "$HOME/.claude/agents/test-agent.md" "$branch/.claude/agents/test
 sandbox_teardown
 
 # =============================================================================
+# Test 4b: Global output-styles grafting
+# =============================================================================
+sandbox_setup
+
+branch=$(create_test_branch "test-branch")
+mkdir -p "$branch/.claude/output-styles"
+echo "# Test style" > "$branch/.claude/output-styles/Clear.md"
+register_branch "$branch"
+
+describe "global output styles create symlink"
+output=$("$GRAFTER" 2>&1)
+assert_symlink "$HOME/.claude/output-styles/Clear.md" "$branch/.claude/output-styles/Clear.md"
+
+sandbox_teardown
+
+# =============================================================================
 # Test 5: Global skills grafting (directory symlink)
 # =============================================================================
 sandbox_setup
