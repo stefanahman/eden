@@ -205,7 +205,7 @@ if command -v find >/dev/null 2>&1; then
             while IFS= read -r -d '' link; do
                 if [ ! -e "$link" ]; then
                     check_warn "Broken symlink: $link"
-                    ((BROKEN++))
+                    BROKEN=$((BROKEN + 1))
                 fi
             done < <(find "$dir" -maxdepth 2 -type l -print0 2>/dev/null)
         fi
@@ -267,7 +267,7 @@ if [ -n "$OS" ]; then
         REL_PATH="${file#$EDEN_DIR/packages/common/}"
         if [ -f "$EDEN_DIR/packages/$OS/$REL_PATH" ]; then
             check_warn "Duplicate: $REL_PATH (in both common and $OS)"
-            ((DUPLICATES++))
+            DUPLICATES=$((DUPLICATES + 1))
         fi
     done < <(find "$EDEN_DIR/packages/common" -type f 2>/dev/null)
     
