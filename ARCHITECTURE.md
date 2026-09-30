@@ -66,7 +66,6 @@ integrate branch content. Each grafter handles one concern independently.
 | `graft-brew` | Runs `brew bundle` on branch Brewfiles (macOS only) |
 | `graft-claude` | Symlinks Claude rules, agents, commands, output styles, skills, `settings.json`, `statusline.sh`, `CLAUDE.md` and `*.local.md` |
 | `graft-configs` | Symlinks paths listed in branch `.eden-graft` allowlists |
-| `graft-gh-dash` | Composes `~/.config/gh-dash/config.yml` from branch fragments |
 | `graft-git` | Creates git `includeIf` directives for branch identities |
 | `graft-mcp` | Merges MCP server JSON from all branches |
 | `graft-secrets` | Collects 1Password secret definitions |
