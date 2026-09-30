@@ -28,7 +28,7 @@ Common is stowed first, then platform overlays. Stow merges directories naturall
 eden/
 ├── eden                    # Root wrapper (copies to ~/.local/bin/eden)
 ├── bin/                    # Core scripts: eden, eden-doctor, eden-graft, eden-update, ...
-├── lib/                    # Shell libraries sourced by bin/ and grafters (branches.sh)
+├── lib/                    # Shell libraries sourced by bin/ and grafters (branches.sh, collisions.sh)
 ├── install.sh              # Bootstrap installer (only requires git + stow)
 ├── packages/
 │   ├── common/             # Stows to $HOME — shared dotfiles + scripts

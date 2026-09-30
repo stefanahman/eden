@@ -41,38 +41,86 @@ fi
 
 # shellcheck source=lib/branches.sh
 source "$EDEN_ROOT/lib/branches.sh"
+# shellcheck source=lib/collisions.sh
+source "$EDEN_ROOT/lib/collisions.sh"
 
 CANONICAL_CONFIG="$HOME/.config/mcp/servers.json"
+
+BRANCHES_FILE="$(eden_branches_file)"
+
+# branch_mcp_config <branch path>: the branch's global MCP file, if any.
+branch_mcp_config() {
+    local file
+    for file in "$1/.config/mcp/servers.json" \
+        "$1/.cursor/mcp.json" \
+        "$1/packages/common/.config/cursor/mcp_config.branch.json"; do
+        # The canonical path mirrors $HOME; the other two are legacy fallbacks.
+        if [[ -f "$file" ]]; then
+            printf '%s\n' "$file"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# for_each_project <function>: call it with (branch name, project name,
+# servers file, target directory) for every project MCP scope.
+for_each_project() {
+    local branch_path projects_dir target_file project_dir local_name project_mcp project_target
+    [[ -f "$BRANCHES_FILE" ]] || return 0
+    while IFS= read -r branch_path; do
+        projects_dir="$branch_path/projects"
+        [[ -d "$projects_dir" ]] || continue
+
+        while IFS= read -r target_file || [[ -n "$target_file" ]]; do
+            project_dir=$(dirname "$target_file")
+            local_name="${project_dir#"$projects_dir"/}"
+            project_mcp="$project_dir/.mcp/servers.json"
+            [[ -f "$project_mcp" ]] || continue
+
+            project_target=$(eden_branch_expand "$(head -1 "$target_file" | tr -d '[:space:]')")
+            "$1" "$(basename "$branch_path")" "$local_name" "$project_mcp" "$project_target"
+        done < <(find "$projects_dir" -name .eden-target -type f || true)
+    done < <(eden_branches)
+}
+
+# Every server name is a named entry: two branches naming the same server,
+# globally or for the same project, collide.
+# shellcheck disable=SC2329  # called through for_each_project
+claim_project() {
+    local name
+    [[ -d "$4" ]] || return 0
+    while IFS= read -r name; do
+        printf '%s: MCP server %s\t%s\n' "$(eden_home_path "$4")" "$name" "$1:$2"
+    done < <(jq -r '.mcpServers // {} | keys[]' "$3")
+}
+
+claims() {
+    local branch_path config name
+    if [[ -f "$BRANCHES_FILE" ]]; then
+        while IFS= read -r branch_path; do
+            config="$(branch_mcp_config "$branch_path")" || continue
+            while IFS= read -r name; do
+                printf 'MCP server %s\t%s\n' "$name" "$(basename "$branch_path")"
+            done < <(jq -r '.mcpServers // {} | keys[]' "$config")
+        done < <(eden_branches)
+    fi
+    for_each_project claim_project
+}
+
+claims | eden_check_collisions || exit 1
 
 # Initialize with empty config
 MERGED_JSON='{"mcpServers": {}}'
 
 echo "  → Merging MCP servers from branches"
 
-# Merge branch configs if branches file exists
-BRANCHES_FILE="$(eden_branches_file)"
 if [[ -f "$BRANCHES_FILE" ]]; then
     while IFS= read -r branch_path; do
-        branch_name=$(basename "$branch_path")
-        
-        # Canonical path (mirrors HOME directory)
-        branch_config="$branch_path/.config/mcp/servers.json"
-        
-        # Legacy fallbacks for backwards compatibility
-        if [[ ! -f "$branch_config" ]]; then
-            branch_config="$branch_path/.cursor/mcp.json"
-        fi
-        if [[ ! -f "$branch_config" ]]; then
-            branch_config="$branch_path/packages/common/.config/cursor/mcp_config.branch.json"
-        fi
-        
-        if [[ -f "$branch_config" ]]; then
-            echo "  → Merging MCP servers from: $branch_name"
-            
-            # Merge mcpServers from branch into merged config
-            MERGED_JSON=$(echo "$MERGED_JSON" | jq --slurpfile branch "$branch_config" \
-                '.mcpServers += $branch[0].mcpServers')
-        fi
+        branch_config="$(branch_mcp_config "$branch_path")" || continue
+        echo "  → Merging MCP servers from: $(basename "$branch_path")"
+        MERGED_JSON=$(echo "$MERGED_JSON" | jq --slurpfile branch "$branch_config" \
+            '.mcpServers += $branch[0].mcpServers')
     done < <(eden_branches)
 fi
 
@@ -196,6 +244,7 @@ sync_claude_code
 
 # Write project MCP config to a target directory's client-specific files.
 # Resolves bare commands and writes .mcp.json (Claude Code) + .cursor/mcp.json.
+# shellcheck disable=SC2329  # called by graft_project, through for_each_project
 sync_project_mcp() {
     local project_servers="$1" target_dir="$2" project_name="$3"
 
@@ -233,31 +282,16 @@ sync_project_mcp() {
 }
 
 project_count=0
-if [[ -f "$BRANCHES_FILE" ]]; then
-    while IFS= read -r branch_path; do
-        [[ -d "$branch_path" ]] || continue
-
-        projects_dir="$branch_path/projects"
-        [[ -d "$projects_dir" ]] || continue
-
-        while IFS= read -r target_file || [[ -n "$target_file" ]]; do
-            project_dir=$(dirname "$target_file")
-            local_name="${project_dir#"$projects_dir"/}"
-            project_mcp="$project_dir/.mcp/servers.json"
-
-            [[ -f "$project_mcp" ]] || continue
-
-            project_target=$(eden_branch_expand "$(head -1 "$target_file" | tr -d '[:space:]')")
-            if [[ ! -d "$project_target" ]]; then
-                echo "  ⚠ projects/$local_name: target $project_target not found (skipping MCP)"
-                continue
-            fi
-
-            sync_project_mcp "$(cat "$project_mcp")" "$project_target" "$local_name"
-            project_count=$((project_count + 1))
-        done < <(find "$projects_dir" -name .eden-target -type f || true)
-    done < <(eden_branches)
-fi
+# shellcheck disable=SC2329  # called through for_each_project
+graft_project() {
+    if [[ ! -d "$4" ]]; then
+        echo "  ⚠ projects/$2: target $4 not found (skipping MCP)"
+        return 0
+    fi
+    sync_project_mcp "$(cat "$3")" "$4" "$2"
+    project_count=$((project_count + 1))
+}
+for_each_project graft_project
 
 # Show summary
 SERVER_COUNT=$(echo "$MERGED_JSON" | jq '.mcpServers | length')

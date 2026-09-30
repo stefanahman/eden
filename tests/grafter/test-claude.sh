@@ -211,9 +211,12 @@ echo "# Rule from B" > "$branch2/.claude/rules/conflict.md"
 register_branch "$branch1"
 register_branch "$branch2"
 
-describe "cross-branch conflict is reported"
-output=$("$GRAFTER" 2>&1)
-assert_output_contains "$output" "Conflicts detected"
+describe "cross-branch collision stops the grafter, naming both branches"
+status=0
+output=$("$GRAFTER" 2>&1) || status=$?
+assert_output_contains "$output" "rules/conflict.md (branch-a, branch-b)"
+describe "and writes nothing"
+if [[ $status -ne 0 && ! -e "$HOME/.claude/rules/conflict.md" ]]; then pass; else fail "exit $status, rule linked anyway"; fi
 
 sandbox_teardown
 

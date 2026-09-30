@@ -26,6 +26,8 @@ echo "  → Grafting zsh configs from branches"
 # Graft zsh configs from each branch
 # shellcheck source=lib/branches.sh
 source "$EDEN_ROOT/lib/branches.sh"
+# shellcheck source=lib/collisions.sh
+source "$EDEN_ROOT/lib/collisions.sh"
 
 BRANCHES_FILE="$(eden_branches_file)"
 if [[ ! -f "$BRANCHES_FILE" ]]; then
@@ -33,35 +35,38 @@ if [[ ! -f "$BRANCHES_FILE" ]]; then
     exit 0
 fi
 
-# Ensure zshenv.d directory exists
 ZSHENV_D="${XDG_CONFIG_HOME:-$HOME/.config}/zsh/zshenv.d"
-mkdir -p "$ZSHENV_D"
-
 GRAFTED_COUNT=0
 
-while IFS= read -r branch_path; do
-    branch_name=$(basename "$branch_path")
-    
-    # Check for zshenv.d in branch
-    BRANCH_ZSHENV_D="$branch_path/.config/zsh/zshenv.d"
-    
-    if [[ -d "$BRANCH_ZSHENV_D" ]]; then
-        echo "  → Grafting zsh from: $branch_name"
-        
-        # Symlink all .zsh files from branch zshenv.d/
-        for file in "$BRANCH_ZSHENV_D"/*.zsh; do
+# graft_all claims|link: with "claims" only list each target and its
+# branch; with "link" link every .zsh file from each branch's zshenv.d/.
+graft_all() {
+    local mode="$1" branch_path branch_name file target
+
+    while IFS= read -r branch_path; do
+        [[ -d "$branch_path/.config/zsh/zshenv.d" ]] || continue
+        branch_name=$(basename "$branch_path")
+
+        if [[ "$mode" == link ]]; then
+            echo "  → Grafting zsh from: $branch_name"
+            mkdir -p "$ZSHENV_D"
+            GRAFTED_COUNT=$((GRAFTED_COUNT + 1))
+        fi
+
+        for file in "$branch_path/.config/zsh/zshenv.d"/*.zsh; do
             [[ -e "$file" ]] || continue
-            
-            filename=$(basename "$file")
-            target="$ZSHENV_D/$filename"
-            
-            # Create or update symlink
-            ln -sf "$file" "$target"
+            target="$ZSHENV_D/$(basename "$file")"
+            if [[ "$mode" == claims ]]; then
+                printf '%s\t%s\n' "$(eden_home_path "$target")" "$branch_name"
+            else
+                ln -sfn "$file" "$target"
+            fi
         done
-        
-        GRAFTED_COUNT=$((GRAFTED_COUNT + 1))
-    fi
-done < <(eden_branches)
+    done < <(eden_branches)
+}
+
+graft_all claims | eden_check_collisions || exit 1
+graft_all link
 
 if [[ $GRAFTED_COUNT -eq 0 ]]; then
     echo "  → No zsh configs found in branches"

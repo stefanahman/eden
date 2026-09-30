@@ -2,7 +2,7 @@
 
 ## Overview
 
-Grafters are pluggable scripts that intelligently merge configurations from multiple branches. Each grafter uses a specific **strategy** to handle conflicts and combine sources.
+Grafters are pluggable scripts that intelligently merge configurations from multiple branches. Each grafter uses a specific **strategy** to combine sources, and none lets two branches write the same target.
 
 ## Quick Reference
 
@@ -28,7 +28,7 @@ Most branch configs are deployed via the **`.eden-graft` allowlist** — a simpl
 | Use `.eden-graft` when... | Create a grafter when... |
 |---|---|
 | Only one branch provides the config | Multiple branches contribute to the same file |
-| Simple symlink is sufficient | Configs need merging, routing, or conflict detection |
+| Simple symlink is sufficient | Configs need merging or routing |
 | Examples: karabiner, nvim, skhd | Examples: MCP servers, git identities, shell env |
 
 ### How `graft-configs` works
@@ -58,7 +58,7 @@ Create a grafter when branches need to contribute to the same logical configurat
 ✅ **Create a grafter if:**
 - Multiple branches provide different values for the same thing (MCP servers, binaries, env vars)
 - Branches need to add to a shared collection
-- You need intelligent merging or conflict detection
+- You need intelligent merging or routing
 
 ❌ **Don't create a grafter if:**
 - Only one branch will ever provide the file (karabiner, nvim)
@@ -112,10 +112,10 @@ for item in "$branch/.local/bin"/*; do
 done
 ```
 
-**Conflict resolution:** 
-- Detect conflicts (file already exists)
-- Last branch wins (or warn user)
-- Keep source in branch (editable)
+**Collisions:** two branches linking the same target collide, and so does a
+target inside another branch's linked directory (see
+[Collisions between branches](#collisions-between-branches)). A real file
+at the target is left alone and reported. Keep source in branch (editable).
 
 **Pros:**
 - Immediate updates (edit in branch, reflects instantly)
@@ -124,7 +124,6 @@ done
 
 **Cons:**
 - Can break if branches move
-- Conflicts need manual resolution
 
 ### 2. Merge (JSON/Data)
 
@@ -150,10 +149,8 @@ done
 echo "$MERGED_JSON" > ~/.config/mcp/servers.json
 ```
 
-**Conflict resolution:**
-- Last branch wins for duplicate keys
-- Or: detect and warn about conflicts
-- Or: custom merge logic per data type
+**Collisions:** a named entry, such as an MCP server, given by two branches
+collides; nothing is written.
 
 **Pros:**
 - Single canonical file
@@ -186,9 +183,8 @@ EOF
 done
 ```
 
-**Conflict resolution:**
-- Directory-based (git) or conditional routing
-- No conflicts - each context has its own route
+**Collisions:** each identity routes on its own; two branches providing an
+identity of the same name collide.
 
 **Pros:**
 - Preserves branch-specific configs
@@ -217,9 +213,8 @@ for branch in branches; do
 done
 ```
 
-**Conflict resolution:**
-- Usually none needed (read-only)
-- Can detect duplicates and warn
+**Collisions:** a secret `id` given by two branches collides. A branch may
+reuse an id from the trunk's own `.eden-secrets` to override it.
 
 **Pros:**
 - No file generation
@@ -296,8 +291,10 @@ trap 'echo "  !! graft-<name> failed at line $LINENO" >&2' ERR
   and names the ones that failed
 - Never prompt when `EDEN_GRAFT_FORCE=true` (set by `eden graft --force`):
   apply without asking, for non-interactive runs
-- Warn but continue on conflicts
-- Report summary (added/skipped/conflicts)
+- Fail on a collision between branches, before writing anything (see
+  [Collisions between branches](#collisions-between-branches))
+- Report summary (added/skipped, and targets left alone because a real
+  file is in the way)
 
 ## Common Patterns
 
@@ -321,24 +318,41 @@ done < <(eden_branches)
 the path in a project's `.eden-target`). Nothing else in an entry is
 evaluated.
 
-### Conflict Detection
+### Collisions between branches
+
+Two branches writing the same target is an error, never "last branch
+wins". A grafter first lists every target it is about to write, then
+checks the list with `lib/collisions.sh`, and only then writes:
+
 ```bash
-if [ -L "$target" ]; then
-    current=$(readlink "$target")
-    if [ "$current" != "$source" ]; then
-        # Conflict: already linked elsewhere
-    fi
-elif [ -e "$target" ]; then
-    # Conflict: file exists (not a symlink)
-fi
+# shellcheck source=lib/collisions.sh
+source "$EDEN_ROOT/lib/collisions.sh"
+
+# graft_all claims|link: the same walk twice. With "claims" it prints
+# one "target<TAB>branch" line per target; with "link" it writes.
+graft_all claims | eden_check_collisions || exit 1
+graft_all link
 ```
+
+A target is a path shown with `~` (`eden_home_path`) or, for a named entry
+in a merged output, a label such as `MCP server <name>` or
+`secret <id>`. `eden_check_collisions` reports a target listed by two
+branches, and a target inside another branch's target (a link into a
+linked directory would write into that branch), then returns 1. The
+grafter exits without writing anything; `eden graft` runs the others and
+names it. A collision is resolved in the branches: keep the entry in
+one, move it to a shared branch, or make it per repo.
+
+When linking, a link that already points elsewhere is replaced: the
+check has ruled out another branch, so an earlier graft left it. A real
+file or directory at the target is left alone and reported.
 
 ### Reporting
 ```bash
 echo "  → Grafting <thing> from branches"
 echo "  → Grafted <thing> from: $branch_name"
 echo "  → Grafted N <things> from M branch(es)"
-echo "  ⚠ Conflicts detected:"
+echo "  ⚠ Left alone (not a symlink):"
 ```
 
 ## Examples
@@ -374,7 +388,7 @@ done
 
 1. **Keep source in branches**: Prefer symlinks over copying
 2. **Clear ownership**: Make it obvious which branch owns what
-3. **Detect conflicts**: Warn users about duplicate names
+3. **Check collisions first**: List every target, check the list, then write
 4. **Idempotent**: Running twice should be safe
 5. **Report clearly**: Users should understand what happened
 6. **Exit gracefully**: No files to graft is not an error

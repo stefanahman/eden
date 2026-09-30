@@ -32,62 +32,55 @@ if [ ! -f "$BRANCHES_FILE" ]; then
     exit 0
 fi
 
+# shellcheck source=lib/collisions.sh
+source "$EDEN_ROOT/lib/collisions.sh"
+
 echo "  → Symlinking configs from branches"
 
 GRAFTED_COUNT=0
 
-while IFS= read -r branch_path; do
-    branch_name=$(basename "$branch_path")
-    
-    if [[ -d "$branch_path" ]]; then
-        # Check for .eden-graft file (allowlist)
-        GRAFT_FILE="$branch_path/.eden-graft"
-        
-        if [[ ! -f "$GRAFT_FILE" ]]; then
-            # No .eden-graft file, skip this branch for config grafting
-            continue
+# graft_all claims|link: walk every branch's allowlist. With "claims" it
+# only lists each target and its branch; with "link" it links.
+graft_all() {
+    local mode="$1" branch_path branch_name config_path source_path target_path
+
+    while IFS= read -r branch_path; do
+        branch_name=$(basename "$branch_path")
+        [[ -d "$branch_path" && -f "$branch_path/.eden-graft" ]] || continue
+
+        if [[ "$mode" == link ]]; then
+            echo "  → Grafting configs from: $branch_name"
         fi
-        
-        echo "  → Grafting configs from: $branch_name"
-        
-        # Process each allowed path individually
-        while IFS= read -r config_path; do
+
+        while IFS= read -r config_path || [[ -n "$config_path" ]]; do
             [[ -z "$config_path" ]] && continue
             [[ "$config_path" =~ ^[[:space:]]*# ]] && continue
             config_path=$(echo "$config_path" | xargs)
-            
+
             source_path="$branch_path/$config_path"
-            
+            target_path="$HOME/$config_path"
+
             # Skip if source doesn't exist
             if [[ ! -e "$source_path" ]]; then
-                echo "    ⚠ Not found: $config_path (skipping)"
+                if [[ "$mode" == link ]]; then
+                    echo "    ⚠ Not found: $config_path (skipping)"
+                fi
                 continue
             fi
-            
-            # Get parent directory and item name
-            parent_dir=$(dirname "$config_path")
-            item_name=$(basename "$config_path")
-            
-            # Determine target and source directories
-            if [[ "$parent_dir" == "." ]]; then
-                target_dir="$HOME"
-                source_dir="$branch_path"
-            else
-                target_dir="$HOME/$parent_dir"
-                source_dir="$branch_path/$parent_dir"
-                
-                # Ensure target parent exists
-                mkdir -p "$target_dir"
+
+            if [[ "$mode" == claims ]]; then
+                printf '%s\t%s\n' "$(eden_home_path "$target_path")" "$branch_name"
+                continue
             fi
-            
+
+            mkdir -p "$(dirname "$target_path")"
+
             # Symlink the whole entry (dir or file) at $target_path → $source_path.
             # Stow is the wrong tool here: with `stow PKG`, the package name is
             # stripped and the package's *contents* land in the target, not the
             # package itself. We want the dir name preserved (e.g. ~/.config/nvim
             # → branch/.config/nvim), so plain ln -sfn does the right thing and
             # is idempotent across re-grafts.
-            target_path="$target_dir/$item_name"
-
             if [[ -d "$source_path" && ! -L "$target_path" && -d "$target_path" ]]; then
                 # Real directory already lives at the target (e.g. an app's
                 # local data dir). Don't clobber — ask the user to graft the
@@ -103,12 +96,16 @@ while IFS= read -r branch_path; do
 
             ln -sfn "$source_path" "$target_path"
             echo "    → Linked: $config_path"
-            
-        done < "$GRAFT_FILE"
-        
-        GRAFTED_COUNT=$((GRAFTED_COUNT + 1))
-    fi
-done < <(eden_branches)
+        done < "$branch_path/.eden-graft"
+
+        if [[ "$mode" == link ]]; then
+            GRAFTED_COUNT=$((GRAFTED_COUNT + 1))
+        fi
+    done < <(eden_branches)
+}
+
+graft_all claims | eden_check_collisions || exit 1
+graft_all link
 
 # Create HOME symlinks for tools that don't support XDG
 if [[ "$(uname -s)" == "Darwin" ]]; then

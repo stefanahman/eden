@@ -23,6 +23,8 @@ fi
 
 # shellcheck source=lib/branches.sh
 source "$EDEN_ROOT/lib/branches.sh"
+# shellcheck source=lib/collisions.sh
+source "$EDEN_ROOT/lib/collisions.sh"
 
 BRANCHES_FILE="$(eden_branches_file)"
 
@@ -61,60 +63,46 @@ for link in "$eden_bin"/*; do
     }
 done
 
-# Track which branch owns which script (for conflict detection)
-# Uses newline-separated "name=owner" strings (bash 3.2 compatible)
-script_owners=""
+# graft_all claims|link: walk every branch's .local/bin. With "claims" it
+# only lists each target and its branch; with "link" it links. A link
+# that points elsewhere was left by an earlier graft (the claims have
+# ruled out another branch), so it is replaced.
+graft_all() {
+    local mode="$1" branch_path branch_name script script_name target
 
-_get_owner() {
-    echo "$script_owners" | while IFS='=' read -r k v; do
-        [ "$k" = "$1" ] && echo "$v" && return
-    done
-}
+    while IFS= read -r branch_path; do
+        [ -d "$branch_path/.local/bin" ] || continue
+        branch_name=$(basename "$branch_path")
 
-# Read each branch repo path
-while IFS= read -r branch_path; do
-    if [ ! -d "$branch_path" ]; then
-        continue
-    fi
-
-    # Get branch name from path
-    branch_name=$(basename "$branch_path")
-
-    # Look for .local/bin directory in the branch
-    bin_dir="$branch_path/.local/bin"
-    if [ -d "$bin_dir" ]; then
-        for script in "$bin_dir"/*; do
-            [ -e "$script" ] || continue
-            [ -f "$script" ] || continue  # Skip directories
+        for script in "$branch_path/.local/bin"/*; do
+            [ -f "$script" ] || continue  # Skip directories and empty globs
 
             script_name=$(basename "$script")
             target="$eden_bin/$script_name"
 
-            # Check if script already exists and points elsewhere
-            if [ -L "$target" ]; then
-                current_target=$(readlink "$target")
-                if [ "$current_target" != "$script" ]; then
-                    existing_owner=$(_get_owner "$script_name")
-                    conflicts+=("$script_name: ${existing_owner:-unknown} vs $branch_name")
-                    continue
-                fi
+            if [[ "$mode" == claims ]]; then
+                printf '%s\t%s\n' "$(eden_home_path "$target")" "$branch_name"
+                continue
+            fi
+
+            if [ -L "$target" ] && [ "$(readlink "$target")" = "$script" ]; then
                 echo "  ✓ $script_name ($branch_name) [already linked]"
                 skipped=$((skipped + 1))
-                script_owners="${script_owners}${script_name}=${branch_name}"$'\n'
                 continue
-            elif [ -e "$target" ]; then
+            elif [ -e "$target" ] && [ ! -L "$target" ]; then
                 conflicts+=("$script_name: file exists (not a symlink)")
                 continue
             fi
 
-            # Create symlink
-            ln -sf "$script" "$target"
+            ln -sfn "$script" "$target"
             echo "  → $script_name ($branch_name)"
             added=$((added + 1))
-            script_owners="${script_owners}${script_name}=${branch_name}"$'\n'
         done
-    fi
-done < <(eden_branches)
+    done < <(eden_branches)
+}
+
+graft_all claims | eden_check_collisions || exit 1
+graft_all link
 
 # Report results
 if [ $added -gt 0 ]; then

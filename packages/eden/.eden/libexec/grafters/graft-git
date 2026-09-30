@@ -30,6 +30,8 @@ fi
 
 # shellcheck source=lib/branches.sh
 source "$EDEN_ROOT/lib/branches.sh"
+# shellcheck source=lib/collisions.sh
+source "$EDEN_ROOT/lib/collisions.sh"
 
 BRANCHES_FILE="$(eden_branches_file)"
 
@@ -41,54 +43,59 @@ fi
 IDENTITIES_DIR="$HOME/.config/git/identities"
 GITCONFIG_LOCAL="${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/gitconfig"
 
-mkdir -p "$IDENTITIES_DIR"
-mkdir -p "$(dirname "$GITCONFIG_LOCAL")"
-
 added=0
 has_default=""
 scoped_directives=""
 
-while IFS= read -r branch_path; do
-    [[ -d "$branch_path" ]] || continue
+# graft_all claims|link: with "claims" only list each identity target and
+# its branch; with "link" link the identities and collect the directives.
+# A link that points elsewhere was left by an earlier graft (the claims
+# have ruled out another branch), so it is replaced.
+graft_all() {
+    local mode="$1" branch_path branch_name identity_file name target
 
-    branch_name=$(basename "$branch_path")
-    source_dir="$branch_path/.config/git/identities"
-    [[ -d "$source_dir" ]] || continue
+    while IFS= read -r branch_path; do
+        [[ -d "$branch_path/.config/git/identities" ]] || continue
+        branch_name=$(basename "$branch_path")
 
-    for identity_file in "$source_dir"/*; do
-        [[ -e "$identity_file" ]] || continue
-        [[ -f "$identity_file" ]] || continue
+        for identity_file in "$branch_path/.config/git/identities"/*; do
+            [[ -f "$identity_file" ]] || continue
 
-        name=$(basename "$identity_file")
-        target="$IDENTITIES_DIR/$name"
+            name=$(basename "$identity_file")
+            target="$IDENTITIES_DIR/$name"
 
-        # Symlink the identity file (last branch wins)
-        if [[ -L "$target" ]]; then
-            current=$(readlink "$target")
-            if [[ "$current" == "$identity_file" ]]; then
+            if [[ "$mode" == claims ]]; then
+                printf '%s\t%s\n' "$(eden_home_path "$target")" "$branch_name"
+                continue
+            fi
+
+            if [[ -L "$target" && "$(readlink "$target")" == "$identity_file" ]]; then
                 echo "  ✓ identity/$name ($branch_name) [already linked]"
             else
-                ln -sf "$identity_file" "$target"
-                echo "  → identity/$name ($branch_name) [overridden]"
+                ln -sfn "$identity_file" "$target"
+                echo "  → identity/$name ($branch_name)"
             fi
-        else
-            ln -sf "$identity_file" "$target"
-            echo "  → identity/$name ($branch_name)"
-        fi
 
-        if [[ "$name" == "_default" ]]; then
-            has_default="$branch_name"
-        else
-            # Collect directory-scoped directives
-            scoped_directives+="
+            if [[ "$name" == "_default" ]]; then
+                has_default="$branch_name"
+            else
+                # Collect directory-scoped directives
+                scoped_directives+="
 # $name identity (from $branch_name branch)
 [includeIf \"gitdir:~/Development/$name/\"]
 	path = ~/.config/git/identities/$name
 "
-            added=$((added + 1))
-        fi
-    done
-done < <(eden_branches)
+                added=$((added + 1))
+            fi
+        done
+    done < <(eden_branches)
+}
+
+graft_all claims | eden_check_collisions || exit 1
+
+mkdir -p "$IDENTITIES_DIR"
+mkdir -p "$(dirname "$GITCONFIG_LOCAL")"
+graft_all link
 
 # Write gitconfig: _default first (fallback), then scoped overrides
 cat > "$GITCONFIG_LOCAL" << 'EOF'

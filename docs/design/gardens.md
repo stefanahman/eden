@@ -85,14 +85,8 @@ keep the middle level large and the last one small.
 
 ## Rules that make coexistence safe
 
-1. **A collision is an error.** Two branches writing the same target —
-   a link, or a named entry in a merged output (an MCP server, a secret
-   id, a repo path) — stop the graft with both branches named. A
-   collision is designed out: made per repo, per session, or moved to a
-   shared branch. This replaces today's documented "warn but continue
-   on conflicts" (docs/grafters.md) and today's inconsistent behaviour,
-   where some grafters keep the link already on disk and others let the
-   last branch win.
+1. **A collision is an error.** *Built:* docs/grafters.md, "Collisions
+   between branches".
 2. **Platform-only entries are gated.** A branch can mark entries for
    one platform. Today only `graft-brew` checks the platform;
    `graft-configs` links every entry on every OS.
