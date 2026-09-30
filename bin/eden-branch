@@ -186,8 +186,11 @@ list_branches() {
             
             # Show if it has secrets
             if [ -f "$display_path/.eden-secrets" ]; then
-                local secret_count=$(grep -c "^\[secret\]" "$display_path/.eden-secrets" 2>/dev/null || echo 0)
-                echo "    Secrets: $secret_count defined"
+                # grep -c prints 0 and exits 1 when nothing matches, so
+                # `|| echo 0` would print a second 0.
+                local secret_count
+                secret_count=$(grep -c "^\[secret\]" "$display_path/.eden-secrets" 2>/dev/null) || true
+                echo "    Secrets: ${secret_count:-0} defined"
             fi
             
             # Show if it has MCP configs

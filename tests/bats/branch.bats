@@ -74,3 +74,16 @@ $HOME/b/a-b" ]
     [ "$(cat "$BRANCHES")" = "$HOME/b/a-b
 $HOME/b/a" ]
 }
+
+@test "list counts a branch's secrets once, also when there are none" {
+    mkdir -p "$HOME/b/none" "$HOME/b/two"
+    echo '# no secrets yet' > "$HOME/b/none/.eden-secrets"
+    printf '[secret]\nname=a\n[secret]\nname=b\n' > "$HOME/b/two/.eden-secrets"
+    printf '%s\n' "$HOME/b/none" "$HOME/b/two" > "$BRANCHES"
+    run "$BRANCH" list
+    [ "$status" -eq 0 ]
+    [ "$(grep -c 'Secrets:' <<< "$output")" -eq 2 ]
+    [[ "$output" =~ "Secrets: 0 defined" ]]
+    [[ "$output" =~ "Secrets: 2 defined" ]]
+    [[ ! "$output" =~ $'Secrets: 0\n' ]]
+}
