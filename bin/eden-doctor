@@ -239,6 +239,10 @@ if command -v find >/dev/null 2>&1; then
         depth="${spec##*|}"
         [ -d "$dir" ] || continue
         while IFS= read -r -d '' link; do
+            # Chromium and Electron apps mark a running profile with these
+            # links; they point at host-pid, a number and a socket in /tmp,
+            # so they dangle by design and are never grafts.
+            case "${link##*/}" in SingletonLock|SingletonCookie|SingletonSocket) continue ;; esac
             if [ ! -e "$link" ]; then
                 check_warn "Broken symlink: $link"
                 BROKEN=$((BROKEN + 1))

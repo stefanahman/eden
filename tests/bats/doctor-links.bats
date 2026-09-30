@@ -63,3 +63,14 @@ doctor() {
     doctor
     [[ ! "$output" =~ "Link into an unregistered branch" ]]
 }
+
+@test "the lock links Chromium-based apps keep are not reported, other broken links are" {
+    mkdir -p "$XDG_CONFIG_HOME/app"
+    ln -s "host-4313" "$XDG_CONFIG_HOME/app/SingletonLock"
+    ln -s "2855553049741192354" "$XDG_CONFIG_HOME/app/SingletonCookie"
+    ln -s "$BATS_TEST_TMPDIR/scoped_dir/SingletonSocket" "$XDG_CONFIG_HOME/app/SingletonSocket"
+    ln -s "$BATS_TEST_TMPDIR/gone" "$XDG_CONFIG_HOME/app/settings.json"
+    doctor
+    [[ ! "$output" =~ "Singleton" ]]
+    [[ "$output" =~ "warn|Broken symlink: $XDG_CONFIG_HOME/app/settings.json" ]]
+}
