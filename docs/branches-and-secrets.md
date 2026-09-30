@@ -71,7 +71,8 @@ my-branch/
 ├── .config/
 │   ├── mcp/servers.json       # MCP servers (merged by graft-mcp)
 │   ├── git/identities/work    # Git identity, for its remotes (graft-git)
-│   └── zsh/zshenv.d/work.zsh  # Env vars (collected by graft-zsh)
+│   ├── eden/env.d/work.sh     # Env vars, POSIX sh, for bash and zsh (graft-env)
+│   └── zsh/zshenv.d/work.zsh  # zsh-only env (collected by graft-zsh)
 ├── .local/bin/                # Scripts/wrappers (collected by graft-bin)
 │   ├── mcp-slack
 │   └── mcp-custom
@@ -92,6 +93,22 @@ my-branch/
 ```
 
 Grafters discover and merge content from each path. See [grafters.md](grafters.md) for which grafter handles what.
+
+### Environment
+
+Env files in a branch's `.config/eden/env.d/*.sh` are POSIX sh, grafted
+into `~/.config/eden/env.d/` by `graft-env`, and loaded by both shells:
+zsh from `.zshenv`, bash from `~/.config/bash/env`, which bash login
+shells source through the trunk's profile. Interactive bash reads only
+`~/.bashrc`, which Eden does not own, so it needs one line there:
+
+```sh
+. ~/.config/bash/env
+```
+
+`eden doctor` checks for it where bash is the login shell. Keep env files
+to exports that can run twice; zsh-only settings stay in
+`.config/zsh/zshenv.d/*.zsh`.
 
 ### Platform folders
 

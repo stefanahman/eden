@@ -24,6 +24,12 @@ fi
 # Export PATH
 export PATH
 
+# Eden's environment: every branch's env files (POSIX sh, grafted by
+# graft-env), shared with bash through ~/.config/bash/env
+for file in "${XDG_CONFIG_HOME:-$HOME/.config}"/eden/env.d/*.sh(N); do
+    source "$file"
+done
+
 # Load additional environment configuration from zshenv.d/
 # This allows branches and user customizations to extend base config
 if [[ -d "${XDG_CONFIG_HOME:-$HOME/.config}/zsh/zshenv.d" ]]; then

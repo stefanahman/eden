@@ -20,3 +20,7 @@ if [[ -d "$HOME/.eden/bin" ]] && [[ ":$PATH:" != *":$HOME/.eden/bin:"* ]]; then
     export PATH="$HOME/.eden/bin:$PATH"
 fi
 
+# Eden's environment: every branch's env files
+if [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/bash/env" ]]; then
+    . "${XDG_CONFIG_HOME:-$HOME/.config}/bash/env"
+fi

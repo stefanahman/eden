@@ -12,10 +12,11 @@ Grafters are pluggable scripts that intelligently merge configurations from mult
 | `graft-brew` | Aggregate | Runs `brew bundle` on branch Brewfiles (macOS only) | `Brewfile` |
 | `graft-claude` | Collection | Symlinks Claude rules/agents/commands/skills + top-level files (global + project) | `.claude/{rules,agents,commands,skills}/`, `.claude/{settings.json,statusline.sh,CLAUDE.md,*.local.md}` |
 | `graft-configs` | Allowlist | Symlinks paths listed in `.eden-graft` | Varies (per allowlist) |
+| `graft-env` | Collection | Symlinks POSIX sh env files into `~/.config/eden/env.d/`, loaded by bash and zsh | `.config/eden/env.d/*.sh` |
 | `graft-git` | Generate | Creates `includeIf` directives for branch git identities | `.config/git/identities/*` |
 | `graft-mcp` | Merge | Merges MCP server JSON from all branches (global + project) | `.config/mcp/servers.json` |
 | `graft-secrets` | Aggregate | Collects 1Password secret definitions for `eden secrets` | `.eden-secrets` |
-| `graft-zsh` | Collection | Symlinks zsh env files into `~/.config/zsh/zshenv.d/` | `.config/zsh/zshenv.d/*.zsh` |
+| `graft-zsh` | Collection | Symlinks zsh-only env files into `~/.config/zsh/zshenv.d/` | `.config/zsh/zshenv.d/*.zsh` |
 
 ## Config Deployment: `.eden-graft` vs Dedicated Grafters
 
@@ -107,7 +108,8 @@ Directories without `.eden-target` are organizational folders (silently skipped)
 
 **Examples:**
 - `graft-bin`: Binaries from branches → `~/.eden/bin/`
-- `graft-zsh`: Env files from branches → `~/.config/zsh/zshenv.d/`
+- `graft-env`: POSIX sh env files from branches → `~/.config/eden/env.d/`
+- `graft-zsh`: zsh-only env files from branches → `~/.config/zsh/zshenv.d/`
 - `graft-claude`: Claude rules/agents/commands/skills + top-level files from branches → `~/.claude/` + project targets
 
 **Pattern:**
@@ -277,6 +279,7 @@ packages/eden/.eden/libexec/grafters/
 ├── graft-brew         # Aggregate strategy (macOS only)
 ├── graft-claude       # Collection strategy
 ├── graft-configs      # Allowlist strategy (.eden-graft)
+├── graft-env          # Collection strategy
 ├── graft-git          # Generate strategy
 ├── graft-mcp          # Merge strategy
 ├── graft-secrets      # Aggregate strategy

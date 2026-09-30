@@ -1,0 +1,77 @@
+#!/bin/bash
+# graft-env - Graft env files from branches into ~/.config/eden/env.d/
+# Part of Eden's pluggable grafter system
+#
+# A branch's .config/eden/env.d/*.sh are POSIX sh, so bash and zsh load
+# them alike: bash through ~/.config/bash/env (from its profile and
+# ~/.bashrc), zsh from .zshenv. Keep them to exports that can run twice.
+set -e
+trap 'echo "  !! graft-env failed at line $LINENO" >&2' ERR
+
+if [[ "${1:-}" == "--api-version" ]]; then
+    echo 1
+    exit 0
+fi
+
+# Report covered paths for eden doctor
+if [[ "${1:-}" == "--covers" ]]; then
+    echo ".config/eden/env.d"
+    exit 0
+fi
+
+# Detect Eden root from script location
+if [[ -z "$EDEN_ROOT" ]]; then
+    SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+    EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
+fi
+
+# shellcheck source=lib/branches.sh
+source "$EDEN_ROOT/lib/branches.sh"
+# shellcheck source=lib/collisions.sh
+source "$EDEN_ROOT/lib/collisions.sh"
+
+if [[ ! -f "$(eden_branches_file)" ]]; then
+    echo "  → No branches registered (skipping)"
+    exit 0
+fi
+
+ENV_D="${XDG_CONFIG_HOME:-$HOME/.config}/eden/env.d"
+GRAFTED_COUNT=0
+
+# graft_all claims|link: with "claims" only list each target and its
+# branch; with "link" link every .sh file from each branch's env.d/.
+graft_all() {
+    local mode="$1" branch_path branch_name file target
+
+    while IFS= read -r branch_path; do
+        [[ -d "$branch_path/.config/eden/env.d" ]] || continue
+        branch_name=$(eden_branch_name "$branch_path")
+
+        if [[ "$mode" == link ]]; then
+            echo "  → Grafting env from: $branch_name"
+            mkdir -p "$ENV_D"
+            GRAFTED_COUNT=$((GRAFTED_COUNT + 1))
+        fi
+
+        for file in "$branch_path/.config/eden/env.d"/*.sh; do
+            [[ -e "$file" ]] || continue
+            target="$ENV_D/$(basename "$file")"
+            if [[ "$mode" == claims ]]; then
+                printf '%s\t%s\n' "$(eden_home_path "$target")" "$branch_name"
+            else
+                ln -sfn "$file" "$target"
+            fi
+        done
+    done < <(eden_graft_roots)
+}
+
+graft_all claims | eden_check_collisions || exit 1
+graft_all link
+
+if [[ $GRAFTED_COUNT -eq 0 ]]; then
+    echo "  → No env files found in branches"
+else
+    echo "  → Grafted env from $GRAFTED_COUNT branch(es)"
+fi
+
+exit 0

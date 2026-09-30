@@ -197,6 +197,20 @@ if [ "$IDENTITY_COUNT" -gt 0 ]; then
     check_pass "$IDENTITY_COUNT scoped git identity(ies) configured"
 fi
 
+# Interactive bash reads only ~/.bashrc, which Eden does not own (on
+# Omarchy it is the distribution's template): it needs one line to load
+# the env files that zsh gets from .zshenv.
+if [ "${SHELL##*/}" = "bash" ]; then
+    section "Shell:"
+    if grep -Eq '^[^#]*(\.|source)[[:space:]].*\.config/bash/env' "$HOME/.bashrc" 2>/dev/null; then
+        # shellcheck disable=SC2088  # the ~ is shown to the reader
+        check_pass "~/.bashrc loads Eden's env files"
+    else
+        # shellcheck disable=SC2088  # the ~ is shown to the reader
+        check_warn "~/.bashrc does not load Eden's env files; add: . ~/.config/bash/env"
+    fi
+fi
+
 # Check symlinks
 section "Symlinks:"
 

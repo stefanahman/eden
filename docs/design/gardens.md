@@ -77,8 +77,8 @@ keep the middle level large and the last one small.
    folders").
 3. **Secrets name their account.** *Built:* docs/branches-and-secrets.md,
    `op_account`.
-4. **The environment is shell-neutral.** Env files in POSIX `sh` syntax,
-   sourced by zsh and bash alike, instead of zsh-only `zshenv.d`.
+4. **The environment is shell-neutral.** *Built:*
+   docs/branches-and-secrets.md, "Environment".
 5. **Shared config directories tolerate several contexts.** A tool that
    reads every file in a directory (`*.d/*.yaml`) sees both contexts'
    files at once; if it rejects duplicate names or keys, it must either
