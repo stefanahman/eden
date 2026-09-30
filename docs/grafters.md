@@ -171,17 +171,32 @@ collides; nothing is written.
 **Examples:**
 - `graft-git`: Git includeIf directives → `~/.config/eden/local/gitconfig`
 
-**Pattern:**
-```bash
-# For each branch with git context
-for context in branches; do
-    # Add routing directive
-    cat >> ~/.config/eden/local/gitconfig << EOF
-[includeIf "gitdir:~/Development/$context/"]
-    path = ~/.config/eden/local/gitconfig.$context
-EOF
-done
+**Pattern:** `graft-git` links each identity into `~/.config/git/identities/`
+and writes the includes into `~/.config/eden/local/gitconfig`. `_default` is
+included always. Another identity applies to the repos whose remotes it
+names, in an `[eden]` section of the identity file:
+
+```ini
+# .config/git/identities/example-corp
+[user]
+    email = john@example-corp.com
+[eden]
+    remote = git@github.com:example-corp/**
+    remote = https://github.com/example-corp/**
 ```
+
+which becomes one include per pattern (git ≥ 2.36; SSH and HTTPS remotes
+each need theirs):
+
+```ini
+[includeIf "hasconfig:remote.*.url:git@github.com:example-corp/**"]
+    path = ~/.config/git/identities/example-corp
+```
+
+A repo with no remote, or none that matches, keeps `_default`. An identity
+naming no remotes applies by directory instead,
+`[includeIf "gitdir:~/Development/<name>/"]`. An identity file must not set
+a remote URL: git refuses one in a file included this way.
 
 **Collisions:** each identity routes on its own; two branches providing an
 identity of the same name collide.

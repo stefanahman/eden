@@ -52,15 +52,7 @@ keep the middle level large and the last one small.
 
 ### Per-repo mechanisms
 
-- **Git identity by remote.** An identity declares the remotes it
-  applies to; `graft-git` writes
-  `includeIf "hasconfig:remote.*.url:<pattern>"` (git ≥ 2.36). Both the
-  SSH and HTTPS forms need a pattern, e.g.
-  `git@github.com:example-corp/**` and
-  `https://github.com/example-corp/**`. A repo without a remote uses
-  `_default`. Git forbids remote URLs in files included this way;
-  identity files have none. Default when nothing is declared: today's
-  `gitdir:~/Development/<name>/`.
+- **Git identity by remote.** *Built:* docs/grafters.md, `graft-git`.
 - **Project MCP servers in the client's local scope.** Claude Code's
   local scope keeps a server "only in the project where you added it",
   stored in `~/.claude.json` under the project's path. `graft-mcp`

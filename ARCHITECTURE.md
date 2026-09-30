@@ -139,7 +139,7 @@ A minimal but functional branch demonstrating each grafter (configs, mcp, zsh, g
 
 **Personal branches (private, `eden graft`)** -- where your real configs live:
 
-Git identity (`_default` + directory-scoped), MCP servers, secrets, Brewfiles, Claude skills, binaries.
+Git identity (`_default`, plus identities scoped by remote or directory), MCP servers, secrets, Brewfiles, Claude skills, binaries.
 See [docs/branches-and-secrets.md](docs/branches-and-secrets.md).
 
 ## Non-Goals

@@ -70,7 +70,7 @@ my-branch/
 ├── Brewfile                   # Branch-specific brew packages (macOS)
 ├── .config/
 │   ├── mcp/servers.json       # MCP servers (merged by graft-mcp)
-│   ├── git/identities/work    # Git identity (routed by graft-git)
+│   ├── git/identities/work    # Git identity, for its remotes (graft-git)
 │   └── zsh/zshenv.d/work.zsh  # Env vars (collected by graft-zsh)
 ├── .local/bin/                # Scripts/wrappers (collected by graft-bin)
 │   ├── mcp-slack
