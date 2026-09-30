@@ -3,7 +3,7 @@
 #   common/Brewfile     — cross-platform dev tools you want everywhere
 #   macos/Brewfile      — macOS-only apps (terminal, editor, WM)
 #   personal/Brewfile   — personal-context apps (e.g., Signal)
-#   bardo/Brewfile      — work-context apps and tooling
+#   work/Brewfile       — work-context apps and tooling
 #
 # `eden graft` picks those up automatically for each registered branch.
 
