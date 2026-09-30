@@ -53,15 +53,8 @@ keep the middle level large and the last one small.
 ### Per-repo mechanisms
 
 - **Git identity by remote.** *Built:* docs/grafters.md, `graft-git`.
-- **Project MCP servers in the client's local scope.** Claude Code's
-  local scope keeps a server "only in the project where you added it",
-  stored in `~/.claude.json` under the project's path. `graft-mcp`
-  writes project servers there (through `claude mcp add-json -s local`,
-  run in the repo), instead of a generated `.mcp.json` in the repo,
-  which leaves an untracked file that nothing ignores. Local scope also
-  reaches a repo's subdirectories and its linked git worktrees, which
-  resolve to the main checkout's path; an untracked `.mcp.json` is
-  absent from a fresh worktree.
+- **Project MCP servers in the client's local scope.** *Built:*
+  docs/grafters.md, "Project Scope".
 
 ### Per-garden mechanisms
 
@@ -145,7 +138,7 @@ describe the need and the platform branch supplies the implementation.
 2. Where the garden state and `eden garden` live, and how readers are
    told to reload.
 3. Whether Cursor has a per-project equivalent of Claude Code's local
-   scope.
+   scope. Meanwhile a repo with `.cursor/` still gets `.cursor/mcp.json`.
 4. The data format for keys, and whether renderers live in the trunk or
    in platform branches.
 5. Where machine-specific facts live (network, window positions,

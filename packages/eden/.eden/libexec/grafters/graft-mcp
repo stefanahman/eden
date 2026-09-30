@@ -45,6 +45,11 @@ source "$EDEN_ROOT/lib/branches.sh"
 source "$EDEN_ROOT/lib/collisions.sh"
 
 CANONICAL_CONFIG="$HOME/.config/mcp/servers.json"
+# Claude Code's state file, which holds its user-scope servers and each
+# project's local-scope ones: under CLAUDE_CONFIG_DIR when that is set,
+# as Claude Code reads it. EDEN_CLAUDE_CLI names another claude command.
+CLAUDE_STATE="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
+CLAUDE_CLI="${EDEN_CLAUDE_CLI:-claude}"
 
 BRANCHES_FILE="$(eden_branches_file)"
 
@@ -214,10 +219,10 @@ sync_mcp_client() {
     fi
 }
 
-# Sync MCP servers into Claude Code's ~/.claude.json.
+# Sync MCP servers into Claude Code's state file (user scope).
 # Union merge: preserves user-added global servers, Eden servers win on conflicts.
 sync_claude_code() {
-    local client_config="$HOME/.claude.json"
+    local client_config="$CLAUDE_STATE"
     [[ -f "$client_config" ]] || return 0
 
     local merged
@@ -242,11 +247,63 @@ sync_claude_code
 # Project scope: place .mcp.json in target directories
 # =============================================================================
 
-# Write project MCP config to a target directory's client-specific files.
-# Resolves bare commands and writes .mcp.json (Claude Code) + .cursor/mcp.json.
+# Claude Code keeps a project's local-scope servers in its own state file,
+# under the repo's path: they reach the repo's subdirectories and linked
+# worktrees, and leave no untracked file in the repo. Written through the
+# CLI, which owns that file; read directly, to leave alone what is already
+# right.
+# sync_local_scope <resolved servers json> <target dir>
+# shellcheck disable=SC2329  # called by sync_project_mcp, through for_each_project
+sync_local_scope() {
+    local resolved="$1" target_dir="$2" key name want have stale=""
+
+    if ! command -v "$CLAUDE_CLI" >/dev/null 2>&1; then
+        echo "  ⚠ $CLAUDE_CLI not found: skipping Claude Code's servers for $(eden_home_path "$target_dir")"
+        return 0
+    fi
+
+    key="$(cd "$target_dir" && { git rev-parse --show-toplevel 2>/dev/null || pwd -P; })"
+    while IFS= read -r name; do
+        want="$(printf '%s' "$resolved" | jq -cS --arg n "$name" '.mcpServers[$n]')"
+        have=""
+        if [[ -f "$CLAUDE_STATE" ]]; then
+            have="$(jq -cS --arg k "$key" --arg n "$name" '.projects[$k].mcpServers[$n] // empty' "$CLAUDE_STATE")"
+        fi
+        [[ "$have" == "$want" ]] && continue
+
+        # An entry under another spelling of the path is found by the add
+        # failing; replacing it is the same as replacing a changed one.
+        if [[ -n "$have" ]] || ! (cd "$target_dir" && "$CLAUDE_CLI" mcp add-json -s local "$name" "$want" >/dev/null 2>&1); then
+            (cd "$target_dir" && "$CLAUDE_CLI" mcp remove -s local "$name" >/dev/null 2>&1) || true
+            if ! (cd "$target_dir" && "$CLAUDE_CLI" mcp add-json -s local "$name" "$want" >/dev/null); then
+                echo "  ✗ $name: $CLAUDE_CLI could not add it to $(eden_home_path "$target_dir")" >&2
+                return 1
+            fi
+        fi
+        echo "    → $name (Claude Code, local scope)"
+    done < <(printf '%s' "$resolved" | jq -r '.mcpServers | keys[]')
+
+    # Earlier grafts wrote the servers into an untracked .mcp.json; the
+    # local scope has them now, so a copy there only goes stale.
+    if [[ -f "$target_dir/.mcp.json" ]] && ! git -C "$target_dir" ls-files --error-unmatch .mcp.json >/dev/null 2>&1; then
+        stale="$(jq -r --argjson eden "$resolved" \
+            '[(.mcpServers // {} | keys[]) as $n | select($eden.mcpServers[$n] != null) | $n] | join(", ")' \
+            "$target_dir/.mcp.json" 2>/dev/null)" || stale=""
+        if [[ -n "$stale" ]]; then
+            echo "  ⚠ $(eden_home_path "$target_dir")/.mcp.json is untracked and still has $stale from an earlier graft; Claude Code has them in local scope now, so remove them from the file"
+        fi
+    fi
+}
+
+# Write a project's servers to its clients: Claude Code's local scope, and
+# .cursor/mcp.json when the repo has .cursor/. Resolves bare commands first.
 # shellcheck disable=SC2329  # called by graft_project, through for_each_project
 sync_project_mcp() {
     local project_servers="$1" target_dir="$2" project_name="$3"
+
+    local count
+    count=$(printf '%s' "$project_servers" | jq '.mcpServers | length')
+    echo "  → projects/$project_name: $count server(s)"
 
     # Resolve bare commands for all clients
     local resolved
@@ -269,26 +326,23 @@ sync_project_mcp() {
         fi
     }
 
-    _merge_into "$target_dir/.mcp.json"
+    sync_local_scope "$resolved" "$target_dir"
 
     # Cursor: .cursor/mcp.json (only if .cursor/ exists)
     if [[ -d "$target_dir/.cursor" ]]; then
         _merge_into "$target_dir/.cursor/mcp.json"
     fi
-
-    local count
-    count=$(printf '%s' "$project_servers" | jq '.mcpServers | length')
-    echo "  → projects/$project_name: $count server(s)"
 }
 
 project_count=0
+project_failed=0
 # shellcheck disable=SC2329  # called through for_each_project
 graft_project() {
     if [[ ! -d "$4" ]]; then
         echo "  ⚠ projects/$2: target $4 not found (skipping MCP)"
         return 0
     fi
-    sync_project_mcp "$(cat "$3")" "$4" "$2"
+    sync_project_mcp "$(cat "$3")" "$4" "$2" || project_failed=1
     project_count=$((project_count + 1))
 }
 for_each_project graft_project
@@ -297,6 +351,8 @@ for_each_project graft_project
 SERVER_COUNT=$(echo "$MERGED_JSON" | jq '.mcpServers | length')
 echo "  → Configured $SERVER_COUNT global MCP server(s)"
 [[ $project_count -gt 0 ]] && echo "  → Configured $project_count project MCP scope(s)"
+
+[[ $project_failed -eq 0 ]] || exit 1
 
 exit 0
 

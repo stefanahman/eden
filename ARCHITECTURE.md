@@ -73,8 +73,9 @@ integrate branch content. Each grafter handles one concern independently.
 
 Grafters support two scopes:
 - **Global**: branch configs merged into `$HOME` (e.g. `~/.config/mcp/servers.json`)
-- **Project**: configs placed in external project directories via `.eden-target` markers
-  (e.g. `projects/games/greenwash/.mcp/servers.json` → `~/Development/.../greenwash/.mcp.json`)
+- **Project**: configs for one repo, found through `.eden-target` markers
+  (e.g. `projects/games/my-game/.mcp/servers.json` → Claude Code's local scope for
+  `~/Development/games/my-game`)
 
 See [docs/grafters.md](docs/grafters.md) for strategies, patterns, and how to create new grafters.
 

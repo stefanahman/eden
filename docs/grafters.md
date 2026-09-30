@@ -81,7 +81,7 @@ branch/
     ├── my-app/
     │   ├── .eden-target     # contains: ~/Development/my-app
     │   ├── .claude/skills/  # → ~/Development/my-app/.claude/skills/ (symlinked)
-    │   └── .mcp/servers.json# → ~/Development/my-app/.mcp.json (generated)
+    │   └── .mcp/servers.json# → Claude Code's local scope for ~/Development/my-app
     └── games/my-game/       # any nesting depth allowed
         ├── .eden-target
         └── .mcp/servers.json
@@ -91,7 +91,13 @@ Directories without `.eden-target` are organizational folders (silently skipped)
 
 **Grafters with project scope:**
 - `graft-claude` — symlinks `.claude/{rules,agents,commands,skills}` and top-level `settings.json`, `statusline.sh`, `CLAUDE.md`, `*.local.md` into target (`*.local.md` = Claude Code's per-project plugin-settings files; `settings.local.json` is never grafted because Claude Code writes to it)
-- `graft-mcp` — generates `.mcp.json` (Claude Code) and `.cursor/mcp.json` in target
+- `graft-mcp` — adds the servers to Claude Code's local scope for the target repo
+  (`claude mcp add-json -s local`, run in the repo), and writes `.cursor/mcp.json`
+  when the repo has `.cursor/`. Local scope keeps them in Claude Code's state
+  file (`~/.claude.json`, or under `CLAUDE_CONFIG_DIR`), not in the repo, so they
+  also reach its subdirectories and linked worktrees and leave no untracked
+  file. A server already in place is left alone; a changed one is replaced.
+  An untracked `.mcp.json` from earlier grafts is named, not deleted.
 
 ### 1. Collection (Symlink)
 
@@ -132,7 +138,7 @@ at the target is left alone and reported. Keep source in branch (editable).
 **How it works:** Parse, merge, and write combined output
 
 **Examples:**
-- `graft-mcp`: MCP servers from branches → `~/.config/mcp/servers.json` (global) + `.mcp.json` per project
+- `graft-mcp`: MCP servers from branches → `~/.config/mcp/servers.json` (global) + Claude Code's local scope per project
 
 **Pattern:**
 ```bash

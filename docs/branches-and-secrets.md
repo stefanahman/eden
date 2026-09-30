@@ -82,7 +82,7 @@ my-branch/
 │   └── my-app/
 │       ├── .eden-target       # Contains: ~/Development/my-app
 │       ├── .claude/skills/    # Symlinked into the project
-│       └── .mcp/servers.json  # Generated as .mcp.json in the project
+│       └── .mcp/servers.json  # Claude Code's local scope for the project
 └── platforms/                 # Parts for one platform only
     ├── mac/                   # Grafted on macOS, right after the branch
     │   ├── .eden-graft
