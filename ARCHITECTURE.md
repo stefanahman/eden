@@ -63,8 +63,9 @@ integrate branch content. Each grafter handles one concern independently.
 |---------|-------------|
 | `graft-bin` | Symlinks branch binaries into `~/.eden/bin/` |
 | `graft-brew` | Runs `brew bundle` on branch Brewfiles (macOS only) |
-| `graft-claude` | Symlinks Claude rules, agents, and skills |
+| `graft-claude` | Symlinks Claude rules, agents, commands, output styles, skills, `settings.json`, `statusline.sh`, `CLAUDE.md` and `*.local.md` |
 | `graft-configs` | Symlinks paths listed in branch `.eden-graft` allowlists |
+| `graft-gh-dash` | Composes `~/.config/gh-dash/config.yml` from branch fragments |
 | `graft-git` | Creates git `includeIf` directives for branch identities |
 | `graft-mcp` | Merges MCP server JSON from all branches |
 | `graft-secrets` | Collects 1Password secret definitions |
@@ -112,7 +113,7 @@ Provider: 1Password CLI (`op`). Secrets are fetched at runtime, never stored in 
 
 - No credentials or secrets in VCS
 - User-space overrides only (no modifying system defaults like `~/.local/share/omarchy`)
-- All deploys reversible (stow provides this naturally)
+- Planting is reversible (`eden unplant`, via stow); grafting does not yet remove what a branch left behind when it is unregistered
 - Portable paths: use `$HOME` and XDG locations, no machine-specific absolute paths
 - Respect XDG environment variables (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, etc.)
 
@@ -147,4 +148,4 @@ See [docs/branches-and-secrets.md](docs/branches-and-secrets.md).
 - No distros beyond Arch Linux
 - No OS beyond Arch Linux + macOS
 - No automated 1Password authentication
-- No automated package installation (user runs from lists)
+- No implicit installation of trunk packages: `eden install` runs the lists when asked (branch Brewfiles are the exception: `graft-brew` applies them on macOS during `eden graft`)

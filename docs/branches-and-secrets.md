@@ -95,12 +95,12 @@ Each branch defines its 1Password requirements in `.eden-secrets`:
 
 ```ini
 [secret]
-id=slack-mcp-bot-token
-name=Slack MCP Bot Token
-path=op://Employee/slack-mcp-bot-token/credential
+id=slack-bot-token
+name=Slack Bot Token
+path=op://Employee/slack-bot-token/credential
 description=Slack Bot User OAuth Token for workspace messaging
 required_by=mcp-slack
-op_account=bardotechnology.1password.eu
+op_account=example-corp.1password.com
 setup_command=echo "Create app at https://api.slack.com/apps"
 ```
 
@@ -125,9 +125,9 @@ eden secrets list
 eden secrets validate
 
 # Look up a specific secret by id
-eden secrets lookup slack-mcp-bot-token
-eden secrets lookup slack-mcp-bot-token path        # Just the op:// path
-eden secrets lookup slack-mcp-bot-token op_account   # Just the account domain
+eden secrets lookup slack-bot-token
+eden secrets lookup slack-bot-token path        # Just the op:// path
+eden secrets lookup slack-bot-token op_account   # Just the account domain
 ```
 
 ### How MCP Wrappers Use Secrets
