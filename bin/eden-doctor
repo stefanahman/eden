@@ -222,7 +222,7 @@ if command -v find >/dev/null 2>&1; then
     REGISTERED=""
     while IFS= read -r branch_path; do
         REGISTERED+="$(cd "$branch_path" 2>/dev/null && pwd -P || printf '%s' "$branch_path")"$'\n'
-    done < <(eden_branches)
+    done < <(eden_graft_roots)
     EDEN_REAL="$(cd "$EDEN_ROOT" && pwd -P)"
 
     # Where grafts put links, and how deep: dir|maxdepth. ~/.config goes
@@ -373,14 +373,15 @@ is_metadata() {
     local path="$1"
     # Skip eden metadata, docs, and root-level config files at branch root
     case "$path" in
-        .eden-*|README.md|ARCHITECTURE.md|Brewfile) return 0 ;;
+        # platforms/ holds per-platform parts, each checked as a root of its own
+        .eden-*|README.md|ARCHITECTURE.md|Brewfile|platforms) return 0 ;;
     esac
     return 1
 }
 
 if [ -f "$BRANCHES_FILE" ]; then
     while IFS= read -r branch_path; do
-        branch_name=$(basename "$branch_path")
+        branch_name=$(eden_branch_name "$branch_path")
 
         if [[ ! -d "$branch_path" ]]; then
             check_warn "$branch_name: branch directory not found"
@@ -469,7 +470,7 @@ if [ -f "$BRANCHES_FILE" ]; then
         fi
 
         unset graft_entries
-    done < <(eden_branches)
+    done < <(eden_graft_roots)
 else
     info_line "No branches registered (skipping)"
 fi

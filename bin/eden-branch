@@ -197,6 +197,19 @@ list_branches() {
             if [ -f "$display_path/.config/mcp/servers.json" ] || [ -f "$display_path/.cursor/mcp.json" ]; then
                 echo "    MCP: config found"
             fi
+
+            # Show its platform folders, and which one this machine grafts
+            if [ -d "$display_path/platforms" ]; then
+                local platform here names=""
+                here="$(eden_platform)" || here=""
+                for platform in "$display_path/platforms"/*/; do
+                    [ -d "$platform" ] || continue
+                    platform="$(basename "$platform")"
+                    [ "$platform" = "$here" ] && platform="$platform (grafted here)"
+                    names="${names:+$names, }$platform"
+                done
+                [ -n "$names" ] && echo "    Platforms: $names"
+            fi
         else
             echo "  ✗ $branch_path (not found)"
         fi

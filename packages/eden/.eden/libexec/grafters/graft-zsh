@@ -45,7 +45,7 @@ graft_all() {
 
     while IFS= read -r branch_path; do
         [[ -d "$branch_path/.config/zsh/zshenv.d" ]] || continue
-        branch_name=$(basename "$branch_path")
+        branch_name=$(eden_branch_name "$branch_path")
 
         if [[ "$mode" == link ]]; then
             echo "  → Grafting zsh from: $branch_name"
@@ -62,7 +62,7 @@ graft_all() {
                 ln -sfn "$file" "$target"
             fi
         done
-    done < <(eden_branches)
+    done < <(eden_graft_roots)
 }
 
 graft_all claims | eden_check_collisions || exit 1

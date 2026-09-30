@@ -301,7 +301,9 @@ trap 'echo "  !! graft-<name> failed at line $LINENO" >&2' ERR
 ### Reading the Branch List
 
 Every grafter reads the list through `lib/branches.sh`, never the file
-directly:
+directly, and walks the graft roots: each registered branch, followed by
+its `platforms/<platform>/` folder when it has one for this machine
+(see [Platform folders](branches-and-secrets.md#platform-folders)):
 
 ```bash
 # shellcheck source=lib/branches.sh
@@ -310,9 +312,13 @@ source "$EDEN_ROOT/lib/branches.sh"
 while IFS= read -r branch_path; do
     # branch_path is absolute: blanks and comments are skipped,
     # and ~, $EDEN_ROOT and $HOME are expanded
+    branch_name=$(eden_branch_name "$branch_path")   # "work", or "work (mac)"
     ...
-done < <(eden_branches)
+done < <(eden_graft_roots)
 ```
+
+`eden_branches` lists the registered entries alone, for commands that
+show or edit the list.
 
 `eden_branch_expand <entry>` expands one entry the same way (for example
 the path in a project's `.eden-target`). Nothing else in an entry is

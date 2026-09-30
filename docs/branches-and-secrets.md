@@ -78,14 +78,33 @@ my-branch/
 ├── .claude/
 │   ├── rules/                 # Claude rules (collected by graft-claude)
 │   └── skills/                # Claude skills
-└── projects/                  # Project-scoped configs
-    └── my-app/
-        ├── .eden-target       # Contains: ~/Development/my-app
-        ├── .claude/skills/    # Symlinked into the project
-        └── .mcp/servers.json  # Generated as .mcp.json in the project
+├── projects/                  # Project-scoped configs
+│   └── my-app/
+│       ├── .eden-target       # Contains: ~/Development/my-app
+│       ├── .claude/skills/    # Symlinked into the project
+│       └── .mcp/servers.json  # Generated as .mcp.json in the project
+└── platforms/                 # Parts for one platform only
+    ├── mac/                   # Grafted on macOS, right after the branch
+    │   ├── .eden-graft
+    │   └── .local/bin/open-browser
+    └── arch/                  # Grafted on Arch Linux
+        └── .eden-graft
 ```
 
 Grafters discover and merge content from each path. See [grafters.md](grafters.md) for which grafter handles what.
+
+### Platform folders
+
+A branch that is used on more than one platform keeps its platform-only
+parts in `platforms/<platform>/`, named as the trunk's platform packages
+are: `mac` and `arch`. Each folder mirrors `$HOME` like the branch itself,
+with its own `.eden-graft`, `.local/bin/` and so on, and is grafted right
+after its branch on that platform only. Nothing else marks an entry as
+platform-only, so every grafter gates it the same way. A platform folder
+and its branch writing the same target collide like two branches.
+
+`eden branch list` shows a branch's platform folders and which one this
+machine grafts. `EDEN_PLATFORM=mac` or `arch` overrides the detection.
 
 ## Secrets Integration
 

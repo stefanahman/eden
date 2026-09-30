@@ -8,6 +8,11 @@
 #   eden_branches_file          the list's path
 #   eden_branch_expand <entry>  an entry as an absolute path
 #   eden_branches               every entry, expanded, one per line, in order
+#   eden_platform               this machine's platform: mac or arch
+#   eden_graft_roots            what grafters walk: each entry, followed by
+#                               its platforms/<platform>/ folder if it has one
+#   eden_branch_name <root>     a root's name for messages: the folder name,
+#                               or "<branch> (<platform>)" for a platform folder
 #
 # An entry is one line. Blank lines and lines whose first non-blank
 # character is `#` are skipped. Surrounding whitespace is ignored, a
@@ -45,4 +50,41 @@ eden_branches() {
         [[ "$line" =~ ^[[:space:]]*(#|$) ]] && continue
         eden_branch_expand "$line"
     done < "$file"
+}
+
+# The trunk's names for its platform packages (packages/mac, packages/arch).
+# EDEN_PLATFORM overrides the detection.
+eden_platform() {
+    if [[ -n "${EDEN_PLATFORM:-}" ]]; then
+        printf '%s\n' "$EDEN_PLATFORM"
+        return 0
+    fi
+    case "$(uname -s)" in
+        Darwin) echo mac ;;
+        Linux) echo arch ;;
+        *) return 1 ;;
+    esac
+}
+
+# A branch's parts for one platform live in platforms/<platform>/, which
+# mirrors $HOME like the branch itself and is grafted right after it, on
+# that platform only.
+eden_graft_roots() {
+    local branch platform
+    platform="$(eden_platform)" || platform=""
+    while IFS= read -r branch; do
+        printf '%s\n' "$branch"
+        if [[ -n "$platform" && -d "$branch/platforms/$platform" ]]; then
+            printf '%s\n' "$branch/platforms/$platform"
+        fi
+    done < <(eden_branches)
+}
+
+eden_branch_name() {
+    local root="${1%/}"
+    if [[ "$(basename "$(dirname "$root")")" == platforms ]]; then
+        printf '%s (%s)\n' "$(basename "$(dirname "$(dirname "$root")")")" "$(basename "$root")"
+    else
+        basename "$root"
+    fi
 }

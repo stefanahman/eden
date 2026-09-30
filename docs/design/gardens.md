@@ -87,9 +87,9 @@ keep the middle level large and the last one small.
 
 1. **A collision is an error.** *Built:* docs/grafters.md, "Collisions
    between branches".
-2. **Platform-only entries are gated.** A branch can mark entries for
-   one platform. Today only `graft-brew` checks the platform;
-   `graft-configs` links every entry on every OS.
+2. **Platform-only entries are gated.** *Built:* a branch's
+   `platforms/<mac|arch>/` folder (docs/branches-and-secrets.md, "Platform
+   folders").
 3. **Secrets name their account.** *Built:* docs/branches-and-secrets.md,
    `op_account`.
 4. **The environment is shell-neutral.** Env files in POSIX `sh` syntax,
@@ -148,8 +148,8 @@ describe the need and the platform branch supplies the implementation.
 
 ## Open questions
 
-1. How platform-only entries are marked, and the platform names (the
-   trunk uses `mac` and `arch`).
+1. *Settled:* platform-only parts live in a branch's `platforms/<platform>/`
+   folder, with the trunk's names, `mac` and `arch`.
 2. Where the garden state and `eden garden` live, and how readers are
    told to reload.
 3. Whether Cursor has a per-project equivalent of Claude Code's local

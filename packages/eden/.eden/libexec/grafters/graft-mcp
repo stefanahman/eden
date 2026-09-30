@@ -79,9 +79,9 @@ for_each_project() {
             [[ -f "$project_mcp" ]] || continue
 
             project_target=$(eden_branch_expand "$(head -1 "$target_file" | tr -d '[:space:]')")
-            "$1" "$(basename "$branch_path")" "$local_name" "$project_mcp" "$project_target"
+            "$1" "$(eden_branch_name "$branch_path")" "$local_name" "$project_mcp" "$project_target"
         done < <(find "$projects_dir" -name .eden-target -type f || true)
-    done < <(eden_branches)
+    done < <(eden_graft_roots)
 }
 
 # Every server name is a named entry: two branches naming the same server,
@@ -101,9 +101,9 @@ claims() {
         while IFS= read -r branch_path; do
             config="$(branch_mcp_config "$branch_path")" || continue
             while IFS= read -r name; do
-                printf 'MCP server %s\t%s\n' "$name" "$(basename "$branch_path")"
+                printf 'MCP server %s\t%s\n' "$name" "$(eden_branch_name "$branch_path")"
             done < <(jq -r '.mcpServers // {} | keys[]' "$config")
-        done < <(eden_branches)
+        done < <(eden_graft_roots)
     fi
     for_each_project claim_project
 }
@@ -118,10 +118,10 @@ echo "  → Merging MCP servers from branches"
 if [[ -f "$BRANCHES_FILE" ]]; then
     while IFS= read -r branch_path; do
         branch_config="$(branch_mcp_config "$branch_path")" || continue
-        echo "  → Merging MCP servers from: $(basename "$branch_path")"
+        echo "  → Merging MCP servers from: $(eden_branch_name "$branch_path")"
         MERGED_JSON=$(echo "$MERGED_JSON" | jq --slurpfile branch "$branch_config" \
             '.mcpServers += $branch[0].mcpServers')
-    done < <(eden_branches)
+    done < <(eden_graft_roots)
 fi
 
 # Ensure canonical directory exists
