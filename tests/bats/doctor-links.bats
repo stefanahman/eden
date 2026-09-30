@@ -91,3 +91,15 @@ doctor() {
     doctor
     [[ "$output" =~ "warn|Broken symlink: $HOME/.ssh/config" ]]
 }
+
+@test "a branch's projects folder counts as grafted" {
+    branch="$BATS_TEST_TMPDIR/work"
+    mkdir -p "$branch/projects/app/.mcp"
+    touch "$branch/.eden-graft"
+    echo "$HOME/Development/app" > "$branch/projects/app/.eden-target"
+    echo '{"mcpServers": {}}' > "$branch/projects/app/.mcp/servers.json"
+    echo "$branch" > "$BRANCHES"
+    doctor
+    [[ ! "$output" =~ "projects (not in .eden-graft" ]]
+    [[ "$output" =~ "work: all configs covered" ]]
+}

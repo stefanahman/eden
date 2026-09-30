@@ -20,6 +20,7 @@ fi
 # Report covered paths for eden doctor
 if [[ "${1:-}" == "--covers" ]]; then
     echo ".claude"
+    echo "projects"   # project scope: projects/<path>/ with an .eden-target
     exit 0
 fi
 
