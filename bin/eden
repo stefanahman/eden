@@ -86,11 +86,11 @@ HELP
             echo "Run all grafters, or a specific one"
             [[ "$full" ]] && cat <<'HELP'
 
-Usage: eden graft [name]
+Usage: eden graft [name] [--force]
 
 Options:
   --list            Show available grafters
-  --force           Apply without prompting
+  --force           Apply without prompting (grafters see EDEN_GRAFT_FORCE=true)
 
 Examples:
   eden graft        Run all grafters

@@ -45,7 +45,7 @@ mkdir -p "$eden_bin"
 for link in "$eden_bin"/*; do
     [ -L "$link" ] && [ ! -e "$link" ] && {
         name=$(basename "$link")
-        if [[ "$FORCE" == "true" ]]; then
+        if [[ "${EDEN_GRAFT_FORCE:-${FORCE:-}}" == "true" ]]; then
             echo "  × $name [removing broken link]"
             rm "$link"
         elif [[ -t 0 ]]; then

@@ -291,7 +291,11 @@ trap 'echo "  !! graft-<name> failed at line $LINENO" >&2' ERR
 
 ### Error Handling
 - ERR trap reports script name and line number on `set -e` failures
-- Exit 0 if nothing to do (not an error)
+- Exit 0 if nothing to do (not an error); any other non-zero exit fails
+  the run — `eden graft` still runs every grafter, then exits non-zero
+  and names the ones that failed
+- Never prompt when `EDEN_GRAFT_FORCE=true` (set by `eden graft --force`):
+  apply without asking, for non-interactive runs
 - Warn but continue on conflicts
 - Report summary (added/skipped/conflicts)
 

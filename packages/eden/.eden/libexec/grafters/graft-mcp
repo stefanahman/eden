@@ -23,7 +23,7 @@ fi
 
 # --force: apply without prompting (for non-interactive / agent use)
 FORCE=false
-if [[ "${1:-}" == "--force" ]]; then
+if [[ "${1:-}" == "--force" || "${EDEN_GRAFT_FORCE:-}" == "true" ]]; then
     FORCE=true
 fi
 
