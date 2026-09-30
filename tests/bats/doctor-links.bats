@@ -74,3 +74,20 @@ doctor() {
     [[ ! "$output" =~ "Singleton" ]]
     [[ "$output" =~ "warn|Broken symlink: $XDG_CONFIG_HOME/app/settings.json" ]]
 }
+
+@test "a leftover three levels under ~/.config is reported" {
+    branch="$BATS_TEST_TMPDIR/old-branch"
+    mkdir -p "$branch/.config/app/app.d" "$XDG_CONFIG_HOME/app/app.d"
+    touch "$branch/.eden-graft" "$branch/.config/app/app.d/work.yaml"
+    ln -s "$branch/.config/app/app.d/work.yaml" "$XDG_CONFIG_HOME/app/app.d/work.yaml"
+    doctor
+    [[ "$output" =~ "Link into an unregistered branch" ]]
+    [[ "$output" =~ "$XDG_CONFIG_HOME/app/app.d/work.yaml" ]]
+}
+
+@test "a broken link in ~/.ssh is reported" {
+    mkdir -p "$HOME/.ssh"
+    ln -s "$BATS_TEST_TMPDIR/gone" "$HOME/.ssh/config"
+    doctor
+    [[ "$output" =~ "warn|Broken symlink: $HOME/.ssh/config" ]]
+}

@@ -225,42 +225,49 @@ if command -v find >/dev/null 2>&1; then
     done < <(eden_branches)
     EDEN_REAL="$(cd "$EDEN_ROOT" && pwd -P)"
 
-    # Where grafts put links, and how deep: dir|maxdepth. The subfolders
-    # are listed on their own because they sit deeper than their parent's
-    # scan reaches.
-    for spec in \
-        "$HOME/.config|2" \
-        "$HOME/.local/bin|2" \
-        "$HOME/.eden/bin|1" \
-        "$HOME/.claude|2" \
-        "${XDG_CONFIG_HOME:-$HOME/.config}/zsh/zshenv.d|1" \
-        "$HOME/.config/git/identities|1"; do
-        dir="${spec%|*}"
-        depth="${spec##*|}"
-        [ -d "$dir" ] || continue
-        while IFS= read -r -d '' link; do
-            # Chromium and Electron apps mark a running profile with these
-            # links; they point at host-pid, a number and a socket in /tmp,
-            # so they dangle by design and are never grafts.
-            case "${link##*/}" in SingletonLock|SingletonCookie|SingletonSocket) continue ;; esac
-            if [ ! -e "$link" ]; then
-                check_warn "Broken symlink: $link"
-                BROKEN=$((BROKEN + 1))
-                continue
-            fi
-            # A working link into a branch that is no longer registered:
-            # what a removed branch left behind. The trunk carries its own
-            # .eden-secrets, so links into it are not branch links.
-            target="$(readlink -f "$link" 2>/dev/null)" || continue
-            case "$target" in "$EDEN_REAL"/*) [[ "$target" == "$EDEN_REAL"/branches/* ]] || continue ;; esac
-            root="$(branch_root_of "$target")" || continue
-            [[ "$root" == "$EDEN_REAL" ]] && continue
-            if ! grep -qxF "$root" <<< "$REGISTERED"; then
-                check_warn "Link into an unregistered branch ($root): $link"
-                LEFTOVERS=$((LEFTOVERS + 1))
-            fi
-        done < <(find "$dir" -maxdepth "$depth" -type l -print0 2>/dev/null)
-    done
+    # Where grafts put links, and how deep: dir|maxdepth. ~/.config goes
+    # three levels down, as deep as the deepest graft
+    # (.config/spaces/spaces.d/<branch>.yaml). zshenv.d is listed on its
+    # own for an XDG_CONFIG_HOME elsewhere; a link found twice is checked
+    # once.
+    link_scan() {
+        local spec dir depth
+        for spec in \
+            "$HOME/.config|3" \
+            "$HOME/.local/bin|2" \
+            "$HOME/.eden/bin|1" \
+            "$HOME/.claude|2" \
+            "$HOME/.ssh|1" \
+            "${XDG_CONFIG_HOME:-$HOME/.config}/zsh/zshenv.d|1" \
+            "$HOME/.config/git/identities|1"; do
+            dir="${spec%|*}"
+            depth="${spec##*|}"
+            [ -d "$dir" ] || continue
+            find "$dir" -maxdepth "$depth" -type l -print0 2>/dev/null
+        done | sort -zu
+    }
+    while IFS= read -r -d '' link; do
+        # Chromium and Electron apps mark a running profile with these
+        # links; they point at host-pid, a number and a socket in /tmp,
+        # so they dangle by design and are never grafts.
+        case "${link##*/}" in SingletonLock|SingletonCookie|SingletonSocket) continue ;; esac
+        if [ ! -e "$link" ]; then
+            check_warn "Broken symlink: $link"
+            BROKEN=$((BROKEN + 1))
+            continue
+        fi
+        # A working link into a branch that is no longer registered:
+        # what a removed branch left behind. The trunk carries its own
+        # .eden-secrets, so links into it are not branch links.
+        target="$(readlink -f "$link" 2>/dev/null)" || continue
+        case "$target" in "$EDEN_REAL"/*) [[ "$target" == "$EDEN_REAL"/branches/* ]] || continue ;; esac
+        root="$(branch_root_of "$target")" || continue
+        [[ "$root" == "$EDEN_REAL" ]] && continue
+        if ! grep -qxF "$root" <<< "$REGISTERED"; then
+            check_warn "Link into an unregistered branch ($root): $link"
+            LEFTOVERS=$((LEFTOVERS + 1))
+        fi
+    done < <(link_scan)
 
     if [ $BROKEN -eq 0 ]; then
         check_pass "No broken symlinks found"
