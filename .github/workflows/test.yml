@@ -43,5 +43,5 @@ jobs:
           # Lint scripts but don't fail on warnings (yet); just report.
           shopt -s globstar nullglob
           shellcheck --severity=error \
-            bin/eden bin/eden-* install.sh get-eden.sh \
+            bin/eden bin/eden-* install.sh get-eden.sh lib/*.sh \
             packages/eden/.eden/libexec/grafters/graft-*

@@ -82,6 +82,9 @@ info_line() {
 
 # Get Eden directory (parent of bin/)
 EDEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+EDEN_ROOT="${EDEN_ROOT:-$EDEN_DIR}"
+# shellcheck source=lib/branches.sh
+source "$EDEN_ROOT/lib/branches.sh"
 
 section "Eden Health Check"
 section "=================="
@@ -163,7 +166,7 @@ if [ -d "$HOME/.eden" ]; then
         check_warn "~/.eden/bin not found (no branch binaries grafted)"
     fi
     
-    if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches" ]; then
+    if [ -f "$(eden_branches_file)" ]; then
         check_pass "Branch tracking file exists"
     else
         check_warn "No branch tracking file (run 'eden graft' to set up)"
@@ -279,7 +282,7 @@ fi
 # Branch coverage - detect ungrafted configs
 section "Branch Coverage:"
 
-BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+BRANCHES_FILE="$(eden_branches_file)"
 
 # Discover covered paths dynamically from grafters (each supports --covers)
 GRAFTER_PATTERNS=()
@@ -319,13 +322,6 @@ is_metadata() {
 
 if [ -f "$BRANCHES_FILE" ]; then
     while IFS= read -r branch_path; do
-        [[ -z "$branch_path" ]] && continue
-        [[ "$branch_path" =~ ^[[:space:]]*# ]] && continue
-
-        # Expand variables
-        branch_path="${branch_path//\$EDEN_ROOT/$EDEN_DIR}"
-        branch_path="${branch_path/#\~/$HOME}"
-
         branch_name=$(basename "$branch_path")
 
         if [[ ! -d "$branch_path" ]]; then
@@ -415,7 +411,7 @@ if [ -f "$BRANCHES_FILE" ]; then
         fi
 
         unset graft_entries
-    done < "$BRANCHES_FILE"
+    done < <(eden_branches)
 else
     info_line "No branches registered (skipping)"
 fi

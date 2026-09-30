@@ -25,7 +25,9 @@ err()  { echo -e "${RED}✗${NC} $1" >&2; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EDEN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+# shellcheck source=lib/branches.sh
+source "$EDEN_ROOT/lib/branches.sh"
+BRANCHES_FILE="$(eden_branches_file)"
 
 NO_PROMPT=false
 while [ $# -gt 0 ]; do

@@ -28,8 +28,11 @@ err() {
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EDEN_ROOT="${EDEN_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
-BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+# shellcheck source=lib/branches.sh
+source "$EDEN_ROOT/lib/branches.sh"
+BRANCHES_FILE="$(eden_branches_file)"
 
 # Grafter contract version. Bump when changing how grafters are invoked,
 # discovered, or what env vars they may rely on — not for optional additions.

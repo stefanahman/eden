@@ -281,13 +281,12 @@ set -e
 trap 'echo "  !! graft-<name> failed at line $LINENO" >&2' ERR
 
 # 1. Detect Eden root
-# 2. Load branches file
-# 3. Expand branch paths
-# 4. For each branch:
+# 2. source "$EDEN_ROOT/lib/branches.sh"
+# 3. For each branch in `eden_branches`:
 #    - Check if relevant files exist
 #    - Apply strategy (symlink/merge/generate)
 #    - (Optional) Discover projects via .eden-target for project scope
-# 5. Report results
+# 4. Report results
 ```
 
 ### Error Handling
@@ -298,15 +297,25 @@ trap 'echo "  !! graft-<name> failed at line $LINENO" >&2' ERR
 
 ## Common Patterns
 
-### Branch Path Expansion
+### Reading the Branch List
+
+Every grafter reads the list through `lib/branches.sh`, never the file
+directly:
+
 ```bash
-expand_branch_path() {
-    local path="$1"
-    path="${path//\$EDEN_ROOT/$EDEN_ROOT}"
-    path="${path/#\~/$HOME}"
-    echo "$path"
-}
+# shellcheck source=lib/branches.sh
+source "$EDEN_ROOT/lib/branches.sh"
+
+while IFS= read -r branch_path; do
+    # branch_path is absolute: blanks and comments are skipped,
+    # and ~, $EDEN_ROOT and $HOME are expanded
+    ...
+done < <(eden_branches)
 ```
+
+`eden_branch_expand <entry>` expands one entry the same way (for example
+the path in a project's `.eden-target`). Nothing else in an entry is
+evaluated.
 
 ### Conflict Detection
 ```bash

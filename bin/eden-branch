@@ -26,8 +26,6 @@ bold() {
     echo -e "${BOLD}$1${RESET}"
 }
 
-BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
-
 # Detect Eden root
 detect_eden_root() {
     # Check if we're in the Eden repo
@@ -44,15 +42,9 @@ detect_eden_root() {
 
 EDEN_ROOT=$(detect_eden_root)
 
-# Expand variables in branch path
-expand_branch_path() {
-    local path="$1"
-    # Expand $EDEN_ROOT
-    path="${path//\$EDEN_ROOT/$EDEN_ROOT}"
-    # Expand tilde
-    path="${path/#\~/$HOME}"
-    echo "$path"
-}
+# shellcheck source=lib/branches.sh
+source "$EDEN_ROOT/lib/branches.sh"
+BRANCHES_FILE="$(eden_branches_file)"
 
 # Show help
 show_help() {
@@ -157,7 +149,7 @@ list_branches() {
         [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
         
         # Expand variables and tilde for display
-        local display_path=$(expand_branch_path "$branch_path")
+        local display_path=$(eden_branch_expand "$branch_path")
         
         count=$((count + 1))
         

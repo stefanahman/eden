@@ -28,19 +28,15 @@ if [[ -z "$EDEN_ROOT" ]]; then
     EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
 fi
 
-BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+# shellcheck source=lib/branches.sh
+source "$EDEN_ROOT/lib/branches.sh"
+
+BRANCHES_FILE="$(eden_branches_file)"
 
 if [[ ! -f "$BRANCHES_FILE" ]]; then
     echo "  → No branches registered (skipping)"
     exit 0
 fi
-
-expand_branch_path() {
-    local path="$1"
-    path="${path//\$EDEN_ROOT/$EDEN_ROOT}"
-    path="${path/#\~/$HOME}"
-    echo "$path"
-}
 
 IDENTITIES_DIR="$HOME/.config/git/identities"
 GITCONFIG_LOCAL="${XDG_CONFIG_HOME:-$HOME/.config}/eden/local/gitconfig"
@@ -52,10 +48,7 @@ added=0
 has_default=""
 scoped_directives=""
 
-while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do
-    [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
-
-    branch_path=$(expand_branch_path "$branch_path")
+while IFS= read -r branch_path; do
     [[ -d "$branch_path" ]] || continue
 
     branch_name=$(basename "$branch_path")
@@ -95,7 +88,7 @@ while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do
             added=$((added + 1))
         fi
     done
-done < "$BRANCHES_FILE"
+done < <(eden_branches)
 
 # Write gitconfig: _default first (fallback), then scoped overrides
 cat > "$GITCONFIG_LOCAL" << 'EOF'

@@ -32,14 +32,10 @@ if [[ -z "$EDEN_ROOT" ]]; then
     EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
 fi
 
-expand_branch_path() {
-    local path="$1"
-    path="${path//\$EDEN_ROOT/$EDEN_ROOT}"
-    path="${path/#\~/$HOME}"
-    echo "$path"
-}
+# shellcheck source=lib/branches.sh
+source "$EDEN_ROOT/lib/branches.sh"
 
-BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+BRANCHES_FILE="$(eden_branches_file)"
 if [[ ! -f "$BRANCHES_FILE" ]]; then
     exit 0
 fi
@@ -47,10 +43,6 @@ fi
 GRAFTED_COUNT=0
 
 while IFS= read -r branch_path; do
-    [[ -z "$branch_path" ]] && continue
-    [[ "$branch_path" =~ ^[[:space:]]*# ]] && continue
-
-    branch_path=$(expand_branch_path "$branch_path")
     branch_name=$(basename "$branch_path")
     branch_brewfile="$branch_path/Brewfile"
 
@@ -59,7 +51,7 @@ while IFS= read -r branch_path; do
         HOMEBREW_NO_AUTO_UPDATE=1 brew bundle --file="$branch_brewfile" --no-upgrade --quiet
         GRAFTED_COUNT=$((GRAFTED_COUNT + 1))
     fi
-done < "$BRANCHES_FILE"
+done < <(eden_branches)
 
 if [[ $GRAFTED_COUNT -eq 0 ]]; then
     echo "  → No Brewfiles found in branches"
