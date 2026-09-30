@@ -33,6 +33,11 @@ jobs:
           umask ${{ matrix.umask }}
           bats tests/bats/
 
+      - name: Run the grafter scripts
+        run: |
+          set -e
+          for t in tests/grafter/test-*.sh; do bash "$t"; done
+
   shellcheck:
     name: Shellcheck
     runs-on: ubuntu-latest
