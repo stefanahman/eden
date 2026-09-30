@@ -200,22 +200,69 @@ fi
 # Check symlinks
 section "Symlinks:"
 
-BROKEN=0
-if command -v find >/dev/null 2>&1; then
-    # Check for broken symlinks in common Eden locations
-    for dir in "$HOME/.config" "$HOME/.local/bin"; do
-        if [ -d "$dir" ]; then
-            while IFS= read -r -d '' link; do
-                if [ ! -e "$link" ]; then
-                    check_warn "Broken symlink: $link"
-                    BROKEN=$((BROKEN + 1))
-                fi
-            done < <(find "$dir" -maxdepth 2 -type l -print0 2>/dev/null)
+# branch_root_of <path> — the nearest folder above path that carries a
+# branch marker (.eden-graft or .eden-secrets), if any.
+branch_root_of() {
+    local d="$1"
+    while [[ -n "$d" && "$d" != "/" ]]; do
+        if [[ -f "$d/.eden-graft" || -f "$d/.eden-secrets" ]]; then
+            printf '%s\n' "$d"
+            return 0
         fi
+        d="$(dirname "$d")"
     done
-    
+    return 1
+}
+
+BROKEN=0
+LEFTOVERS=0
+if command -v find >/dev/null 2>&1; then
+    # Compare resolved paths on both sides, so a symlink anywhere on the
+    # way to a branch or the trunk does not make a match fail.
+    REGISTERED=""
+    while IFS= read -r branch_path; do
+        REGISTERED+="$(cd "$branch_path" 2>/dev/null && pwd -P || printf '%s' "$branch_path")"$'\n'
+    done < <(eden_branches)
+    EDEN_REAL="$(cd "$EDEN_ROOT" && pwd -P)"
+
+    # Where grafts put links, and how deep: dir|maxdepth. The subfolders
+    # are listed on their own because they sit deeper than their parent's
+    # scan reaches.
+    for spec in \
+        "$HOME/.config|2" \
+        "$HOME/.local/bin|2" \
+        "$HOME/.eden/bin|1" \
+        "$HOME/.claude|2" \
+        "${XDG_CONFIG_HOME:-$HOME/.config}/zsh/zshenv.d|1" \
+        "$HOME/.config/git/identities|1"; do
+        dir="${spec%|*}"
+        depth="${spec##*|}"
+        [ -d "$dir" ] || continue
+        while IFS= read -r -d '' link; do
+            if [ ! -e "$link" ]; then
+                check_warn "Broken symlink: $link"
+                BROKEN=$((BROKEN + 1))
+                continue
+            fi
+            # A working link into a branch that is no longer registered:
+            # what a removed branch left behind. The trunk carries its own
+            # .eden-secrets, so links into it are not branch links.
+            target="$(readlink -f "$link" 2>/dev/null)" || continue
+            case "$target" in "$EDEN_REAL"/*) [[ "$target" == "$EDEN_REAL"/branches/* ]] || continue ;; esac
+            root="$(branch_root_of "$target")" || continue
+            [[ "$root" == "$EDEN_REAL" ]] && continue
+            if ! grep -qxF "$root" <<< "$REGISTERED"; then
+                check_warn "Link into an unregistered branch ($root): $link"
+                LEFTOVERS=$((LEFTOVERS + 1))
+            fi
+        done < <(find "$dir" -maxdepth "$depth" -type l -print0 2>/dev/null)
+    done
+
     if [ $BROKEN -eq 0 ]; then
         check_pass "No broken symlinks found"
+    fi
+    if [ $LEFTOVERS -eq 0 ]; then
+        check_pass "No links into unregistered branches"
     fi
 else
     check_warn "find command not available, skipping symlink check"
