@@ -209,50 +209,6 @@ unset EDEN_CLAUDE_CLI
 sandbox_teardown
 
 # =============================================================================
-# Test 8: Cursor sync — .cursor/mcp.json written if .cursor/ exists
-# =============================================================================
-sandbox_setup
-
-branch=$(create_test_branch "test-branch")
-project_target="$SANDBOX/cursor-target"
-mkdir -p "$project_target/.cursor"
-
-mkdir -p "$branch/projects/myapp/.mcp"
-cat > "$branch/projects/myapp/.mcp/servers.json" <<'JSON'
-{"mcpServers": {"cursor-srv": {"command": "/usr/bin/cursor", "args": []}}}
-JSON
-echo "$project_target" > "$branch/projects/myapp/.eden-target"
-register_branch "$branch"
-
-describe "project with .cursor/ dir gets .cursor/mcp.json"
-output=$("$GRAFTER" 2>&1)
-assert_file_exists "$project_target/.cursor/mcp.json"
-
-sandbox_teardown
-
-# =============================================================================
-# Test 9: No .cursor/ dir — .cursor/mcp.json not created
-# =============================================================================
-sandbox_setup
-
-branch=$(create_test_branch "test-branch")
-project_target="$SANDBOX/no-cursor-target"
-mkdir -p "$project_target"
-
-mkdir -p "$branch/projects/myapp/.mcp"
-cat > "$branch/projects/myapp/.mcp/servers.json" <<'JSON'
-{"mcpServers": {"srv": {"command": "/usr/bin/srv", "args": []}}}
-JSON
-echo "$project_target" > "$branch/projects/myapp/.eden-target"
-register_branch "$branch"
-
-describe "project without .cursor/ dir skips .cursor/mcp.json"
-output=$("$GRAFTER" 2>&1)
-assert_not_exists "$project_target/.cursor/mcp.json"
-
-sandbox_teardown
-
-# =============================================================================
 # Test 10: Claude Desktop config is never modified
 # =============================================================================
 sandbox_setup

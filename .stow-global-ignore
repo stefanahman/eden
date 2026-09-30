@@ -25,7 +25,6 @@ docs/
 \.gitkeep$
 
 # MCP config - merged by graft.sh, not stowed
-# (Note: Cursor looks for ~/.cursor/mcp.json, not in .config)
 
 # Branches and ideas
 branches/

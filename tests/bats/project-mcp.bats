@@ -94,13 +94,6 @@ local_server() {
     [ ! -e "$REPO/.mcp.json" ]
 }
 
-@test "a repo with .cursor/ still gets .cursor/mcp.json" {
-    mkdir -p "$REPO/.cursor"
-    run "$GRAFTER"
-    [ "$status" -eq 0 ]
-    [ "$(jq -r '.mcpServers.tracker.url' "$REPO/.cursor/mcp.json")" = https://mcp.example.com/a ]
-}
-
 @test "global servers go to the state file under CLAUDE_CONFIG_DIR, where Claude reads them" {
     echo '{}' > "$CLAUDE_CONFIG_DIR/.claude.json"
     mkdir -p "$WORK/.config/mcp"

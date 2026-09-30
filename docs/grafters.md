@@ -100,8 +100,7 @@ exist is skipped with a warning.
 **Grafters with project scope:**
 - `graft-claude` — symlinks `.claude/{rules,agents,commands,skills}` and top-level `settings.json`, `statusline.sh`, `CLAUDE.md`, `*.local.md` into target (`*.local.md` = Claude Code's per-project plugin-settings files; `settings.local.json` is never grafted because Claude Code writes to it)
 - `graft-mcp` — adds the servers to Claude Code's local scope for the target repo
-  (`claude mcp add-json -s local`, run in the repo), and writes `.cursor/mcp.json`
-  when the repo has `.cursor/`. Local scope keeps them in Claude Code's state
+  (`claude mcp add-json -s local`, run in the repo). Local scope keeps them in Claude Code's state
   file (`~/.claude.json`, or under `CLAUDE_CONFIG_DIR`), not in the repo, so they
   also reach its subdirectories and linked worktrees and leave no untracked
   file. A server already in place is left alone; a changed one is replaced.

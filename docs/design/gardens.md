@@ -137,8 +137,8 @@ describe the need and the platform branch supplies the implementation.
    folder, with the trunk's names, `mac` and `arch`.
 2. Where the garden state and `eden garden` live, and how readers are
    told to reload.
-3. Whether Cursor has a per-project equivalent of Claude Code's local
-   scope. Meanwhile a repo with `.cursor/` still gets `.cursor/mcp.json`.
+3. *Settled:* Cursor is no longer supported, so only Claude Code's local
+   scope matters.
 4. The data format for keys, and whether renderers live in the trunk or
    in platform branches.
 5. Where machine-specific facts live (network, window positions,

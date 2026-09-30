@@ -184,17 +184,6 @@ fi
 # JSON Validity
 # =============================================================================
 
-test "Cursor MCP config JSON validity"
-if [[ -f packages/common/.config/cursor/mcp_config.json ]]; then
-    if python3 -m json.tool packages/common/.config/cursor/mcp_config.json > /dev/null 2>&1; then
-        pass
-    else
-        fail "Invalid JSON in mcp_config.json"
-    fi
-else
-    fail "mcp_config.json missing"
-fi
-
 # =============================================================================
 # Package Lists
 # =============================================================================

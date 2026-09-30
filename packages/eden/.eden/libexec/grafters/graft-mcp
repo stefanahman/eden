@@ -22,12 +22,6 @@ if [[ "${1:-}" == "--covers" ]]; then
     exit 0
 fi
 
-# --force: apply without prompting (for non-interactive / agent use)
-FORCE=false
-if [[ "${1:-}" == "--force" || "${EDEN_GRAFT_FORCE:-}" == "true" ]]; then
-    FORCE=true
-fi
-
 # Check if jq is installed
 if ! command -v jq >/dev/null 2>&1; then
     echo "  ⚠ jq required for MCP graft (skipping)"
@@ -57,16 +51,8 @@ BRANCHES_FILE="$(eden_branches_file)"
 # branch_mcp_config <branch path>: the branch's global MCP file, if any.
 branch_mcp_config() {
     local file
-    for file in "$1/.config/mcp/servers.json" \
-        "$1/.cursor/mcp.json" \
-        "$1/packages/common/.config/cursor/mcp_config.branch.json"; do
-        # The canonical path mirrors $HOME; the other two are legacy fallbacks.
-        if [[ -f "$file" ]]; then
-            printf '%s\n' "$file"
-            return 0
-        fi
-    done
-    return 1
+    [[ -f "$1/.config/mcp/servers.json" ]] || return 1
+    printf '%s\n' "$1/.config/mcp/servers.json"
 }
 
 # for_each_project <function>: call it with (branch name, project name,
@@ -134,7 +120,7 @@ fi
 mkdir -p "$(dirname "$CANONICAL_CONFIG")"
 
 # Resolve bare command names to absolute paths.
-# GUI clients (Claude Desktop, Cursor) don't inherit shell PATH, so bare
+# GUI clients don't inherit shell PATH, so bare
 # commands like "mcp-foo" or "npx" won't be found. The graft runs from a
 # terminal with the full PATH, so we resolve here at plant time.
 resolve_commands() {
@@ -156,70 +142,6 @@ resolve_commands() {
 MERGED_JSON=$(resolve_commands "$MERGED_JSON")
 echo "$MERGED_JSON" | jq '.' > "$CANONICAL_CONFIG"
 
-# Sync MCP servers into a client's config.
-# Merges only .mcpServers — preserves other keys (app preferences, etc.).
-sync_mcp_client() {
-    local client_name="$1" client_config="$2"
-    local client_dir
-    client_dir="$(dirname "$client_config")"
-    [[ -d "$client_dir" ]] || return 0
-
-    # Resolve bare commands to absolute paths for GUI clients
-    local resolved_json
-    resolved_json=$(resolve_commands "$(cat "$CANONICAL_CONFIG")")
-
-    # No config yet — just write resolved config
-    if [[ ! -f "$client_config" ]]; then
-        printf '%s' "$resolved_json" | jq '.' > "$client_config"
-        echo "  → Synced $client_name"
-        return 0
-    fi
-
-    # Merge Eden's mcpServers into the client config, preserving other keys
-    local merged
-    merged=$(jq -S --argjson eden "$resolved_json" \
-        '.mcpServers = $eden.mcpServers' "$client_config")
-
-    # Already in sync — nothing to do
-    if diff -q <(echo "$merged") <(jq -S . "$client_config") &>/dev/null; then
-        echo "  → $client_name in sync"
-        return 0
-    fi
-
-    # Differs — force-apply or prompt
-    echo "  ⚠ $client_name MCP servers differ from Eden"
-    if [[ "$FORCE" == "true" ]]; then
-        echo "$merged" | jq . > "$client_config"
-        echo "  → Applied Eden MCP servers to $client_name"
-        return 0
-    fi
-    if [[ -t 0 ]]; then
-        while true; do
-            echo -n "    [a]pply, [s]kip, [d]iff? "
-            read -r choice
-            case "$choice" in
-                a|A)
-                    echo "$merged" | jq . > "$client_config"
-                    echo "  → Applied Eden MCP servers to $client_name"
-                    break ;;
-                s|S)
-                    echo "  → Skipped $client_name"
-                    break ;;
-                d|D)
-                    diff -u --label "current ($client_name)" --label "after (eden merged)" \
-                        <(jq -S . "$client_config") <(echo "$merged") \
-                        | if command -v delta &>/dev/null; then delta
-                          elif command -v colordiff &>/dev/null; then colordiff
-                          else cat; fi || true
-                    ;;
-                *) echo "    Please enter a, s, or d" ;;
-            esac
-        done
-    else
-        echo "    Skipped (run interactively to resolve)"
-    fi
-}
-
 # Sync MCP servers into Claude Code's state file (user scope).
 # Union merge: preserves user-added global servers, Eden servers win on conflicts.
 sync_claude_code() {
@@ -239,8 +161,6 @@ sync_claude_code() {
     echo "  → Synced Claude Code"
 }
 
-# Sync to MCP clients
-sync_mcp_client "Cursor" "$HOME/.cursor/mcp.json"
 # Claude Desktop: MCP servers managed via Settings → Connectors (not config file)
 sync_claude_code
 
@@ -296,8 +216,8 @@ sync_local_scope() {
     fi
 }
 
-# Write a project's servers to its clients: Claude Code's local scope, and
-# .cursor/mcp.json when the repo has .cursor/. Resolves bare commands first.
+# Write a project's servers to Claude Code's local scope, bare commands
+# resolved first.
 # shellcheck disable=SC2329  # called by graft_project, through for_each_project
 sync_project_mcp() {
     local project_servers="$1" target_dir="$2" project_name="$3"
@@ -310,29 +230,7 @@ sync_project_mcp() {
     local resolved
     resolved=$(resolve_commands "$project_servers")
 
-    # Union merge into existing target file (eden wins on name conflicts).
-    # Preserves project-tracked servers; never clobbers user-managed entries.
-    _merge_into() {
-        local target_file="$1"
-        if [[ -f "$target_file" ]]; then
-            local merged
-            merged=$(jq -S --argjson eden "$resolved" \
-                '.mcpServers = ((.mcpServers // {}) + $eden.mcpServers)' "$target_file")
-            if diff -q <(echo "$merged") <(jq -S . "$target_file") &>/dev/null; then
-                return 0
-            fi
-            echo "$merged" | jq '.' > "$target_file"
-        else
-            printf '%s' "$resolved" | jq '.' > "$target_file"
-        fi
-    }
-
     sync_local_scope "$resolved" "$target_dir"
-
-    # Cursor: .cursor/mcp.json (only if .cursor/ exists)
-    if [[ -d "$target_dir/.cursor" ]]; then
-        _merge_into "$target_dir/.cursor/mcp.json"
-    fi
 }
 
 project_count=0

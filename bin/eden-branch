@@ -194,7 +194,7 @@ list_branches() {
             fi
             
             # Show if it has MCP configs
-            if [ -f "$display_path/.config/mcp/servers.json" ] || [ -f "$display_path/.cursor/mcp.json" ]; then
+            if [ -f "$display_path/.config/mcp/servers.json" ]; then
                 echo "    MCP: config found"
             fi
 
@@ -320,7 +320,6 @@ Private configuration branch for Eden.
 - \`.eden-secrets\`: Secret requirements for 1Password
 - \`.config/eden/local/\`: Configuration files (git, etc.)
 - \`.local/bin/\`: Branch-specific scripts
-- \`.cursor/mcp.json\`: Cursor MCP server configurations
 
 ## Usage
 
