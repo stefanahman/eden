@@ -13,6 +13,8 @@
 #                               its platforms/<platform>/ folder if it has one
 #   eden_branch_name <root>     a root's name for messages: the folder name,
 #                               or "<branch> (<platform>)" for a platform folder
+#   eden_project_target <file>  a project's repo: the first path in its
+#                               .eden-target that exists (else the first, exit 1)
 #
 # An entry is one line. Blank lines and lines whose first non-blank
 # character is `#` are skipped. Surrounding whitespace is ignored, a
@@ -87,4 +89,23 @@ eden_branch_name() {
     else
         basename "$root"
     fi
+}
+
+# A project's .eden-target names where its repo is checked out, one path
+# per line (blank and # lines skipped, expanded as branch entries are).
+# Machines check a repo out in different places, so the first path that
+# exists here wins. With none, the first is printed and the status is 1.
+eden_project_target() {
+    local line path first=""
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ "$line" =~ ^[[:space:]]*(#|$) ]] && continue
+        path="$(eden_branch_expand "$line")"
+        [[ -z "$first" ]] && first="$path"
+        if [[ -d "$path" ]]; then
+            printf '%s\n' "$path"
+            return 0
+        fi
+    done < "$1"
+    printf '%s\n' "$first"
+    return 1
 }

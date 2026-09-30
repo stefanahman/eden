@@ -147,7 +147,7 @@ graft_all() {
             project_dir=$(dirname "$target_file")
             local_name="${project_dir#"$projects_dir"/}"
 
-            project_target=$(eden_branch_expand "$(head -1 "$target_file" | tr -d '[:space:]')")
+            project_target=$(eden_project_target "$target_file") || true
 
             if [[ ! -d "$project_target" ]]; then
                 if [[ "$MODE" == link ]]; then

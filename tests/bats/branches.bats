@@ -46,3 +46,18 @@ $HOME/two
     run bash "$GRAFTERS/graft-configs"
     [ ! -e "$marker" ]
 }
+
+@test "a project's target is the first listed path that exists" {
+    source "$EDEN_ROOT/lib/branches.sh"
+    mkdir -p "$HOME/Development/private/app"
+    printf '%s\n' '# where the repo is checked out' '~/Development/app' '~/Development/private/app' > "$BATS_TEST_TMPDIR/target"
+    [ "$(eden_project_target "$BATS_TEST_TMPDIR/target")" = "$HOME/Development/private/app" ]
+}
+
+@test "a project's target falls back to its first path when none exists" {
+    source "$EDEN_ROOT/lib/branches.sh"
+    printf '%s\n' '~/Development/app' '~/Development/private/app' > "$BATS_TEST_TMPDIR/target"
+    run eden_project_target "$BATS_TEST_TMPDIR/target"
+    [ "$status" -eq 1 ]
+    [ "$output" = "$HOME/Development/app" ]
+}

@@ -90,6 +90,13 @@ branch/
 
 Directories without `.eden-target` are organizational folders (silently skipped).
 
+An `.eden-target` lists where the repo is checked out, one path per line;
+the first that exists on this machine wins, since machines check a repo
+out in different places (`~/Development/app` on one, `~/Development/private/app`
+on another). Blank lines and `#` comments are skipped, and `~`, `$HOME` and
+`$EDEN_ROOT` expand as in the branch list. A project none of whose paths
+exist is skipped with a warning.
+
 **Grafters with project scope:**
 - `graft-claude` — symlinks `.claude/{rules,agents,commands,skills}` and top-level `settings.json`, `statusline.sh`, `CLAUDE.md`, `*.local.md` into target (`*.local.md` = Claude Code's per-project plugin-settings files; `settings.local.json` is never grafted because Claude Code writes to it)
 - `graft-mcp` — adds the servers to Claude Code's local scope for the target repo
