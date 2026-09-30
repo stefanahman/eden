@@ -46,6 +46,25 @@ EDEN_ROOT=$(detect_eden_root)
 source "$EDEN_ROOT/lib/branches.sh"
 BRANCHES_FILE="$(eden_branches_file)"
 
+# branch_arg_path <path> — the absolute path a command-line argument
+# means: entry expansion (~, $EDEN_ROOT, $HOME), then relative to the
+# working directory, resolved when the directory exists.
+branch_arg_path() {
+    local p
+    p="$(eden_branch_expand "$1")"
+    [[ "$p" == /* ]] || p="$PWD/$p"
+    if [[ -d "$p" ]]; then
+        p="$(cd "$p" && pwd)"
+    fi
+    printf '%s\n' "$p"
+}
+
+# is_entry <line> — whether a line of the list is an entry, not a blank
+# or a comment.
+is_entry() {
+    [[ ! "$1" =~ ^[[:space:]]*(#|$) ]]
+}
+
 # Show help
 show_help() {
     bold "Eden Branch Management"
@@ -81,14 +100,8 @@ add_branch() {
         exit 1
     fi
     
-    # Expand tilde
-    branch_path="${branch_path/#\~/$HOME}"
-    
-    # Convert to absolute path if relative
-    if [[ ! "$branch_path" = /* ]]; then
-        branch_path="$(cd "$(dirname "$branch_path")" 2>/dev/null && pwd)/$(basename "$branch_path")"
-    fi
-    
+    branch_path="$(branch_arg_path "$branch_path")"
+
     # Check if directory exists
     if [ ! -d "$branch_path" ]; then
         warn "Directory does not exist: $branch_path"
@@ -105,13 +118,20 @@ add_branch() {
     mkdir -p "$(dirname "$BRANCHES_FILE")"
     touch "$BRANCHES_FILE"
     
-    # Check if already registered
-    if grep -qF "$branch_path" "$BRANCHES_FILE" 2>/dev/null; then
-        warn "Branch already registered: $branch_path"
-        exit 0
+    # Already registered: an entry that expands to the same path, compared
+    # whole — /x/a is not /x/a-b.
+    local entry
+    while IFS= read -r entry; do
+        if [[ "$entry" == "$branch_path" ]]; then
+            warn "Branch already registered: $branch_path"
+            exit 0
+        fi
+    done < <(eden_branches)
+
+    # Add on a line of its own, even when the last line has no newline.
+    if [[ -s "$BRANCHES_FILE" && -n "$(tail -c 1 "$BRANCHES_FILE")" ]]; then
+        echo >> "$BRANCHES_FILE"
     fi
-    
-    # Add to branches file
     echo "$branch_path" >> "$BRANCHES_FILE"
 
     log "Branch registered: $branch_path"
@@ -205,23 +225,36 @@ remove_branch() {
         exit 1
     fi
     
-    # Expand tilde
-    branch_path="${branch_path/#\~/$HOME}"
-    
-    # Remove from file
-    if grep -qF "$branch_path" "$BRANCHES_FILE"; then
-        # Create temp file without the branch
-        grep -vF "$branch_path" "$BRANCHES_FILE" > "$BRANCHES_FILE.tmp"
-        mv "$BRANCHES_FILE.tmp" "$BRANCHES_FILE"
-        
-        log "Branch unregistered: $branch_path"
-        echo ""
-        info "The directory still exists. Remove it manually if needed:"
-        echo "  rm -rf $branch_path"
-    else
+    branch_path="$(branch_arg_path "$branch_path")"
+
+    # Keep every line except the entries that expand to this path, compared
+    # whole; comments and blank lines stay as they are.
+    local line removed=0
+    local -a kept=()
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if is_entry "$line" && [[ "$(eden_branch_expand "$line")" == "$branch_path" ]]; then
+            removed=$((removed + 1))
+            continue
+        fi
+        kept+=("$line")
+    done < "$BRANCHES_FILE"
+
+    if (( removed == 0 )); then
         warn "Branch not found in registry: $branch_path"
         exit 1
     fi
+
+    if (( ${#kept[@]} > 0 )); then
+        printf '%s\n' "${kept[@]}" > "$BRANCHES_FILE.tmp"
+    else
+        : > "$BRANCHES_FILE.tmp"
+    fi
+    mv "$BRANCHES_FILE.tmp" "$BRANCHES_FILE"
+
+    log "Branch unregistered: $branch_path"
+    echo ""
+    info "The directory still exists. Remove it manually if needed:"
+    echo "  rm -rf $branch_path"
 }
 
 # Create a new branch
