@@ -305,7 +305,7 @@ personal	$REPO/games"* ]]
 }
 
 @test "branch add --shared --platform lists it under [shared] for one platform" {
-    mkdir -p "$REPO/mac-extra"
+    mkdir -p "$REPO/mac-extra" && touch "$REPO/mac-extra/.eden-graft"
     run branch add "$REPO/mac-extra" --shared --platform mac
     [ "$status" -eq 0 ]
     [ "$(sed -n '2,6p' "$REPO/.eden-gardens")" = "[shared]
@@ -684,4 +684,29 @@ mcp_fixture() {
     [ "$output" = "school
 work
 personal" ]
+}
+
+@test "doctor counts a folder as a branch by its .eden-graft alone" {
+    mkdir -p "$REPO/secrets-only" "$REPO/loose-secrets"
+    touch "$REPO/secrets-only/.eden-secrets" "$REPO/loose-secrets/.eden-secrets"
+    printf '%s\n' '[work]' 'secrets-only' >> "$REPO/.eden-gardens"
+    run gardens_report
+    [[ "$output" == *"warn|.eden-gardens lists secrets-only, which is not a branch (no .eden-graft)"* ]] || false
+    [[ "$output" != *"loose-secrets"* ]] || false
+}
+
+@test "branch new gives a branch its .eden-graft" {
+    cd "$REPO"
+    run branch new games --garden personal
+    [ "$status" -eq 0 ]
+    [ -f "$REPO/games/.eden-graft" ]
+}
+
+@test "branch add refuses a folder without a .eden-graft" {
+    mkdir -p "$REPO/plain"
+    run branch add "$REPO/plain" --garden personal
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"not a branch"*".eden-graft"* ]] || false
+    run grep -q plain "$REPO/.eden-gardens"
+    [ "$status" -eq 1 ]
 }

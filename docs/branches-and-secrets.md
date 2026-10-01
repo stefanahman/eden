@@ -65,12 +65,19 @@ eden branch remove ~/eden-private-branches/work
 
 ## Branch Structure
 
+A branch is a folder with a `.eden-graft`, even an empty one: that file
+is what makes it a branch, for `eden branch add`, `eden doctor` and the
+gardens. Which branch holds a path is answered from the branch list
+(`.eden-gardens`, or `~/.config/eden/branches`): the longest listed folder
+that is the path or holds it, so a branch's `platforms/<platform>/` folder
+is its own, whatever the folders around it are called.
+
 Branches mirror `$HOME` for consistency. Place files where they would live under `$HOME`:
 
 ```
 my-branch/
 ├── .eden-secrets              # 1Password secret definitions
-├── .eden-graft                # Allowlist for graft-configs
+├── .eden-graft                # Marks the branch; allowlist for graft-configs
 ├── Brewfile                   # Branch-specific brew packages (macOS)
 ├── .config/
 │   ├── mcp/servers.json       # MCP servers (merged by graft-mcp)
