@@ -42,43 +42,10 @@ Its scripts, repo configuration and packages stay installed.
 
 ## Defining gardens
 
-The repo that holds a user's branches declares its gardens in one file
-at its root, `.eden-gardens`. Each machine records which of them it
-grows.
-
-```ini
-[shared]
-common
-mac-desktop    mac
-linux-desktop  arch
-
-[work]
-work
-
-[personal]
-personal
-```
-
-- Each section is a garden, except `[shared]`, which lists the shared
-  branches. Each line is a branch folder, relative to the file. A
-  platform after it (`mac`, `arch`) grafts that branch on that platform
-  only.
-- A machine records, untracked in `~/.config/eden/`, where the repo is
-  and which gardens it grows (`eden garden add <name>`).
-- `eden graft` works out the branch list on every run: the shared
-  branches for this platform, then each grown garden's branches. A
-  garden that gains or loses a branch is one edit to `.eden-gardens`,
-  then `eden graft` on each machine; nothing is registered by hand.
-- Without `.eden-gardens`, `~/.config/eden/branches` works as before.
-
-Setting up a machine:
-
-```sh
-eden init ~/eden-branches
-eden garden add personal
-eden graft
-eden garden use personal
-```
+*Built:* docs/branches-and-secrets.md, "Gardens": `.eden-gardens` in the
+repo, the machine's choices in `~/.config/eden/`, the branch list worked
+out on every graft, `eden init <repo>`, `eden garden`, the branch
+commands that edit the file, and doctor's checks.
 
 ## Levels
 
@@ -137,14 +104,14 @@ keep the middle level large and the last one small.
 
 ## Switching gardens
 
-`eden garden use <name>` records the garden in view in one state file,
-`~/.local/state/eden/garden`, re-runs the MCP grafter, and runs the
-platform's `garden-apply <name>` when one is on `PATH`, which reloads
-what cannot read the state itself. Readers that read the state on each
-use need nothing.
+*Built:* docs/branches-and-secrets.md, "Growing and switching":
+`eden garden use <name>` records the garden in view in
+`~/.local/state/eden/garden` and runs the hooks branches graft into
+`~/.config/eden/garden.d/`, which reload what cannot read the state
+itself. Readers that read the state on each use need nothing.
 
-The command was first proven as a script in a branches repo; it moves
-into the trunk together with `.eden-gardens`.
+Still to build: `use` re-running the MCP grafter, for the garden's MCP
+servers outside a repo.
 
 ## Deferred, and why
 
@@ -188,8 +155,8 @@ describe the need and the platform branch supplies the implementation.
 1. *Settled:* platform-only parts live in a branch's `platforms/<platform>/`
    folder, with the trunk's names, `mac` and `arch`.
 2. *Settled:* the state is `~/.local/state/eden/garden` and the command
-   `eden garden`; readers read the state on each use, and a platform's
-   `garden-apply` reloads the rest.
+   `eden garden`; readers read the state on each use, and hooks in
+   `~/.config/eden/garden.d/` reload the rest.
 3. *Settled:* Cursor is no longer supported, so only Claude Code's local
    scope matters.
 4. The data format for keys, and whether renderers live in the trunk or
