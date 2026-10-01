@@ -533,3 +533,17 @@ gardens_report() {
     run gardens_report
     [[ "$output" == *"warn|This machine grows no garden"* ]]
 }
+
+@test "branch move finds a branch in a subfolder by its name, unless two share it" {
+    mkdir -p "$REPO/branches/chess" "$REPO/old/chess"
+    printf '%s\n' '[personal]' 'branches/chess' > "$REPO/.eden-gardens.add"
+    cat "$REPO/.eden-gardens.add" >> "$REPO/.eden-gardens"
+    run branch move chess --garden work
+    [ "$status" -eq 0 ]
+    run bash -c 'source "$EDEN_ROOT/lib/branches.sh"; eden_gardens_entries | cut -f1,2'
+    [[ "$output" == *"work	$REPO/branches/chess"* ]]
+    printf '%s\n' 'old/chess' >> "$REPO/.eden-gardens"
+    run branch move chess --shared
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"More than one branch is called chess; give its path: branches/chess old/chess"* ]]
+}

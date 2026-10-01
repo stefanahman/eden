@@ -167,14 +167,25 @@ listed() {
 }
 
 # listed_path <arg> — the branch an argument names: a path from where eden
-# was run, else a folder in the repo.
+# was run, else a folder in the repo, else the one listed branch with that
+# folder name.
 listed_path() {
-    local p
+    local p matches
     p="$(branch_arg_path "$1")"
     if [[ -z "$(listed "$p")" ]]; then
         p="$(eden_branch_expand "$(eden_branches_repo)/$1")"
     fi
     if [[ -z "$(listed "$p")" ]]; then
+        matches="$(eden_gardens_entries | cut -f2 | sort -u | while IFS= read -r p; do
+            [[ "$(basename "$p")" == "$1" ]] && printf '%s\n' "$p"
+        done)"
+        if [[ -n "$matches" && "$(printf '%s\n' "$matches" | wc -l)" -gt 1 ]]; then
+            warn "More than one branch is called $1; give its path: $(printf '%s\n' "$matches" | sed "s|^$(eden_branches_repo)/||" | paste -sd' ' -)" >&2
+            exit 1
+        fi
+        p="$matches"
+    fi
+    if [[ -z "$p" || -z "$(listed "$p")" ]]; then
         warn "Not in $(eden_gardens_file): $1" >&2
         exit 1
     fi
