@@ -46,6 +46,24 @@ CANONICAL_CONFIG="$HOME/.config/mcp/servers.json"
 CLAUDE_STATE="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
 CLAUDE_CLI="${EDEN_CLAUDE_CLI:-claude}"
 
+# What graft-mcp put in Claude Code, so a later graft can take out what no
+# branch declares any more and leave alone servers added by hand under a
+# name no branch uses (one that shares a branch's name is Eden's from then
+# on): per state file, the user-scope names and each repo's local-scope
+# names.
+MCP_RECORD="${XDG_STATE_HOME:-$HOME/.local/state}/eden/mcp-servers.json"
+RECORD_OLD="$(jq -c --arg s "$CLAUDE_STATE" '.[$s] // {}' "$MCP_RECORD" 2>/dev/null)" || RECORD_OLD=""
+if [[ -z "$RECORD_OLD" && -f "$MCP_RECORD" ]]; then
+    echo "  ⚠ $(eden_home_path "$MCP_RECORD") was unreadable: starting a new record, so servers an earlier graft added stay until removed by hand"
+fi
+[[ -n "$RECORD_OLD" ]] || RECORD_OLD='{}'
+USER_SYNCED=false
+# Without the CLI nothing goes into or out of local scope, whether or not
+# a project reaches sync_local_scope.
+LOCAL_SKIPPED=false
+command -v "$CLAUDE_CLI" >/dev/null 2>&1 || LOCAL_SKIPPED=true
+LOCAL_WANTED='{}'
+
 # branch_mcp_config <branch path>: the branch's global MCP file, if any.
 branch_mcp_config() {
     local file
@@ -140,15 +158,20 @@ resolve_commands() {
 MERGED_JSON=$(resolve_commands "$MERGED_JSON")
 echo "$MERGED_JSON" | jq '.' > "$CANONICAL_CONFIG"
 
-# Sync MCP servers into Claude Code's state file (user scope).
-# Union merge: preserves user-added global servers, Eden servers win on conflicts.
+# Sync MCP servers into Claude Code's state file (user scope). Servers
+# added by hand stay; Eden's win on a name both use; the ones an earlier
+# graft added that no branch declares any more are taken out.
 sync_claude_code() {
     local client_config="$CLAUDE_STATE"
     [[ -f "$client_config" ]] || return 0
+    USER_SYNCED=true
 
-    local merged
-    merged=$(jq -S --slurpfile eden "$CANONICAL_CONFIG" \
-        '.mcpServers = ((.mcpServers // {}) + $eden[0].mcpServers)' "$client_config")
+    local drop gone merged name
+    drop=$(jq -c --argjson old "$RECORD_OLD" \
+        '[($old.user // [])[] as $n | select(.mcpServers[$n] == null) | $n]' "$CANONICAL_CONFIG")
+    gone=$(jq -r --argjson drop "$drop" '$drop[] as $n | select(.mcpServers[$n] != null) | $n' "$client_config")
+    merged=$(jq -S --slurpfile eden "$CANONICAL_CONFIG" --argjson drop "$drop" \
+        '.mcpServers = (((.mcpServers // {}) | with_entries(select(.key as $k | $drop | index($k) | not))) + $eden[0].mcpServers)' "$client_config")
 
     if diff -q <(echo "$merged") <(jq -S . "$client_config") &>/dev/null; then
         echo "  → Claude Code in sync"
@@ -156,6 +179,9 @@ sync_claude_code() {
     fi
 
     echo "$merged" | jq . > "$client_config"
+    while IFS= read -r name; do
+        [[ -n "$name" ]] && echo "    − $name (user scope: no branch declares it now)"
+    done <<< "$gone"
     echo "  → Synced Claude Code"
 }
 
@@ -178,10 +204,13 @@ sync_local_scope() {
 
     if ! command -v "$CLAUDE_CLI" >/dev/null 2>&1; then
         echo "  ⚠ $CLAUDE_CLI not found: skipping Claude Code's servers for $(eden_home_path "$target_dir")"
+        LOCAL_SKIPPED=true
         return 0
     fi
 
     key="$(cd "$target_dir" && { git rev-parse --show-toplevel 2>/dev/null || pwd -P; })"
+    LOCAL_WANTED=$(jq -c --arg k "$key" --argjson n "$(printf '%s' "$resolved" | jq -c '.mcpServers | keys')" \
+        '.[$k] = (((.[$k] // []) + $n) | unique)' <<< "$LOCAL_WANTED")
     while IFS= read -r name; do
         want="$(printf '%s' "$resolved" | jq -cS --arg n "$name" '.mcpServers[$n]')"
         have=""
@@ -243,6 +272,54 @@ graft_project() {
     project_count=$((project_count + 1))
 }
 for_each_project graft_project
+
+# The servers an earlier graft put in a repo's local scope that no branch
+# declares there now — the project left its branch, or its garden is no
+# longer grown here — are taken out. A repo not on this machine keeps its
+# record until it is back. Without the CLI nothing was added or removed,
+# so the record stays as it was.
+LOCAL_RECORD="$LOCAL_WANTED"
+prune_local_scope() {
+    local key names name
+    if $LOCAL_SKIPPED; then
+        LOCAL_RECORD=$(jq -c '.local // {}' <<< "$RECORD_OLD")
+        return 0
+    fi
+    while IFS= read -r key; do
+        names=$(jq -r --arg k "$key" --argjson want "$LOCAL_WANTED" \
+            '(.local[$k] // []) - ($want[$k] // []) | .[]' <<< "$RECORD_OLD")
+        [[ -n "$names" ]] || continue
+        if [[ ! -d "$key" ]]; then
+            LOCAL_RECORD=$(jq -c --arg k "$key" --argjson old "$RECORD_OLD" \
+                '.[$k] = (((.[$k] // []) + ($old.local[$k] // [])) | unique)' <<< "$LOCAL_RECORD")
+            continue
+        fi
+        while IFS= read -r name; do
+            if (cd "$key" && "$CLAUDE_CLI" mcp remove -s local "$name" >/dev/null 2>&1); then
+                echo "    − $name ($(eden_home_path "$key"), local scope: no branch declares it now)"
+            fi
+        done <<< "$names"
+    done < <(jq -r '.local // {} | keys[]' <<< "$RECORD_OLD")
+}
+prune_local_scope
+
+write_record() {
+    local all="" user
+    if $USER_SYNCED; then
+        user=$(jq -c '.mcpServers | keys' "$CANONICAL_CONFIG")
+    else
+        user=$(jq -c '.user // []' <<< "$RECORD_OLD")
+    fi
+    if [[ -f "$MCP_RECORD" ]]; then
+        all=$(jq -c . "$MCP_RECORD" 2>/dev/null) || all=""
+    fi
+    [[ -n "$all" ]] || all='{}'
+    mkdir -p "$(dirname "$MCP_RECORD")"
+    jq --arg s "$CLAUDE_STATE" --argjson user "$user" --argjson local "$LOCAL_RECORD" \
+        '.[$s] = {user: $user, local: $local}' <<< "$all" > "$MCP_RECORD.tmp"
+    mv "$MCP_RECORD.tmp" "$MCP_RECORD"
+}
+write_record
 
 # Show summary
 SERVER_COUNT=$(echo "$MERGED_JSON" | jq '.mcpServers | length')
