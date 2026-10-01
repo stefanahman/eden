@@ -19,6 +19,11 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 # bin/eden is one level deep from repo root
 EDEN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Subcommands run from EDEN_ROOT; a path given on the command line is
+# relative to where eden was run.
+EDEN_CALLER_PWD="${EDEN_CALLER_PWD:-$PWD}"
+export EDEN_CALLER_PWD
+
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'

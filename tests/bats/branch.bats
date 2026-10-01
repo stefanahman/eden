@@ -87,3 +87,19 @@ $HOME/b/a" ]
     [[ "$output" =~ "Secrets: 2 defined" ]]
     [[ ! "$output" =~ $'Secrets: 0\n' ]]
 }
+
+@test "a relative path is relative to where eden was run, not to the trunk" {
+    mkdir -p "$HOME/work/mine"
+    cd "$HOME/work"
+    run "$EDEN_ROOT/bin/eden" branch add mine
+    [ "$status" -eq 0 ]
+    [ "$(cat "$BRANCHES")" = "$HOME/work/mine" ]
+}
+
+@test "new creates a relative path where eden was run" {
+    cd "$HOME"
+    run "$EDEN_ROOT/bin/eden" branch new fresh
+    [ "$status" -eq 0 ]
+    [ -d "$HOME/fresh/.local/bin" ]
+    [ "$(cat "$BRANCHES")" = "$HOME/fresh" ]
+}

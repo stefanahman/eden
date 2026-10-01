@@ -47,12 +47,13 @@ source "$EDEN_ROOT/lib/branches.sh"
 BRANCHES_FILE="$(eden_branches_file)"
 
 # branch_arg_path <path> — the absolute path a command-line argument
-# means: entry expansion (~, $EDEN_ROOT, $HOME), then relative to the
-# working directory, resolved when the directory exists.
+# means: entry expansion (~, $EDEN_ROOT, $HOME), then relative to where
+# eden was run (bin/eden runs this from EDEN_ROOT), resolved when the
+# directory exists.
 branch_arg_path() {
     local p
     p="$(eden_branch_expand "$1")"
-    [[ "$p" == /* ]] || p="$PWD/$p"
+    [[ "$p" == /* ]] || p="${EDEN_CALLER_PWD:-$PWD}/$p"
     if [[ -d "$p" ]]; then
         p="$(cd "$p" && pwd)"
     fi
@@ -282,13 +283,7 @@ new_branch() {
         exit 1
     fi
     
-    # Expand tilde
-    branch_path="${branch_path/#\~/$HOME}"
-    
-    # Convert to absolute path if relative
-    if [[ ! "$branch_path" = /* ]]; then
-        branch_path="$(pwd)/$branch_path"
-    fi
+    branch_path="$(branch_arg_path "$branch_path")"
     
     local branch_name=$(basename "$branch_path")
     
