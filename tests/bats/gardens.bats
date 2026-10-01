@@ -134,3 +134,100 @@ personal" ]
     [ -L "$XDG_CONFIG_HOME/zsh/zshenv.d/work-arch.zsh" ]
     [ ! -e "$XDG_CONFIG_HOME/zsh/zshenv.d/hobby.zsh" ]
 }
+
+# eden garden ----------------------------------------------------------------
+
+garden() {
+    "$EDEN_ROOT/bin/eden-garden" "$@"
+}
+
+@test "garden: none in view says how to pick one" {
+    run garden
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"eden garden use"* ]]
+}
+
+@test "garden add grows a declared garden once" {
+    run garden add work
+    [ "$status" -eq 0 ]
+    run garden add work
+    [[ "$output" == *"Already growing work"* ]]
+    [ "$(cat "$XDG_CONFIG_HOME/eden/gardens")" = "work" ]
+}
+
+@test "garden add refuses a garden .eden-gardens does not declare" {
+    run garden add school
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"declared: work personal"* ]]
+    [ ! -e "$XDG_CONFIG_HOME/eden/gardens" ]
+}
+
+@test "garden list shows each garden's state here" {
+    printf '%s\n' work retired > "$XDG_CONFIG_HOME/eden/gardens"
+    mkdir -p "$XDG_STATE_HOME/eden" && echo work > "$XDG_STATE_HOME/eden/garden"
+    run garden list
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"work"*"in view"* ]]
+    [[ "$output" == *"personal"*"not grown"* ]]
+    [[ "$output" == *"retired"*"grown, but not declared"* ]]
+}
+
+@test "garden use refuses a garden this machine does not grow" {
+    run garden use personal
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"eden garden add personal"* ]]
+    [ ! -e "$XDG_STATE_HOME/eden/garden" ]
+}
+
+@test "garden use records the garden and runs every hook, a failing one reported" {
+    echo work > "$XDG_CONFIG_HOME/eden/gardens"
+    hooks="$XDG_CONFIG_HOME/eden/garden.d"
+    mkdir -p "$hooks"
+    printf '#!/bin/sh\necho "first $1" >> "%s"\n' "$BATS_TEST_TMPDIR/ran" > "$hooks/10-first"
+    printf '#!/bin/sh\nexit 3\n' > "$hooks/20-fails"
+    printf '#!/bin/sh\necho "last $1" >> "%s"\n' "$BATS_TEST_TMPDIR/ran" > "$hooks/30-last"
+    printf 'not a hook\n' > "$hooks/40-not-executable"
+    chmod +x "$hooks/10-first" "$hooks/20-fails" "$hooks/30-last"
+
+    run garden use work
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"garden.d/20-fails failed"* ]]
+    [ "$(cat "$XDG_STATE_HOME/eden/garden")" = "work" ]
+    [ "$(cat "$BATS_TEST_TMPDIR/ran")" = "first work
+last work" ]
+    run garden
+    [ "$output" = "work" ]
+}
+
+@test "garden remove stops growing it and takes it out of view" {
+    printf '%s\n' work personal > "$XDG_CONFIG_HOME/eden/gardens"
+    mkdir -p "$XDG_STATE_HOME/eden" && echo work > "$XDG_STATE_HOME/eden/garden"
+    run garden remove work
+    [ "$status" -eq 0 ]
+    [ "$(cat "$XDG_CONFIG_HOME/eden/gardens")" = "personal" ]
+    [ ! -e "$XDG_STATE_HOME/eden/garden" ]
+}
+
+@test "garden new declares an empty garden and refuses a taken or reserved name" {
+    run garden new school
+    [ "$status" -eq 0 ]
+    [ "$(tail -n 2 "$REPO/.eden-gardens")" = "
+[school]" ]
+    run bash -c 'source "$EDEN_ROOT/lib/branches.sh"; eden_gardens_declared'
+    [ "$output" = "work
+personal
+school" ]
+    run garden new work
+    [ "$status" -eq 1 ]
+    run garden new shared
+    [ "$status" -eq 1 ]
+    run garden new 'two words'
+    [ "$status" -eq 1 ]
+}
+
+@test "garden commands need a repo with gardens" {
+    rm "$XDG_CONFIG_HOME/eden/branches-repo"
+    run garden list
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"eden init"* ]]
+}

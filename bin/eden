@@ -145,6 +145,21 @@ Subcommands:
   new <path>        Create and register a new branch
 HELP
             ;;
+        garden)
+            echo "Gardens: which this machine grows, which is in view"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden garden [subcommand]
+
+Subcommands:
+  (none)            The garden in view
+  list              The gardens .eden-gardens declares, and their state here
+  add <name>        Grow a declared garden on this machine (then: eden graft)
+  remove <name>     Stop growing it
+  use <name>        Put a grown garden in view, then run ~/.config/eden/garden.d/*
+  new <name>        Declare a garden in .eden-gardens
+HELP
+            ;;
         secrets)
             echo "Manage 1Password secrets (list, validate)"
             [[ "$full" ]] && cat <<'HELP'
@@ -245,7 +260,7 @@ show_help() {
 
     _section "Getting Started"    grow install doctor
     _section "Config Management"  plant unplant graft update uninstall
-    _section "Branches & Secrets" branch secrets
+    _section "Branches & Secrets" branch garden secrets
     _section "Inspect & Debug"    status diff-file check-package list-packages os
 
     echo -e "${BOLD}Environment:${RESET}"
@@ -975,6 +990,9 @@ main() {
             ;;
         branch)
             run_script "eden-branch" "$@"
+            ;;
+        garden)
+            run_script "eden-garden" "$@"
             ;;
         doctor)
             run_script "eden-doctor" "$@"
