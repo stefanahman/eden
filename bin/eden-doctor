@@ -404,7 +404,11 @@ if [ "$(uname -s)" = "Darwin" ]; then
     done
 
     if [ -d "/Applications/Karabiner-Elements.app" ]; then
-        if pgrep -f "karabiner_" >/dev/null 2>&1; then
+        # Both namings: 15 and earlier ran karabiner_console_user_server
+        # and karabiner_grabber, 16 renamed them Karabiner-Core-Service
+        # and Karabiner-Console-User-Server. Matching only the first
+        # warned that a running Karabiner was not running.
+        if pgrep -f "[kK]arabiner[_-]" >/dev/null 2>&1; then
             check_pass "Karabiner running"
         else
             check_warn "Karabiner installed but not running"
