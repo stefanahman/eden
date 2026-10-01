@@ -231,3 +231,117 @@ school" ]
     [ "$status" -eq 1 ]
     [[ "$output" == *"eden init"* ]]
 }
+
+# eden branch, with gardens ---------------------------------------------------
+
+branch() {
+    "$EDEN_ROOT/bin/eden-branch" "$@"
+}
+
+@test "branch new creates a branch in the repo and lists it in its garden" {
+    cd "$REPO"
+    run branch new games --garden personal
+    [ "$status" -eq 0 ]
+    [ -f "$REPO/games/.eden-secrets" ]
+    run bash -c 'source "$EDEN_ROOT/lib/branches.sh"; eden_gardens_entries | cut -f1,2'
+    [[ "$output" == *"personal	$REPO/hobby
+personal	$REPO/games"* ]]
+    [ ! -e "$XDG_CONFIG_HOME/eden/branches" ]
+}
+
+@test "branch new refuses a folder outside the repo before creating it" {
+    cd "$HOME"
+    run branch new loose --garden personal
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"outside"* ]]
+    [ ! -e "$HOME/loose" ]
+}
+
+@test "branch new and add refuse a folder name with whitespace" {
+    cd "$REPO"
+    run branch new "my branch" --garden personal
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"whitespace"* ]] || false
+    [ ! -e "$REPO/my branch" ]
+    mkdir -p "$REPO/two words"
+    run branch add "$REPO/two words" --garden personal
+    [ "$status" -eq 1 ]
+    run grep -q two "$REPO/.eden-gardens"
+    [ "$status" -eq 1 ]
+}
+
+@test "branch add needs to be told where, and the garden must be declared" {
+    mkdir -p "$REPO/extra"
+    run branch add "$REPO/extra"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"--garden <name> or --shared"* ]]
+    run branch add "$REPO/extra" --garden school
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"eden garden new school"* ]]
+}
+
+@test "branch add --shared --platform lists it under [shared] for one platform" {
+    mkdir -p "$REPO/mac-extra"
+    run branch add "$REPO/mac-extra" --shared --platform mac
+    [ "$status" -eq 0 ]
+    [ "$(sed -n '2,6p' "$REPO/.eden-gardens")" = "[shared]
+common
+mac-desktop    mac
+linux-desktop  arch
+mac-extra  mac" ]
+    run branch add "$REPO/mac-extra" --shared
+    [[ "$output" == *"Already listed under [shared]"* ]]
+}
+
+@test "branch move takes a branch to another garden and keeps its platform" {
+    sed 's/^hobby$/hobby  arch/' "$REPO/.eden-gardens" > "$REPO/.eden-gardens.new"
+    mv "$REPO/.eden-gardens.new" "$REPO/.eden-gardens"
+    run branch move hobby --garden work
+    [ "$status" -eq 0 ]
+    run bash -c 'source "$EDEN_ROOT/lib/branches.sh"; eden_gardens_entries'
+    [[ "$output" == *"work	$REPO/hobby	arch"* ]]
+    [[ "$output" != *"personal	$REPO/hobby"* ]]
+}
+
+@test "branch remove takes it out of .eden-gardens and leaves the folder" {
+    run branch remove hobby
+    [ "$status" -eq 0 ]
+    run grep -q hobby "$REPO/.eden-gardens"
+    [ "$status" -eq 1 ]
+    [ -d "$REPO/hobby" ]
+}
+
+@test "branch move that cannot place a branch leaves .eden-gardens as it was" {
+    mkdir -p "$HOME/outside"
+    printf '%s\n' '[personal]' "$HOME/outside" >> "$REPO/.eden-gardens"
+    cp "$REPO/.eden-gardens" "$BATS_TEST_TMPDIR/before"
+    run branch move "$HOME/outside" --garden work
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"outside"* ]] || false
+    cmp "$REPO/.eden-gardens" "$BATS_TEST_TMPDIR/before"
+    run branch remove "$HOME/outside"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Took $HOME/outside out of"* ]] || false
+}
+
+@test "branch list shows each garden's branches and what is grafted here" {
+    echo work > "$XDG_CONFIG_HOME/eden/gardens"
+    run branch list
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"[shared]"*"✓ common"*"· mac-desktop (mac)"*"✓ linux-desktop (arch)"* ]]
+    [[ "$output" == *"[work]  grown"*"✓ work"* ]]
+    [[ "$output" == *"[personal]  not grown here"*"· personal"* ]]
+}
+
+@test "without gardens, --garden is refused" {
+    rm "$XDG_CONFIG_HOME/eden/branches-repo"
+    run branch add "$REPO/work" --garden work
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"need gardens"* ]]
+}
+
+@test "branch remove names a branch .eden-gardens does not list" {
+    run branch remove nowhere
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Not in $REPO/.eden-gardens: nowhere"* ]]
+}

@@ -133,7 +133,7 @@ Examples:
 HELP
             ;;
         branch)
-            echo "Manage Eden branches (add, list, remove, new)"
+            echo "Manage Eden branches (add, list, remove, new, move)"
             [[ "$full" ]] && cat <<'HELP'
 
 Usage: eden branch <subcommand>
@@ -143,6 +143,13 @@ Subcommands:
   list              List registered branches
   remove <path>     Unregister a branch
   new <path>        Create and register a new branch
+  move <branch>     Move a branch to another garden (gardens only)
+
+With gardens (eden init <repo>), add, new, move and remove edit the repo's
+.eden-gardens instead, and take where the branch goes:
+  --garden <name>   in that garden
+  --shared          in every garden
+  --platform <p>    on mac or arch only
 HELP
             ;;
         garden)

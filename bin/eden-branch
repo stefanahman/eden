@@ -66,6 +66,250 @@ is_entry() {
     [[ ! "$1" =~ ^[[:space:]]*(#|$) ]]
 }
 
+# Gardens -------------------------------------------------------------------
+# With gardens set up (eden init <repo>), the branches are the lines of the
+# repo's .eden-gardens, not entries of the branches file: new, add, move
+# and remove edit that file, and say which garden with --garden <name> or
+# --shared, optionally --platform mac|arch.
+
+GARDEN=""
+PLATFORM=""
+ARGS=()
+
+gardens_on() {
+    eden_branches_repo >/dev/null
+}
+
+trim() {
+    local t="${1#"${1%%[![:space:]]*}"}"
+    t="${t%"${t##*[![:space:]]}"}"
+    # A trailing " # comment" is not part of the line, as eden reads it.
+    if [[ "$t" =~ ^(.*[^[:space:]])[[:space:]]+#.*$ ]]; then
+        t="${BASH_REMATCH[1]}"
+    fi
+    printf '%s\n' "$t"
+}
+
+# no_whitespace <path> — .eden-gardens splits a line on whitespace, so a
+# folder name with any cannot be listed.
+no_whitespace() {
+    if [[ "$1" =~ [[:space:]] ]]; then
+        warn "$1 has whitespace in its name, which .eden-gardens cannot hold" >&2
+        exit 1
+    fi
+}
+
+# parse_placement <args...> — takes out --garden, --shared and --platform,
+# leaving the rest in ARGS.
+parse_placement() {
+    ARGS=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --garden)
+                [[ -n "${2:-}" ]] || { warn "--garden needs a name"; exit 1; }
+                GARDEN="$2"; shift 2 ;;
+            --garden=*) GARDEN="${1#*=}"; shift ;;
+            --shared) GARDEN=shared; shift ;;
+            --platform)
+                [[ -n "${2:-}" ]] || { warn "--platform needs mac or arch"; exit 1; }
+                PLATFORM="$2"; shift 2 ;;
+            --platform=*) PLATFORM="${1#*=}"; shift ;;
+            *) ARGS+=("$1"); shift ;;
+        esac
+    done
+    if [[ -n "$PLATFORM" && "$PLATFORM" != mac && "$PLATFORM" != arch ]]; then
+        warn "Unknown platform: $PLATFORM (mac or arch)"
+        exit 1
+    fi
+}
+
+# require_placement — gardens need --garden or --shared; without gardens
+# the options mean nothing.
+require_placement() {
+    if gardens_on; then
+        if [[ -z "$GARDEN" ]]; then
+            warn "Gardens are set up: say where the branch goes, --garden <name> or --shared"
+            exit 1
+        fi
+        if [[ "$GARDEN" != shared ]] && ! grep -qxF -- "$GARDEN" <<< "$(eden_gardens_declared)"; then
+            warn "No garden $GARDEN in $(eden_gardens_file); declare it with: eden garden new $GARDEN"
+            exit 1
+        fi
+    elif [[ -n "$GARDEN" || -n "$PLATFORM" ]]; then
+        warn "--garden, --shared and --platform need gardens: run eden init <repo>"
+        exit 1
+    fi
+}
+
+# repo_rel <path> — the path relative to the repo, which must hold it.
+repo_rel() {
+    local repo
+    repo="$(eden_branches_repo)"
+    case "$1" in
+        "$repo")
+            warn "The repo itself is not a branch" >&2
+            exit 1 ;;
+        "$repo"/*) printf '%s\n' "${1#"$repo"/}" ;;
+        *)
+            warn "$1 is outside $repo: a garden's branches live in its repo" >&2
+            exit 1 ;;
+    esac
+}
+
+# listed <path> — the section and platform the path is listed under, as
+# section<TAB>platform, one per listing.
+listed() {
+    local section path platform
+    while IFS=$'\t' read -r section path platform; do
+        [[ "$path" == "$1" ]] && printf '%s\t%s\n' "$section" "$platform"
+    done < <(eden_gardens_entries)
+    return 0
+}
+
+# listed_path <arg> — the branch an argument names: a path from where eden
+# was run, else a folder in the repo.
+listed_path() {
+    local p
+    p="$(branch_arg_path "$1")"
+    if [[ -z "$(listed "$p")" ]]; then
+        p="$(eden_branch_expand "$(eden_branches_repo)/$1")"
+    fi
+    if [[ -z "$(listed "$p")" ]]; then
+        warn "Not in $(eden_gardens_file): $1" >&2
+        exit 1
+    fi
+    printf '%s\n' "$p"
+}
+
+write_lines() {
+    local file="$1"
+    shift
+    if [[ $# -gt 0 ]]; then
+        printf '%s\n' "$@" > "$file.tmp"
+    else
+        : > "$file.tmp"
+    fi
+    mv "$file.tmp" "$file"
+}
+
+# gardens_delete <path> — drops every line that names it.
+gardens_delete() {
+    local file repo line folder
+    local -a out=()
+    file="$(eden_gardens_file)"
+    repo="$(eden_branches_repo)"
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if is_entry "$line" && [[ ! "$(trim "$line")" =~ ^\[ ]]; then
+            read -r folder _ <<< "$line"
+            folder="$(eden_branch_expand "$folder")"
+            [[ "$folder" == /* ]] || folder="$repo/$folder"
+            [[ "$folder" == "$1" ]] && continue
+        fi
+        out+=("$line")
+    done < "$file"
+    write_lines "$file" "${out[@]}"
+}
+
+# gardens_insert <section> <line> — adds the line after the section's last
+# one; a missing [shared] is started at the top (gardens come from eden
+# garden new).
+gardens_insert() {
+    local section="$1" entry="$2" file line current="" i header=-1 last=-1
+    local -a lines=()
+    file="$(eden_gardens_file)"
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        lines+=("$line")
+    done < "$file"
+    for i in "${!lines[@]}"; do
+        line="$(trim "${lines[$i]}")"
+        if [[ "$line" =~ ^\[([^]]+)\]$ ]]; then
+            current="${BASH_REMATCH[1]}"
+            if [[ "$current" == "$section" && $header -lt 0 ]]; then
+                header=$i
+                last=$i
+            fi
+            continue
+        fi
+        if [[ "$current" == "$section" && $header -ge 0 && $last -ge $header ]] && is_entry "$line"; then
+            last=$i
+        fi
+    done
+    if (( header < 0 )); then
+        lines=("[$section]" "$entry" "" "${lines[@]}")
+    else
+        lines=("${lines[@]:0:last+1}" "$entry" "${lines[@]:last+1}")
+    fi
+    write_lines "$file" "${lines[@]}"
+}
+
+# place <path> — lists the branch under GARDEN, with PLATFORM.
+place() {
+    local rel entry
+    rel="$(repo_rel "$1")"
+    no_whitespace "$rel"
+    entry="$rel"
+    [[ -n "$PLATFORM" ]] && entry="$rel  $PLATFORM"
+    gardens_insert "$GARDEN" "$entry"
+    log "Listed $rel under [$GARDEN] in $(eden_gardens_file)"
+    if [[ "$GARDEN" != shared ]] && ! grep -qxF -- "$GARDEN" <<< "$(eden_gardens_grown)"; then
+        info "This machine does not grow $GARDEN: eden garden add $GARDEN"
+    fi
+    info "Commit .eden-gardens, then run 'eden graft'"
+}
+
+move_branch() {
+    local path where platform rel
+    [[ -n "${1:-}" ]] || { warn "Usage: eden branch move <branch> --garden <name> | --shared [--platform mac|arch]"; exit 1; }
+    gardens_on || { warn "move needs gardens: run eden init <repo>"; exit 1; }
+    require_placement
+    path="$(listed_path "$1")"
+    where="$(listed "$path")"
+    where="${where%%$'\n'*}"
+    platform="${where#*$'\t'}"
+    [[ -n "$PLATFORM" ]] || PLATFORM="$platform"
+    # Check the new place before touching the file, so a branch that
+    # cannot be placed keeps its line.
+    rel="$(repo_rel "$path")" || exit 1
+    no_whitespace "$rel"
+    gardens_delete "$path"
+    place "$path"
+}
+
+list_gardens() {
+    local repo here grown section path platform current="" mark note
+    repo="$(eden_branches_repo)"
+    here="$(eden_platform)" || here=""
+    grown="$(eden_gardens_grown)"
+    bold "Branches in $(eden_gardens_file)"
+    while IFS=$'\t' read -r section path platform; do
+        if [[ "$section" != "$current" ]]; then
+            current="$section"
+            echo ""
+            if [[ "$section" == shared ]]; then
+                echo "[shared]"
+            elif [[ "$(eden_garden_in_view 2>/dev/null)" == "$section" ]]; then
+                echo "[$section]  in view"
+            elif grep -qxF -- "$section" <<< "$grown"; then
+                echo "[$section]  grown"
+            else
+                echo "[$section]  not grown here"
+            fi
+        fi
+        note=""
+        [[ -n "$platform" ]] && note=" ($platform)"
+        if [[ ! -d "$path" ]]; then
+            mark="✗"; note="$note, not found"
+        elif grep -qxF -- "$path" <<< "$(eden_branches)"; then
+            mark="✓"
+        else
+            mark="·"
+        fi
+        echo "  $mark ${path#"$repo"/}$note"
+    done < <(eden_gardens_entries)
+    echo ""
+    info "✓ grafted here, · not grafted here"
+}
+
 # Show help
 show_help() {
     bold "Eden Branch Management"
@@ -75,13 +319,21 @@ show_help() {
     echo "Commands:"
     echo "  add <path>       Register an existing branch"
     echo "  new <path>       Create and register a new branch"
+    echo "  move <branch>    Move a branch to another garden (gardens only)"
     echo "  list             List all registered branches"
     echo "  remove <path>    Unregister a branch"
+    echo ""
+    echo "With gardens (eden init <repo>), add, new, move and remove edit the"
+    echo "repo's .eden-gardens and take where the branch goes:"
+    echo "  --garden <name>  in that garden"
+    echo "  --shared         in every garden"
+    echo "  --platform <p>   on mac or arch only"
     echo "  help             Show this help message"
     echo ""
     echo "Examples:"
     echo "  eden branch new ~/branch-work"
     echo "  eden branch add ~/existing-branch"
+    echo "  eden branch new branches/hobby --garden personal"
     echo "  eden branch list"
     echo ""
     echo "Branches extend Eden with private configurations:"
@@ -102,6 +354,7 @@ add_branch() {
     fi
     
     branch_path="$(branch_arg_path "$branch_path")"
+    require_placement
 
     # Check if directory exists
     if [ ! -d "$branch_path" ]; then
@@ -115,6 +368,17 @@ add_branch() {
         exit 1
     fi
     
+    if gardens_on; then
+        local where
+        where="$(listed "$branch_path" | cut -f1 | paste -sd' ' -)"
+        if [[ -n "$where" ]]; then
+            warn "Already listed under [$where]; to change that: eden branch move"
+            exit 0
+        fi
+        place "$branch_path"
+        return 0
+    fi
+
     # Create branches file if it doesn't exist
     mkdir -p "$(dirname "$BRANCHES_FILE")"
     touch "$BRANCHES_FILE"
@@ -154,6 +418,10 @@ add_branch() {
 
 # List branches
 list_branches() {
+    if gardens_on; then
+        list_gardens
+        return 0
+    fi
     if [ ! -f "$BRANCHES_FILE" ]; then
         warn "No branches registered"
         echo ""
@@ -237,6 +505,14 @@ remove_branch() {
         exit 1
     fi
     
+    if gardens_on; then
+        branch_path="$(listed_path "$branch_path")"
+        gardens_delete "$branch_path"
+        log "Took ${branch_path#"$(eden_branches_repo)"/} out of $(eden_gardens_file)"
+        info "The folder stays, and what it grafted stays until removed by hand; eden doctor reports it"
+        return 0
+    fi
+
     if [ ! -f "$BRANCHES_FILE" ]; then
         warn "No branches registered"
         exit 1
@@ -284,6 +560,12 @@ new_branch() {
     fi
     
     branch_path="$(branch_arg_path "$branch_path")"
+    require_placement
+    if gardens_on; then
+        local rel
+        rel="$(repo_rel "$branch_path")" || exit 1
+        no_whitespace "$rel"
+    fi
     
     local branch_name=$(basename "$branch_path")
     
@@ -400,10 +682,15 @@ EOF
 main() {
     local command="${1:-help}"
     shift || true
+    parse_placement "$@"
+    set -- ${ARGS[@]+"${ARGS[@]}"}
     
     case "$command" in
         add)
             add_branch "$@"
+            ;;
+        move|mv)
+            move_branch "$@"
             ;;
         list|ls)
             list_branches "$@"
