@@ -2,7 +2,8 @@
 # graft-mcp - Merge MCP servers from trunk and branches
 #
 # Two scopes:
-#   1. Global: branch/.config/mcp/servers.json → merged into ~/.config/mcp/servers.json
+#   1. Global: branch/.config/mcp/servers.json → merged into ~/.config/mcp/servers.json,
+#      a garden's branch only while its garden is in view
 #   2. Project: branch/projects/<path>/.mcp/servers.json → <target>/.mcp.json (+ client variants)
 #      where <target> is read from projects/<path>/.eden-target
 #
@@ -93,7 +94,9 @@ for_each_project() {
 }
 
 # Every server name is a named entry: two branches naming the same server,
-# globally or for the same project, collide.
+# globally or for the same project, collide. Two gardens' global servers
+# are never in user scope together, so they collide only with the shared
+# branches' and their own garden's.
 # shellcheck disable=SC2329  # called through for_each_project
 claim_project() {
     local name
@@ -107,6 +110,7 @@ claims() {
     local branch_path config name
     if eden_branch_list_exists; then
         while IFS= read -r branch_path; do
+            eden_in_view "$branch_path" || continue
             config="$(branch_mcp_config "$branch_path")" || continue
             while IFS= read -r name; do
                 printf 'MCP server %s\t%s\n' "$name" "$(eden_branch_name "$branch_path")"
@@ -126,6 +130,10 @@ echo "  → Merging MCP servers from branches"
 if eden_branch_list_exists; then
     while IFS= read -r branch_path; do
         branch_config="$(branch_mcp_config "$branch_path")" || continue
+        if ! eden_in_view "$branch_path"; then
+            echo "  → $(eden_branch_name "$branch_path"): global servers wait for $(eden_garden_of "$branch_path") to be in view"
+            continue
+        fi
         echo "  → Merging MCP servers from: $(eden_branch_name "$branch_path")"
         MERGED_JSON=$(echo "$MERGED_JSON" | jq --slurpfile branch "$branch_config" \
             '.mcpServers += $branch[0].mcpServers')

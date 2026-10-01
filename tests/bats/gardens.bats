@@ -579,3 +579,51 @@ garden_of() {
     rm "$XDG_CONFIG_HOME/eden/branches-repo"
     in_view "$REPO/personal"
 }
+
+# A garden's MCP servers outside a repo --------------------------------------------
+
+user_servers() {
+    jq -r '.mcpServers | keys | join(" ")' "$CLAUDE_CONFIG_DIR/.claude.json"
+}
+
+mcp_fixture() {
+    export CLAUDE_CONFIG_DIR="$HOME/claude"
+    mkdir -p "$CLAUDE_CONFIG_DIR" "$XDG_STATE_HOME/eden"
+    echo '{"mcpServers": {"mine": {"type": "http", "url": "https://mine"}}}' > "$CLAUDE_CONFIG_DIR/.claude.json"
+    for b in common work personal; do mkdir -p "$REPO/$b/.config/mcp"; done
+    echo '{"mcpServers": {"docs": {"type": "http", "url": "https://docs"}}}' > "$REPO/common/.config/mcp/servers.json"
+    echo '{"mcpServers": {"tracker": {"type": "http", "url": "https://work.tracker"}}}' > "$REPO/work/.config/mcp/servers.json"
+    echo '{"mcpServers": {"tracker": {"type": "http", "url": "https://home.tracker"}, "notes": {"type": "http", "url": "https://notes"}}}' > "$REPO/personal/.config/mcp/servers.json"
+    printf '%s\n' work personal > "$XDG_CONFIG_HOME/eden/gardens"
+}
+
+@test "a garden's global servers are in user scope only while it is in view" {
+    command -v jq >/dev/null || skip "jq not installed"
+    mcp_fixture
+    echo work > "$XDG_STATE_HOME/eden/garden"
+    run bash "$GRAFTERS/graft-mcp"
+    [ "$status" -eq 0 ]
+    [ "$(user_servers)" = "docs mine tracker" ]
+    [ "$(jq -r '.mcpServers.tracker.url' "$CLAUDE_CONFIG_DIR/.claude.json")" = "https://work.tracker" ]
+    [[ "$output" == *"personal: global servers wait for personal to be in view"* ]] || false
+
+    echo personal > "$XDG_STATE_HOME/eden/garden"
+    run bash "$GRAFTERS/graft-mcp"
+    [ "$status" -eq 0 ]
+    [ "$(user_servers)" = "docs mine notes tracker" ]
+    [ "$(jq -r '.mcpServers.tracker.url' "$CLAUDE_CONFIG_DIR/.claude.json")" = "https://home.tracker" ]
+
+    rm "$XDG_STATE_HOME/eden/garden"
+    run bash "$GRAFTERS/graft-mcp"
+    [ "$(user_servers)" = "docs mine" ]
+}
+
+@test "a garden's server may share a name with a shared branch's only by colliding" {
+    command -v jq >/dev/null || skip "jq not installed"
+    mcp_fixture
+    echo work > "$XDG_STATE_HOME/eden/garden"
+    echo '{"mcpServers": {"tracker": {"type": "http", "url": "https://shared"}}}' > "$REPO/common/.config/mcp/servers.json"
+    run bash "$GRAFTERS/graft-mcp"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"tracker"* ]] || false
+}
