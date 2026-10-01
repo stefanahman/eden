@@ -547,3 +547,35 @@ gardens_report() {
     [ "$status" -eq 1 ]
     [[ "$output" == *"More than one branch is called chess; give its path: branches/chess old/chess"* ]]
 }
+
+# A graft root's garden -----------------------------------------------------------
+
+garden_of() {
+    bash -c 'source "$EDEN_ROOT/lib/branches.sh"; eden_garden_of "$1"' _ "$1"
+}
+
+@test "a root's garden is its branch's section, platform folders included" {
+    run garden_of "$REPO/common"
+    [ "$output" = shared ]
+    run garden_of "$REPO/work/platforms/mac"
+    [ "$output" = work ]
+    run garden_of "$REPO/hobby"
+    [ "$output" = personal ]
+    run garden_of "$HOME/elsewhere"
+    [ "$status" -eq 1 ]
+}
+
+@test "a shared root is always in view, a garden's only while its garden is" {
+    in_view() {
+        bash -c 'source "$EDEN_ROOT/lib/branches.sh"; eden_in_view "$1"' _ "$1"
+    }
+    in_view "$REPO/common"
+    run in_view "$REPO/work"
+    [ "$status" -eq 1 ]
+    mkdir -p "$XDG_STATE_HOME/eden" && echo work > "$XDG_STATE_HOME/eden/garden"
+    in_view "$REPO/work"
+    run in_view "$REPO/personal"
+    [ "$status" -eq 1 ]
+    rm "$XDG_CONFIG_HOME/eden/branches-repo"
+    in_view "$REPO/personal"
+}

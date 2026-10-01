@@ -38,6 +38,12 @@
 #   eden_gardens_declared       the gardens it declares, in order
 #   eden_gardens_grown          the gardens this machine grows
 #   eden_garden_in_view         the garden in view (exit 1 if none)
+#   eden_garden_of <root>       the section a graft root's branch is listed
+#                               in, shared included (exit 1 if none)
+#   eden_in_view <root>         whether what a root declares for its garden
+#                               applies now: always without gardens and for
+#                               shared branches, else while its garden is in
+#                               view
 #
 # .eden-gardens is a [shared] section and one section per garden. Each
 # line is a branch folder relative to the file, optionally followed by
@@ -204,6 +210,30 @@ eden_garden_in_view() {
     name="${name%%$'\n'*}"
     [[ -n "$name" ]] || return 1
     printf '%s\n' "$name"
+}
+
+eden_garden_of() {
+    local root="${1%/}" entries section path
+    if [[ "$(basename "$(dirname "$root")")" == platforms ]]; then
+        root="$(dirname "$(dirname "$root")")"
+    fi
+    # Read whole before the loop returns early: see eden_branches_repo.
+    entries="$(eden_gardens_entries)"
+    while IFS=$'\t' read -r section path _; do
+        if [[ "$path" == "$root" ]]; then
+            printf '%s\n' "$section"
+            return 0
+        fi
+    done <<< "$entries"
+    return 1
+}
+
+eden_in_view() {
+    local garden here
+    garden="$(eden_garden_of "$1")" || return 0
+    [[ "$garden" == shared ]] && return 0
+    here="$(eden_garden_in_view)" || return 1
+    [[ "$garden" == "$here" ]]
 }
 
 # The shared branches for this platform, then each grown garden's, in the
