@@ -76,13 +76,8 @@ keep the middle level large and the last one small.
 - **Garden-aware readers**: the few programs that own global keys and
   workspaces read the garden in view and show only its branches and the
   shared ones.
-- **MCP servers outside a repo.** A shared branch's
-  `.config/mcp/servers.json` goes into the client's user scope always,
-  a garden branch's only while its garden is in view. `eden garden use`
-  re-runs the MCP grafter, which removes the servers it added before
-  that no branch in view declares any more; servers added by hand are
-  never touched. A client already running keeps the servers it started
-  with.
+- **MCP servers outside a repo.** *Built:* docs/branches-and-secrets.md,
+  "Growing and switching", and docs/grafters.md, "Project Scope".
 
 ## Rules that make coexistence safe
 
@@ -110,14 +105,14 @@ keep the middle level large and the last one small.
 `~/.config/eden/garden.d/`, which reload what cannot read the state
 itself. Readers that read the state on each use need nothing.
 
-Still to build: `use` re-running the MCP grafter, for the garden's MCP
-servers outside a repo.
+It then re-runs the MCP grafter, which swaps the garden's MCP servers
+outside a repo.
 
 ## Deferred, and why
 
 | Deferred | Needed only when |
 |---|---|
-| Removing what an unregistered branch grafted (link scan, record of merged entries) | a branch stops being grafted on a machine — rare, since gardens stay grafted. `eden doctor` reports leftovers meanwhile. The MCP grafter keeps its own record, for garden MCP servers. |
+| Removing what an unregistered branch grafted (link scan, record of merged entries) | a branch stops being grafted on a machine — rare, since gardens stay grafted. `eden doctor` reports leftovers meanwhile. The MCP grafter already keeps its own record and removes what it added. |
 | Branch kinds and precedence | a branch must override another's output. None does today: no branch grafts a path the trunk plants. |
 | Check before apply (grafter API v2, plan mode) | collisions can't be caught inside each grafter. The runner accepts exactly one API version (bin/eden-graft:50), so a v2 must either move all grafters in one change or first teach the runner to accept both. |
 | A Claude configuration folder per garden (`CLAUDE_CONFIG_DIR`) | two gardens need separate Claude accounts. Claude Code documents the variable for running accounts side by side. |

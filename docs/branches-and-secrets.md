@@ -258,6 +258,19 @@ beyond what reads the state itself: a link to the garden's config for
 some tool, a window manager reload. A hook that fails is reported and
 the rest still run.
 
+Last, `use` re-runs the MCP grafter. MCP servers come in three layers:
+
+| Declared in | In Claude Code | Applies |
+|---|---|---|
+| a shared branch's `.config/mcp/servers.json` | user scope | always |
+| a garden branch's `.config/mcp/servers.json` | user scope | while its garden is in view |
+| `projects/<repo>/.mcp/servers.json` | that repo's local scope | in the repo, for every grown garden |
+
+A switch takes the previous garden's servers out of user scope and puts
+the new one's in. A Claude Code already running keeps the servers it
+started with. Two gardens may declare the same server name, since they
+are never in user scope together.
+
 `eden doctor` checks the file against the repo and the machine: a branch
 the file does not list, a listed folder that is missing or not a branch,
 a branch listed twice, an unknown platform, and a machine that grows no
