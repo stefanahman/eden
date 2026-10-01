@@ -420,3 +420,54 @@ work" ]
     [ ! -e "$XDG_CONFIG_HOME/zsh/zshenv.d/personal.zsh" ]
     [ "$(cat "$XDG_STATE_HOME/eden/garden")" = "work" ]
 }
+
+# eden update: pulling the repo -------------------------------------------------
+
+pull() {
+    bash -c 'source "$EDEN_ROOT/lib/branches.sh"; source "$EDEN_ROOT/lib/repo.sh"; eden_branches_repo_pull'
+}
+
+clone_repo() {
+    export GIT_AUTHOR_NAME=Test GIT_AUTHOR_EMAIL=test@example.com
+    export GIT_COMMITTER_NAME=Test GIT_COMMITTER_EMAIL=test@example.com
+    git -C "$REPO" init -q -b main
+    git -C "$REPO" add -A
+    git -C "$REPO" commit -q -m initial
+    git clone -q --bare "$REPO" "$HOME/origin.git"
+    git clone -q "$HOME/origin.git" "$HOME/clone"
+    echo "$HOME/clone" > "$XDG_CONFIG_HOME/eden/branches-repo"
+}
+
+@test "pull does nothing for a repo that is not a git checkout" {
+    run pull
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "pull reports a repo already up to date" {
+    clone_repo
+    run pull
+    [ "$status" -eq 0 ]
+    [ "$output" = "$HOME/clone is up to date" ]
+}
+
+@test "pull fast-forwards and says how many commits came in" {
+    clone_repo
+    printf '%s\n' '[school]' >> "$REPO/.eden-gardens"
+    git -C "$REPO" commit -q -am 'declare school'
+    git -C "$REPO" push -q "$HOME/origin.git" main
+    run pull
+    [ "$status" -eq 2 ]
+    [ "$output" = "$HOME/clone updated: 1 new commit(s)" ]
+    grep -qx '\[school\]' "$HOME/clone/.eden-gardens"
+}
+
+@test "pull leaves a diverged repo alone and says so" {
+    clone_repo
+    git -C "$REPO" commit -q --allow-empty -m upstream
+    git -C "$REPO" push -q "$HOME/origin.git" main
+    git -C "$HOME/clone" commit -q --allow-empty -m local
+    run pull
+    [ "$status" -eq 1 ]
+    [[ "$output" == "Could not fast-forward $HOME/clone"* ]]
+}

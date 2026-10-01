@@ -142,4 +142,19 @@ esac
 log "Re-deploying packages…"
 stow -R -t "$HOME" -d packages common "$OS" || err "Failed to re-stow packages"
 
+# The repo with the gardens, when eden init pointed at one: its branches
+# change there, and eden graft picks the changes up.
+EDEN_ROOT="$EDEN_DIR"
+# shellcheck source=lib/branches.sh
+source "$EDEN_DIR/lib/branches.sh"
+# shellcheck source=lib/repo.sh
+source "$EDEN_DIR/lib/repo.sh"
+pull_status=0
+pull_message="$(eden_branches_repo_pull)" || pull_status=$?
+case "$pull_status" in
+    0) [ -z "$pull_message" ] || ok "$pull_message" ;;
+    2) ok "$pull_message"; log "Run 'eden graft' to graft what changed" ;;
+    *) warn "$pull_message" ;;
+esac
+
 ok "Eden updated successfully"

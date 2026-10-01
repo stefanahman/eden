@@ -108,6 +108,9 @@ HELP
             [[ "$full" ]] && cat <<'HELP'
 
 Usage: eden update
+
+Updates the trunk to its track, re-plants its packages, and fast-forwards
+the repo with your .eden-gardens when eden init set one up.
 HELP
             ;;
         uninstall)
