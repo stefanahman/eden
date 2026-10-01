@@ -76,6 +76,7 @@ integrate branch content. Each grafter handles one concern independently.
 | `graft-env` | Symlinks POSIX sh env files into `~/.config/eden/env.d/`, loaded by bash and zsh |
 | `graft-git` | Creates git `includeIf` directives for branch identities |
 | `graft-mcp` | Merges MCP server JSON from all branches |
+| `graft-mise` | Installs the tools branches' mise configs declare (`mise install`) |
 | `graft-secrets` | Collects 1Password secret definitions |
 | `graft-zsh` | Symlinks zsh env files into `zshenv.d/` |
 

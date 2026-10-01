@@ -83,6 +83,7 @@ my-branch/
 │   ├── mcp/servers.json       # MCP servers (merged by graft-mcp)
 │   ├── git/identities/work    # Git identity, for its remotes (graft-git)
 │   ├── eden/env.d/work.sh     # Env vars, POSIX sh, for bash and zsh (graft-env)
+│   ├── mise/conf.d/work.toml  # Tools for every platform (listed in .eden-graft; installed by graft-mise)
 │   └── zsh/zshenv.d/work.zsh  # zsh-only env (collected by graft-zsh)
 ├── .local/bin/                # Scripts/wrappers (collected by graft-bin)
 │   ├── mcp-slack

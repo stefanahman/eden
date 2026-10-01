@@ -1,0 +1,44 @@
+#!/bin/bash
+# graft-mise - Install the tools mise configs declare
+# Part of Eden's pluggable grafter system
+#
+# A branch declares portable tools in a mise config that graft-configs
+# links, such as ~/.config/mise/conf.d/<name>.toml. Linking only declares
+# them: this runs `mise install` from $HOME, after graft-configs, so a tool
+# a branch adds reaches every machine with its next graft. It installs
+# what any global mise config declares, the machine's own included. A
+# machine without mise, or with every tool in place, has nothing to do.
+# EDEN_MISE names another mise command.
+set -e
+trap 'echo "  !! graft-mise failed at line $LINENO" >&2' ERR
+
+if [[ "${1:-}" == "--api-version" ]]; then
+    echo 1
+    exit 0
+fi
+
+# Report covered paths for eden doctor: none, the configs are graft-configs'
+if [[ "${1:-}" == "--covers" ]]; then
+    exit 0
+fi
+
+MISE="${EDEN_MISE:-mise}"
+
+if ! command -v "$MISE" >/dev/null 2>&1; then
+    echo "  → mise not installed (skipping)"
+    exit 0
+fi
+
+# From $HOME, so no project's own mise config is in scope.
+missing="$(cd "$HOME" && "$MISE" ls --missing 2>/dev/null)" || missing=""
+missing="$(printf '%s\n' "$missing" | awk 'NF { print $1 "@" $2 }' | paste -sd' ' -)"
+if [[ -z "$missing" ]]; then
+    echo "  → mise tools all installed"
+    exit 0
+fi
+
+echo "  → Installing mise tools: $missing"
+if ! (cd "$HOME" && "$MISE" install); then
+    echo "  ✗ mise install failed" >&2
+    exit 1
+fi
