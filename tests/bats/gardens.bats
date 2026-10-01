@@ -627,3 +627,36 @@ mcp_fixture() {
     [ "$status" -ne 0 ]
     [[ "$output" == *"tracker"* ]] || false
 }
+
+@test "garden use switches the garden's MCP servers" {
+    command -v jq >/dev/null || skip "jq not installed"
+    mcp_fixture
+    run garden use work
+    [ "$status" -eq 0 ]
+    [ "$(user_servers)" = "docs mine tracker" ]
+    run garden use personal
+    [ "$status" -eq 0 ]
+    [ "$(user_servers)" = "docs mine notes tracker" ]
+    [ "$(jq -r '.mcpServers.tracker.url' "$CLAUDE_CONFIG_DIR/.claude.json")" = "https://home.tracker" ]
+}
+
+@test "garden use says when the MCP servers could not be switched" {
+    command -v jq >/dev/null || skip "jq not installed"
+    mcp_fixture
+    echo '{"mcpServers": {"tracker": {"type": "http", "url": "https://shared"}}}' > "$REPO/common/.config/mcp/servers.json"
+    run garden use work
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"MCP servers not switched: run 'eden graft mcp'"* ]] || false
+    [ "$(cat "$XDG_STATE_HOME/eden/garden")" = "work" ]
+}
+
+@test "init --no-graft leaves Claude Code's servers alone" {
+    command -v jq >/dev/null || skip "jq not installed"
+    mcp_fixture
+    rm "$XDG_CONFIG_HOME/eden/gardens"
+    run init "$REPO" --garden work --no-graft
+    [ "$status" -eq 0 ]
+    [ "$(user_servers)" = "mine" ]
+    [ ! -e "$XDG_CONFIG_HOME/mcp/servers.json" ]
+    [ "$(cat "$XDG_STATE_HOME/eden/garden")" = work ]
+}

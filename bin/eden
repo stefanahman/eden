@@ -167,6 +167,7 @@ Subcommands:
   add <name>        Grow a declared garden on this machine (then: eden graft)
   remove <name>     Stop growing it
   use <name>        Put a grown garden in view, then run ~/.config/eden/garden.d/*
+                    and switch its MCP servers (--no-graft: not those)
   new <name>        Declare a garden in .eden-gardens
 HELP
             ;;
