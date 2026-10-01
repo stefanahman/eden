@@ -7,20 +7,21 @@
 ## The problem
 
 Today a machine has one branch list, `~/.config/eden/branches`, and in
-practice one context: a work laptop grafts the work branch, a personal
-laptop the personal one. That no longer fits when one machine is used
-for both — work in the daytime, personal in the evening and at weekends
-— and when a context has to run on more than one platform.
+practice one area of life: a work laptop grafts the work branch, a
+personal laptop the personal one. That no longer fits when one machine
+is used for both — work in the daytime, personal in the evening and at
+weekends — and when one area has to run on more than one platform.
 
 ## The approach
 
-**Graft every context a machine is used for, keep them from colliding,
-and let the garden decide what is in view.** Switching gardens changes
-only the few global things that belong to one context — keys,
-workspaces, tools that span many repos. Nothing is re-grafted and
-nothing is removed, so a switch is instant and reversible.
+**Graft every garden a machine grows, keep them from colliding, and let
+the garden in view decide what is global.** Switching gardens changes
+only the few global things that belong to one garden — keys,
+workspaces, tools that span many repos, MCP servers outside a repo.
+The branches' files stay grafted and nothing is removed from disk, so a
+switch is quick and reversible.
 
-This works because most context-specific configuration can be scoped
+This works because most of a garden's configuration can be scoped
 to the repos it belongs to, and repo-scoped configuration never
 collides: a work repo's identity, project settings and project tools
 act only inside that repo, whichever garden is in view.
@@ -35,9 +36,49 @@ Its scripts, repo configuration and packages stay installed.
 | **Eden** | The whole: the trunk and every garden grown from it. |
 | **Trunk** | This repo. Its packages are planted by `eden plant` (stow). |
 | **Branch** | A folder that mirrors `$HOME`, grafted by `eden graft`. Unchanged. |
-| **Context** | A branch that carries one area's identity: its accounts, git remotes and tools — e.g. `work` for Example Corp, `personal` for John Doe. |
-| **Garden** | A named choice of contexts in view, e.g. `work` and `personal`. |
-| **Active garden** | The garden in view on a machine. One at a time. |
+| **Garden** | A named group of one or more branches that make up one area of life — its accounts, git remotes and tools; e.g. `work` for Example Corp, `personal` for John Doe. A branch belongs to at most one garden. |
+| **Shared branch** | A branch in no garden: grafted in every garden, optionally on one platform only. |
+| **Garden in view** | The garden a machine shows. One at a time. |
+
+## Defining gardens
+
+The repo that holds a user's branches declares its gardens in one file
+at its root, `.eden-gardens`. Each machine records which of them it
+grows.
+
+```ini
+[shared]
+common
+mac-desktop    mac
+linux-desktop  arch
+
+[work]
+work
+
+[personal]
+personal
+```
+
+- Each section is a garden, except `[shared]`, which lists the shared
+  branches. Each line is a branch folder, relative to the file. A
+  platform after it (`mac`, `arch`) grafts that branch on that platform
+  only.
+- A machine records, untracked in `~/.config/eden/`, where the repo is
+  and which gardens it grows (`eden garden add <name>`).
+- `eden graft` works out the branch list on every run: the shared
+  branches for this platform, then each grown garden's branches. A
+  garden that gains or loses a branch is one edit to `.eden-gardens`,
+  then `eden graft` on each machine; nothing is registered by hand.
+- Without `.eden-gardens`, `~/.config/eden/branches` works as before.
+
+Setting up a machine:
+
+```sh
+eden init ~/eden-branches
+eden garden add personal
+eden graft
+eden garden use personal
+```
 
 ## Levels
 
@@ -46,84 +87,73 @@ keep the middle level large and the last one small.
 
 | Level | Acts | Active | Mechanisms |
 |---|---|---|---|
-| **Shared** | everywhere | always | shell and editor config, Claude rules and settings, the default git identity |
+| **Shared** | everywhere | always | shell and editor config, Claude rules and settings, the default git identity, shared branches' MCP servers |
 | **Per repo** | inside matching repos only | always | git identity by remote, Claude project config, project MCP servers in the client's local scope |
-| **Per garden** | globally, for one context | only while its garden is in view | keys, workspaces, tools that span repos (configured per session), browser profile |
+| **Per garden** | globally, for one garden | only while its garden is in view | keys, workspaces, tools that span repos (configured per session), browser profile, the garden's MCP servers outside a repo |
 
 ### Per-repo mechanisms
 
-- **Git identity by remote.** An identity declares the remotes it
-  applies to; `graft-git` writes
-  `includeIf "hasconfig:remote.*.url:<pattern>"` (git ≥ 2.36). Both the
-  SSH and HTTPS forms need a pattern, e.g.
-  `git@github.com:example-corp/**` and
-  `https://github.com/example-corp/**`. A repo without a remote uses
-  `_default`. Git forbids remote URLs in files included this way;
-  identity files have none. Default when nothing is declared: today's
-  `gitdir:~/Development/<name>/`.
-- **Project MCP servers in the client's local scope.** Claude Code's
-  local scope keeps a server "only in the project where you added it",
-  stored in `~/.claude.json` under the project's path. `graft-mcp`
-  writes project servers there (through `claude mcp add-json -s local`,
-  run in the repo), instead of a generated `.mcp.json` in the repo,
-  which leaves an untracked file that nothing ignores. Local scope also
-  reaches a repo's subdirectories and its linked git worktrees, which
-  resolve to the main checkout's path; an untracked `.mcp.json` is
-  absent from a fresh worktree.
+- **Git identity by remote.** *Built:* docs/grafters.md, `graft-git`.
+- **Project MCP servers in the client's local scope.** *Built:*
+  docs/grafters.md, "Project Scope".
 
 ### Per-garden mechanisms
 
-- **Session environment** for tools that span repos: each context has
+- **Session environment** for tools that span repos: each garden has
   its own terminal-multiplexer session, and that session's server starts
-  with the context's environment (a tool's config path, for example).
+  with the garden's environment (a tool's config path, for example).
   Panes inherit the server's environment, so everything started in the
   session sees it — including workspaces that other tools create inside
   it without passing any environment of their own. Setting variables
   per workspace is not enough for that reason.
 - **Garden-aware readers**: the few programs that own global keys and
-  workspaces read the active garden and show only its contexts.
+  workspaces read the garden in view and show only its branches and the
+  shared ones.
+- **MCP servers outside a repo.** A shared branch's
+  `.config/mcp/servers.json` goes into the client's user scope always,
+  a garden branch's only while its garden is in view. `eden garden use`
+  re-runs the MCP grafter, which removes the servers it added before
+  that no branch in view declares any more; servers added by hand are
+  never touched. A client already running keeps the servers it started
+  with.
 
 ## Rules that make coexistence safe
 
-1. **A collision is an error.** Two branches writing the same target —
-   a link, or a named entry in a merged output (an MCP server, a secret
-   id, a repo path) — stop the graft with both branches named. A
-   collision is designed out: made per repo, per session, or moved to a
-   shared branch. This replaces today's documented "warn but continue
-   on conflicts" (docs/grafters.md) and today's inconsistent behaviour,
-   where some grafters keep the link already on disk and others let the
-   last branch win.
-2. **Platform-only entries are gated.** A branch can mark entries for
-   one platform. Today only `graft-brew` checks the platform;
-   `graft-configs` links every entry on every OS.
+1. **A collision is an error.** *Built:* docs/grafters.md, "Collisions
+   between branches".
+2. **Platform-only entries are gated.** *Built:* a branch's
+   `platforms/<mac|arch>/` folder (docs/branches-and-secrets.md, "Platform
+   folders").
 3. **Secrets name their account.** *Built:* docs/branches-and-secrets.md,
    `op_account`.
-4. **The environment is shell-neutral.** Env files in POSIX `sh` syntax,
-   sourced by zsh and bash alike, instead of zsh-only `zshenv.d`.
-5. **Shared config directories tolerate several contexts.** A tool that
-   reads every file in a directory (`*.d/*.yaml`) sees both contexts'
-   files at once; if it rejects duplicate names or keys, it must either
-   select by garden or the contexts must not share names.
+4. **The environment is shell-neutral.** *Built:*
+   docs/branches-and-secrets.md, "Environment".
+5. **Shared config directories tolerate several gardens.** A tool that
+   reads every file in a directory (`*.d/*.yaml`) sees every grown
+   garden's files at once; if it rejects duplicate names or keys, it must
+   either select by garden or the gardens must not share names.
 6. **Grafting reports failure.** *Built:* docs/grafters.md, "Error
    Handling".
 
 ## Switching gardens
 
-`eden garden use <name>` records the active garden in one state file
-and asks the garden-aware readers to reload. It does not graft.
+`eden garden use <name>` records the garden in view in one state file,
+`~/.local/state/eden/garden`, re-runs the MCP grafter, and runs the
+platform's `garden-apply <name>` when one is on `PATH`, which reloads
+what cannot read the state itself. Readers that read the state on each
+use need nothing.
 
-Where the state and the command live is open: in the branches first,
-as a script, moving into the trunk once the shape has proven itself; or
-in the trunk from the start.
+The command was first proven as a script in a branches repo; it moves
+into the trunk together with `.eden-gardens`.
 
 ## Deferred, and why
 
 | Deferred | Needed only when |
 |---|---|
-| Removing what an unregistered branch grafted (link scan, record of merged entries) | a branch is unregistered — rare, since contexts stay grafted. `eden doctor` reports leftovers meanwhile. |
+| Removing what an unregistered branch grafted (link scan, record of merged entries) | a branch stops being grafted on a machine — rare, since gardens stay grafted. `eden doctor` reports leftovers meanwhile. The MCP grafter keeps its own record, for garden MCP servers. |
 | Branch kinds and precedence | a branch must override another's output. None does today: no branch grafts a path the trunk plants. |
 | Check before apply (grafter API v2, plan mode) | collisions can't be caught inside each grafter. The runner accepts exactly one API version (bin/eden-graft:50), so a v2 must either move all grafters in one change or first teach the runner to accept both. |
-| A Claude configuration folder per garden (`CLAUDE_CONFIG_DIR`) | two contexts need separate Claude accounts. Claude Code documents the variable for running accounts side by side. |
+| A Claude configuration folder per garden (`CLAUDE_CONFIG_DIR`) | two gardens need separate Claude accounts. Claude Code documents the variable for running accounts side by side. |
 
 ## Interfaces across platforms
 
@@ -145,21 +175,23 @@ describe the need and the platform branch supplies the implementation.
 
 ## Documentation that changes when this is built
 
-- ARCHITECTURE.md: Branches (contexts, gardens), Layering Guidance (the
+- ARCHITECTURE.md: Branches (gardens, shared branches, `.eden-gardens`), Layering Guidance (the
   three levels), Constraints (grafting and removal).
 - docs/grafters.md: the collision rule, platform gating, identities by
-  remote, project MCP servers in local scope.
+  remote, project MCP servers in local scope, garden MCP servers.
 - docs/branches-and-secrets.md: "Context Switching" becomes gardens;
-  secrets name their account.
+  setup with `eden init` and `eden garden add`; secrets name their
+  account.
 
 ## Open questions
 
-1. How platform-only entries are marked, and the platform names (the
-   trunk uses `mac` and `arch`).
-2. Where the garden state and `eden garden` live, and how readers are
-   told to reload.
-3. Whether Cursor has a per-project equivalent of Claude Code's local
-   scope.
+1. *Settled:* platform-only parts live in a branch's `platforms/<platform>/`
+   folder, with the trunk's names, `mac` and `arch`.
+2. *Settled:* the state is `~/.local/state/eden/garden` and the command
+   `eden garden`; readers read the state on each use, and a platform's
+   `garden-apply` reloads the rest.
+3. *Settled:* Cursor is no longer supported, so only Claude Code's local
+   scope matters.
 4. The data format for keys, and whether renderers live in the trunk or
    in platform branches.
 5. Where machine-specific facts live (network, window positions,

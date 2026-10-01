@@ -1,0 +1,13 @@
+# Eden's environment: every branch's env files, grafted into
+# ~/.config/eden/env.d/ by graft-env. POSIX sh. Bash sources this from
+# ~/.config/bash/profile (login shells) and from one line in ~/.bashrc
+# (interactive shells), which eden doctor checks for:
+#
+#   . ~/.config/bash/env
+#
+# zsh loads the same files from .zshenv. Each file may run more than once.
+for eden_env_file in "${XDG_CONFIG_HOME:-$HOME/.config}"/eden/env.d/*.sh; do
+    # shellcheck source=/dev/null  # whichever env files are grafted
+    [ -r "$eden_env_file" ] && . "$eden_env_file"
+done
+unset eden_env_file

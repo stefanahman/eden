@@ -1,8 +1,12 @@
 #!/bin/bash
-# graft-zsh - Graft zsh configs from branches (zshenv.d/, zshrc.d/)
+# graft-env - Graft env files from branches into ~/.config/eden/env.d/
 # Part of Eden's pluggable grafter system
+#
+# A branch's .config/eden/env.d/*.sh are POSIX sh, so bash and zsh load
+# them alike: bash through ~/.config/bash/env (from its profile and
+# ~/.bashrc), zsh from .zshenv. Keep them to exports that can run twice.
 set -e
-trap 'echo "  !! graft-zsh failed at line $LINENO" >&2' ERR
+trap 'echo "  !! graft-env failed at line $LINENO" >&2' ERR
 
 if [[ "${1:-}" == "--api-version" ]]; then
     echo 1
@@ -11,7 +15,7 @@ fi
 
 # Report covered paths for eden doctor
 if [[ "${1:-}" == "--covers" ]]; then
-    echo ".config/zsh/zshenv.d"
+    echo ".config/eden/env.d"
     exit 0
 fi
 
@@ -21,41 +25,37 @@ if [[ -z "$EDEN_ROOT" ]]; then
     EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
 fi
 
-echo "  → Grafting zsh configs from branches"
-
-# Graft zsh configs from each branch
 # shellcheck source=lib/branches.sh
 source "$EDEN_ROOT/lib/branches.sh"
 # shellcheck source=lib/collisions.sh
 source "$EDEN_ROOT/lib/collisions.sh"
 
-BRANCHES_FILE="$(eden_branches_file)"
-if [[ ! -f "$BRANCHES_FILE" ]]; then
-    echo "  ⚠ No branches file found"
+if [[ ! -f "$(eden_branches_file)" ]]; then
+    echo "  → No branches registered (skipping)"
     exit 0
 fi
 
-ZSHENV_D="${XDG_CONFIG_HOME:-$HOME/.config}/zsh/zshenv.d"
+ENV_D="${XDG_CONFIG_HOME:-$HOME/.config}/eden/env.d"
 GRAFTED_COUNT=0
 
 # graft_all claims|link: with "claims" only list each target and its
-# branch; with "link" link every .zsh file from each branch's zshenv.d/.
+# branch; with "link" link every .sh file from each branch's env.d/.
 graft_all() {
     local mode="$1" branch_path branch_name file target
 
     while IFS= read -r branch_path; do
-        [[ -d "$branch_path/.config/zsh/zshenv.d" ]] || continue
+        [[ -d "$branch_path/.config/eden/env.d" ]] || continue
         branch_name=$(eden_branch_name "$branch_path")
 
         if [[ "$mode" == link ]]; then
-            echo "  → Grafting zsh from: $branch_name"
-            mkdir -p "$ZSHENV_D"
+            echo "  → Grafting env from: $branch_name"
+            mkdir -p "$ENV_D"
             GRAFTED_COUNT=$((GRAFTED_COUNT + 1))
         fi
 
-        for file in "$branch_path/.config/zsh/zshenv.d"/*.zsh; do
+        for file in "$branch_path/.config/eden/env.d"/*.sh; do
             [[ -e "$file" ]] || continue
-            target="$ZSHENV_D/$(basename "$file")"
+            target="$ENV_D/$(basename "$file")"
             if [[ "$mode" == claims ]]; then
                 printf '%s\t%s\n' "$(eden_home_path "$target")" "$branch_name"
             else
@@ -69,10 +69,9 @@ graft_all claims | eden_check_collisions || exit 1
 graft_all link
 
 if [[ $GRAFTED_COUNT -eq 0 ]]; then
-    echo "  → No zsh configs found in branches"
+    echo "  → No env files found in branches"
 else
-    echo "  → Grafted zsh from $GRAFTED_COUNT branch(es)"
+    echo "  → Grafted env from $GRAFTED_COUNT branch(es)"
 fi
 
 exit 0
-

@@ -20,6 +20,16 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 0
 fi
 
+
+# claude_stub: a stand-in for the claude CLI that records each call as
+# "<directory> <arguments>" in $SANDBOX/claude-calls.
+claude_stub() {
+    mkdir -p "$SANDBOX/bin"
+    printf '#!/bin/bash\necho "$PWD $*" >> "%s/claude-calls"\n' "$SANDBOX" > "$SANDBOX/bin/claude"
+    chmod +x "$SANDBOX/bin/claude"
+    export EDEN_CLAUDE_CLI="$SANDBOX/bin/claude"
+}
+
 # =============================================================================
 # Test 1: No branches file
 # =============================================================================
@@ -86,12 +96,14 @@ if [[ "$count" == "2" ]]; then pass; else fail "expected 2 servers, got $count";
 sandbox_teardown
 
 # =============================================================================
-# Test 4: Project scope — .mcp.json written to target
+# Test 4: Project scope — Claude Code's local scope, not a .mcp.json
 # =============================================================================
 sandbox_setup
 
 branch=$(create_test_branch "test-branch")
-project_target="$SANDBOX/project-target"
+# The path as $PWD spells it after a cd: no doubled slash (macOS TMPDIR
+# ends in one), so it matches what the stub logs.
+project_target="$(cd "$SANDBOX" && pwd)/project-target"
 mkdir -p "$project_target"
 
 mkdir -p "$branch/projects/myapp/.mcp"
@@ -100,15 +112,16 @@ cat > "$branch/projects/myapp/.mcp/servers.json" <<'JSON'
 JSON
 echo "$project_target" > "$branch/projects/myapp/.eden-target"
 register_branch "$branch"
+claude_stub
 
-describe "project scope writes .mcp.json in target dir"
+describe "project scope writes no .mcp.json in the target"
 output=$("$GRAFTER" 2>&1)
-assert_file_exists "$project_target/.mcp.json"
+assert_not_exists "$project_target/.mcp.json"
 
-describe "project .mcp.json contains project servers"
-count=$(jq '.mcpServers | length' "$project_target/.mcp.json")
-if [[ "$count" == "1" ]]; then pass; else fail "expected 1 server, got $count"; fi
+describe "project servers go to Claude Code's local scope, run in the target"
+if grep -qF "$project_target mcp add-json -s local project-server" "$SANDBOX/claude-calls"; then pass; else fail "no add-json for project-server in $project_target"; fi
 
+unset EDEN_CLAUDE_CLI
 sandbox_teardown
 
 # =============================================================================
@@ -117,7 +130,9 @@ sandbox_teardown
 sandbox_setup
 
 branch=$(create_test_branch "test-branch")
-project_target="$SANDBOX/nested-target"
+# The path as $PWD spells it after a cd: no doubled slash (macOS TMPDIR
+# ends in one), so it matches what the stub logs.
+project_target="$(cd "$SANDBOX" && pwd)/nested-target"
 mkdir -p "$project_target"
 
 mkdir -p "$branch/projects/games/mygame/.mcp"
@@ -126,14 +141,16 @@ cat > "$branch/projects/games/mygame/.mcp/servers.json" <<'JSON'
 JSON
 echo "$project_target" > "$branch/projects/games/mygame/.eden-target"
 register_branch "$branch"
+claude_stub
 
-describe "nested project scope writes .mcp.json"
+describe "nested project scope reaches the target's local scope"
 output=$("$GRAFTER" 2>&1)
-assert_file_exists "$project_target/.mcp.json"
+if grep -qF "$project_target mcp add-json -s local game-server" "$SANDBOX/claude-calls"; then pass; else fail "no add-json for game-server in $project_target"; fi
 
 describe "reports nested project name"
 assert_output_contains "$output" "games/mygame"
 
+unset EDEN_CLAUDE_CLI
 sandbox_teardown
 
 # =============================================================================
@@ -177,6 +194,7 @@ cat > "$branch/projects/myapp/.mcp/servers.json" <<'JSON'
 JSON
 echo "$project_target" > "$branch/projects/myapp/.eden-target"
 register_branch "$branch"
+claude_stub
 
 output=$("$GRAFTER" 2>&1)
 
@@ -184,54 +202,10 @@ describe "global config has only global server"
 global_has_proj=$(jq '.mcpServers | has("project-srv")' "$HOME/.config/mcp/servers.json")
 if [[ "$global_has_proj" == "false" ]]; then pass; else fail "project server leaked into global"; fi
 
-describe "project .mcp.json has only project server"
-proj_has_global=$(jq '.mcpServers | has("global-srv")' "$project_target/.mcp.json")
-if [[ "$proj_has_global" == "false" ]]; then pass; else fail "global server leaked into project"; fi
+describe "the project's local scope has only the project server"
+if grep -qF "add-json -s local project-srv" "$SANDBOX/claude-calls" && ! grep -qF "global-srv" "$SANDBOX/claude-calls"; then pass; else fail "global server leaked into project"; fi
 
-sandbox_teardown
-
-# =============================================================================
-# Test 8: Cursor sync — .cursor/mcp.json written if .cursor/ exists
-# =============================================================================
-sandbox_setup
-
-branch=$(create_test_branch "test-branch")
-project_target="$SANDBOX/cursor-target"
-mkdir -p "$project_target/.cursor"
-
-mkdir -p "$branch/projects/myapp/.mcp"
-cat > "$branch/projects/myapp/.mcp/servers.json" <<'JSON'
-{"mcpServers": {"cursor-srv": {"command": "/usr/bin/cursor", "args": []}}}
-JSON
-echo "$project_target" > "$branch/projects/myapp/.eden-target"
-register_branch "$branch"
-
-describe "project with .cursor/ dir gets .cursor/mcp.json"
-output=$("$GRAFTER" 2>&1)
-assert_file_exists "$project_target/.cursor/mcp.json"
-
-sandbox_teardown
-
-# =============================================================================
-# Test 9: No .cursor/ dir — .cursor/mcp.json not created
-# =============================================================================
-sandbox_setup
-
-branch=$(create_test_branch "test-branch")
-project_target="$SANDBOX/no-cursor-target"
-mkdir -p "$project_target"
-
-mkdir -p "$branch/projects/myapp/.mcp"
-cat > "$branch/projects/myapp/.mcp/servers.json" <<'JSON'
-{"mcpServers": {"srv": {"command": "/usr/bin/srv", "args": []}}}
-JSON
-echo "$project_target" > "$branch/projects/myapp/.eden-target"
-register_branch "$branch"
-
-describe "project without .cursor/ dir skips .cursor/mcp.json"
-output=$("$GRAFTER" 2>&1)
-assert_not_exists "$project_target/.cursor/mcp.json"
-
+unset EDEN_CLAUDE_CLI
 sandbox_teardown
 
 # =============================================================================

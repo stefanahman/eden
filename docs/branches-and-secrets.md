@@ -70,22 +70,58 @@ my-branch/
 ├── Brewfile                   # Branch-specific brew packages (macOS)
 ├── .config/
 │   ├── mcp/servers.json       # MCP servers (merged by graft-mcp)
-│   ├── git/identities/work    # Git identity (routed by graft-git)
-│   └── zsh/zshenv.d/work.zsh  # Env vars (collected by graft-zsh)
+│   ├── git/identities/work    # Git identity, for its remotes (graft-git)
+│   ├── eden/env.d/work.sh     # Env vars, POSIX sh, for bash and zsh (graft-env)
+│   └── zsh/zshenv.d/work.zsh  # zsh-only env (collected by graft-zsh)
 ├── .local/bin/                # Scripts/wrappers (collected by graft-bin)
 │   ├── mcp-slack
 │   └── mcp-custom
 ├── .claude/
 │   ├── rules/                 # Claude rules (collected by graft-claude)
 │   └── skills/                # Claude skills
-└── projects/                  # Project-scoped configs
-    └── my-app/
-        ├── .eden-target       # Contains: ~/Development/my-app
-        ├── .claude/skills/    # Symlinked into the project
-        └── .mcp/servers.json  # Generated as .mcp.json in the project
+├── projects/                  # Project-scoped configs
+│   └── my-app/
+│       ├── .eden-target       # Contains: ~/Development/my-app
+│       ├── .claude/skills/    # Symlinked into the project
+│       └── .mcp/servers.json  # Claude Code's local scope for the project
+└── platforms/                 # Parts for one platform only
+    ├── mac/                   # Grafted on macOS, right after the branch
+    │   ├── .eden-graft
+    │   └── .local/bin/open-browser
+    └── arch/                  # Grafted on Arch Linux
+        └── .eden-graft
 ```
 
 Grafters discover and merge content from each path. See [grafters.md](grafters.md) for which grafter handles what.
+
+### Environment
+
+Env files in a branch's `.config/eden/env.d/*.sh` are POSIX sh, grafted
+into `~/.config/eden/env.d/` by `graft-env`, and loaded by both shells:
+zsh from `.zshenv`, bash from `~/.config/bash/env`, which bash login
+shells source through the trunk's profile. Interactive bash reads only
+`~/.bashrc`, which Eden does not own, so it needs one line there:
+
+```sh
+. ~/.config/bash/env
+```
+
+`eden doctor` checks for it where bash is the login shell. Keep env files
+to exports that can run twice; zsh-only settings stay in
+`.config/zsh/zshenv.d/*.zsh`.
+
+### Platform folders
+
+A branch that is used on more than one platform keeps its platform-only
+parts in `platforms/<platform>/`, named as the trunk's platform packages
+are: `mac` and `arch`. Each folder mirrors `$HOME` like the branch itself,
+with its own `.eden-graft`, `.local/bin/` and so on, and is grafted right
+after its branch on that platform only. Nothing else marks an entry as
+platform-only, so every grafter gates it the same way. A platform folder
+and its branch writing the same target collide like two branches.
+
+`eden branch list` shows a branch's platform folders and which one this
+machine grafts. `EDEN_PLATFORM=mac` or `arch` overrides the detection.
 
 ## Secrets Integration
 

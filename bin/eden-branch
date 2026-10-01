@@ -194,8 +194,21 @@ list_branches() {
             fi
             
             # Show if it has MCP configs
-            if [ -f "$display_path/.config/mcp/servers.json" ] || [ -f "$display_path/.cursor/mcp.json" ]; then
+            if [ -f "$display_path/.config/mcp/servers.json" ]; then
                 echo "    MCP: config found"
+            fi
+
+            # Show its platform folders, and which one this machine grafts
+            if [ -d "$display_path/platforms" ]; then
+                local platform here names=""
+                here="$(eden_platform)" || here=""
+                for platform in "$display_path/platforms"/*/; do
+                    [ -d "$platform" ] || continue
+                    platform="$(basename "$platform")"
+                    [ "$platform" = "$here" ] && platform="$platform (grafted here)"
+                    names="${names:+$names, }$platform"
+                done
+                [ -n "$names" ] && echo "    Platforms: $names"
             fi
         else
             echo "  ✗ $branch_path (not found)"
@@ -307,7 +320,6 @@ Private configuration branch for Eden.
 - \`.eden-secrets\`: Secret requirements for 1Password
 - \`.config/eden/local/\`: Configuration files (git, etc.)
 - \`.local/bin/\`: Branch-specific scripts
-- \`.cursor/mcp.json\`: Cursor MCP server configurations
 
 ## Usage
 

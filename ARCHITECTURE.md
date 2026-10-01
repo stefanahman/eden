@@ -28,7 +28,7 @@ Common is stowed first, then platform overlays. Stow merges directories naturall
 eden/
 ├── eden                    # Root wrapper (copies to ~/.local/bin/eden)
 ├── bin/                    # Core scripts: eden, eden-doctor, eden-graft, eden-update, ...
-├── lib/                    # Shell libraries sourced by bin/ and grafters (branches.sh)
+├── lib/                    # Shell libraries sourced by bin/ and grafters (branches.sh, collisions.sh)
 ├── install.sh              # Bootstrap installer (only requires git + stow)
 ├── packages/
 │   ├── common/             # Stows to $HOME — shared dotfiles + scripts
@@ -66,6 +66,7 @@ integrate branch content. Each grafter handles one concern independently.
 | `graft-brew` | Runs `brew bundle` on branch Brewfiles (macOS only) |
 | `graft-claude` | Symlinks Claude rules, agents, commands, output styles, skills, `settings.json`, `statusline.sh`, `CLAUDE.md` and `*.local.md` |
 | `graft-configs` | Symlinks paths listed in branch `.eden-graft` allowlists |
+| `graft-env` | Symlinks POSIX sh env files into `~/.config/eden/env.d/`, loaded by bash and zsh |
 | `graft-git` | Creates git `includeIf` directives for branch identities |
 | `graft-mcp` | Merges MCP server JSON from all branches |
 | `graft-secrets` | Collects 1Password secret definitions |
@@ -73,8 +74,9 @@ integrate branch content. Each grafter handles one concern independently.
 
 Grafters support two scopes:
 - **Global**: branch configs merged into `$HOME` (e.g. `~/.config/mcp/servers.json`)
-- **Project**: configs placed in external project directories via `.eden-target` markers
-  (e.g. `projects/games/greenwash/.mcp/servers.json` → `~/Development/.../greenwash/.mcp.json`)
+- **Project**: configs for one repo, found through `.eden-target` markers
+  (e.g. `projects/games/my-game/.mcp/servers.json` → Claude Code's local scope for
+  `~/Development/games/my-game`)
 
 See [docs/grafters.md](docs/grafters.md) for strategies, patterns, and how to create new grafters.
 
@@ -139,7 +141,7 @@ A minimal but functional branch demonstrating each grafter (configs, mcp, zsh, g
 
 **Personal branches (private, `eden graft`)** -- where your real configs live:
 
-Git identity (`_default` + directory-scoped), MCP servers, secrets, Brewfiles, Claude skills, binaries.
+Git identity (`_default`, plus identities scoped by remote or directory), MCP servers, secrets, Brewfiles, Claude skills, binaries.
 See [docs/branches-and-secrets.md](docs/branches-and-secrets.md).
 
 ## Non-Goals

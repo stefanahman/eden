@@ -2,7 +2,7 @@
 
 ## Overview
 
-Grafters are pluggable scripts that intelligently merge configurations from multiple branches. Each grafter uses a specific **strategy** to handle conflicts and combine sources.
+Grafters are pluggable scripts that intelligently merge configurations from multiple branches. Each grafter uses a specific **strategy** to combine sources, and none lets two branches write the same target.
 
 ## Quick Reference
 
@@ -12,10 +12,11 @@ Grafters are pluggable scripts that intelligently merge configurations from mult
 | `graft-brew` | Aggregate | Runs `brew bundle` on branch Brewfiles (macOS only) | `Brewfile` |
 | `graft-claude` | Collection | Symlinks Claude rules/agents/commands/skills + top-level files (global + project) | `.claude/{rules,agents,commands,skills}/`, `.claude/{settings.json,statusline.sh,CLAUDE.md,*.local.md}` |
 | `graft-configs` | Allowlist | Symlinks paths listed in `.eden-graft` | Varies (per allowlist) |
+| `graft-env` | Collection | Symlinks POSIX sh env files into `~/.config/eden/env.d/`, loaded by bash and zsh | `.config/eden/env.d/*.sh` |
 | `graft-git` | Generate | Creates `includeIf` directives for branch git identities | `.config/git/identities/*` |
 | `graft-mcp` | Merge | Merges MCP server JSON from all branches (global + project) | `.config/mcp/servers.json` |
 | `graft-secrets` | Aggregate | Collects 1Password secret definitions for `eden secrets` | `.eden-secrets` |
-| `graft-zsh` | Collection | Symlinks zsh env files into `~/.config/zsh/zshenv.d/` | `.config/zsh/zshenv.d/*.zsh` |
+| `graft-zsh` | Collection | Symlinks zsh-only env files into `~/.config/zsh/zshenv.d/` | `.config/zsh/zshenv.d/*.zsh` |
 
 ## Config Deployment: `.eden-graft` vs Dedicated Grafters
 
@@ -28,7 +29,7 @@ Most branch configs are deployed via the **`.eden-graft` allowlist** — a simpl
 | Use `.eden-graft` when... | Create a grafter when... |
 |---|---|
 | Only one branch provides the config | Multiple branches contribute to the same file |
-| Simple symlink is sufficient | Configs need merging, routing, or conflict detection |
+| Simple symlink is sufficient | Configs need merging or routing |
 | Examples: karabiner, nvim, skhd | Examples: MCP servers, git identities, shell env |
 
 ### How `graft-configs` works
@@ -58,7 +59,7 @@ Create a grafter when branches need to contribute to the same logical configurat
 ✅ **Create a grafter if:**
 - Multiple branches provide different values for the same thing (MCP servers, binaries, env vars)
 - Branches need to add to a shared collection
-- You need intelligent merging or conflict detection
+- You need intelligent merging or routing
 
 ❌ **Don't create a grafter if:**
 - Only one branch will ever provide the file (karabiner, nvim)
@@ -81,7 +82,7 @@ branch/
     ├── my-app/
     │   ├── .eden-target     # contains: ~/Development/my-app
     │   ├── .claude/skills/  # → ~/Development/my-app/.claude/skills/ (symlinked)
-    │   └── .mcp/servers.json# → ~/Development/my-app/.mcp.json (generated)
+    │   └── .mcp/servers.json# → Claude Code's local scope for ~/Development/my-app
     └── games/my-game/       # any nesting depth allowed
         ├── .eden-target
         └── .mcp/servers.json
@@ -89,9 +90,21 @@ branch/
 
 Directories without `.eden-target` are organizational folders (silently skipped).
 
+An `.eden-target` lists where the repo is checked out, one path per line;
+the first that exists on this machine wins, since machines check a repo
+out in different places (`~/Development/app` on one, `~/Development/private/app`
+on another). Blank lines and `#` comments are skipped, and `~`, `$HOME` and
+`$EDEN_ROOT` expand as in the branch list. A project none of whose paths
+exist is skipped with a warning.
+
 **Grafters with project scope:**
 - `graft-claude` — symlinks `.claude/{rules,agents,commands,skills}` and top-level `settings.json`, `statusline.sh`, `CLAUDE.md`, `*.local.md` into target (`*.local.md` = Claude Code's per-project plugin-settings files; `settings.local.json` is never grafted because Claude Code writes to it)
-- `graft-mcp` — generates `.mcp.json` (Claude Code) and `.cursor/mcp.json` in target
+- `graft-mcp` — adds the servers to Claude Code's local scope for the target repo
+  (`claude mcp add-json -s local`, run in the repo). Local scope keeps them in Claude Code's state
+  file (`~/.claude.json`, or under `CLAUDE_CONFIG_DIR`), not in the repo, so they
+  also reach its subdirectories and linked worktrees and leave no untracked
+  file. A server already in place is left alone; a changed one is replaced.
+  An untracked `.mcp.json` from earlier grafts is named, not deleted.
 
 ### 1. Collection (Symlink)
 
@@ -101,7 +114,8 @@ Directories without `.eden-target` are organizational folders (silently skipped)
 
 **Examples:**
 - `graft-bin`: Binaries from branches → `~/.eden/bin/`
-- `graft-zsh`: Env files from branches → `~/.config/zsh/zshenv.d/`
+- `graft-env`: POSIX sh env files from branches → `~/.config/eden/env.d/`
+- `graft-zsh`: zsh-only env files from branches → `~/.config/zsh/zshenv.d/`
 - `graft-claude`: Claude rules/agents/commands/skills + top-level files from branches → `~/.claude/` + project targets
 
 **Pattern:**
@@ -112,10 +126,10 @@ for item in "$branch/.local/bin"/*; do
 done
 ```
 
-**Conflict resolution:** 
-- Detect conflicts (file already exists)
-- Last branch wins (or warn user)
-- Keep source in branch (editable)
+**Collisions:** two branches linking the same target collide, and so does a
+target inside another branch's linked directory (see
+[Collisions between branches](#collisions-between-branches)). A real file
+at the target is left alone and reported. Keep source in branch (editable).
 
 **Pros:**
 - Immediate updates (edit in branch, reflects instantly)
@@ -124,7 +138,6 @@ done
 
 **Cons:**
 - Can break if branches move
-- Conflicts need manual resolution
 
 ### 2. Merge (JSON/Data)
 
@@ -133,7 +146,7 @@ done
 **How it works:** Parse, merge, and write combined output
 
 **Examples:**
-- `graft-mcp`: MCP servers from branches → `~/.config/mcp/servers.json` (global) + `.mcp.json` per project
+- `graft-mcp`: MCP servers from branches → `~/.config/mcp/servers.json` (global) + Claude Code's local scope per project
 
 **Pattern:**
 ```bash
@@ -150,10 +163,8 @@ done
 echo "$MERGED_JSON" > ~/.config/mcp/servers.json
 ```
 
-**Conflict resolution:**
-- Last branch wins for duplicate keys
-- Or: detect and warn about conflicts
-- Or: custom merge logic per data type
+**Collisions:** a named entry, such as an MCP server, given by two branches
+collides; nothing is written.
 
 **Pros:**
 - Single canonical file
@@ -174,21 +185,35 @@ echo "$MERGED_JSON" > ~/.config/mcp/servers.json
 **Examples:**
 - `graft-git`: Git includeIf directives → `~/.config/eden/local/gitconfig`
 
-**Pattern:**
-```bash
-# For each branch with git context
-for context in branches; do
-    # Add routing directive
-    cat >> ~/.config/eden/local/gitconfig << EOF
-[includeIf "gitdir:~/Development/$context/"]
-    path = ~/.config/eden/local/gitconfig.$context
-EOF
-done
+**Pattern:** `graft-git` links each identity into `~/.config/git/identities/`
+and writes the includes into `~/.config/eden/local/gitconfig`. `_default` is
+included always. Another identity applies to the repos whose remotes it
+names, in an `[eden]` section of the identity file:
+
+```ini
+# .config/git/identities/example-corp
+[user]
+    email = john@example-corp.com
+[eden]
+    remote = git@github.com:example-corp/**
+    remote = https://github.com/example-corp/**
 ```
 
-**Conflict resolution:**
-- Directory-based (git) or conditional routing
-- No conflicts - each context has its own route
+which becomes one include per pattern (git ≥ 2.36; SSH and HTTPS remotes
+each need theirs):
+
+```ini
+[includeIf "hasconfig:remote.*.url:git@github.com:example-corp/**"]
+    path = ~/.config/git/identities/example-corp
+```
+
+A repo with no remote, or none that matches, keeps `_default`. An identity
+naming no remotes applies by directory instead,
+`[includeIf "gitdir:~/Development/<name>/"]`. An identity file must not set
+a remote URL: git refuses one in a file included this way.
+
+**Collisions:** each identity routes on its own; two branches providing an
+identity of the same name collide.
 
 **Pros:**
 - Preserves branch-specific configs
@@ -217,9 +242,8 @@ for branch in branches; do
 done
 ```
 
-**Conflict resolution:**
-- Usually none needed (read-only)
-- Can detect duplicates and warn
+**Collisions:** a secret `id` given by two branches collides. A branch may
+reuse an id from the trunk's own `.eden-secrets` to override it.
 
 **Pros:**
 - No file generation
@@ -261,6 +285,7 @@ packages/eden/.eden/libexec/grafters/
 ├── graft-brew         # Aggregate strategy (macOS only)
 ├── graft-claude       # Collection strategy
 ├── graft-configs      # Allowlist strategy (.eden-graft)
+├── graft-env          # Collection strategy
 ├── graft-git          # Generate strategy
 ├── graft-mcp          # Merge strategy
 ├── graft-secrets      # Aggregate strategy
@@ -296,15 +321,19 @@ trap 'echo "  !! graft-<name> failed at line $LINENO" >&2' ERR
   and names the ones that failed
 - Never prompt when `EDEN_GRAFT_FORCE=true` (set by `eden graft --force`):
   apply without asking, for non-interactive runs
-- Warn but continue on conflicts
-- Report summary (added/skipped/conflicts)
+- Fail on a collision between branches, before writing anything (see
+  [Collisions between branches](#collisions-between-branches))
+- Report summary (added/skipped, and targets left alone because a real
+  file is in the way)
 
 ## Common Patterns
 
 ### Reading the Branch List
 
 Every grafter reads the list through `lib/branches.sh`, never the file
-directly:
+directly, and walks the graft roots: each registered branch, followed by
+its `platforms/<platform>/` folder when it has one for this machine
+(see [Platform folders](branches-and-secrets.md#platform-folders)):
 
 ```bash
 # shellcheck source=lib/branches.sh
@@ -313,32 +342,53 @@ source "$EDEN_ROOT/lib/branches.sh"
 while IFS= read -r branch_path; do
     # branch_path is absolute: blanks and comments are skipped,
     # and ~, $EDEN_ROOT and $HOME are expanded
+    branch_name=$(eden_branch_name "$branch_path")   # "work", or "work (mac)"
     ...
-done < <(eden_branches)
+done < <(eden_graft_roots)
 ```
+
+`eden_branches` lists the registered entries alone, for commands that
+show or edit the list.
 
 `eden_branch_expand <entry>` expands one entry the same way (for example
 the path in a project's `.eden-target`). Nothing else in an entry is
 evaluated.
 
-### Conflict Detection
+### Collisions between branches
+
+Two branches writing the same target is an error, never "last branch
+wins". A grafter first lists every target it is about to write, then
+checks the list with `lib/collisions.sh`, and only then writes:
+
 ```bash
-if [ -L "$target" ]; then
-    current=$(readlink "$target")
-    if [ "$current" != "$source" ]; then
-        # Conflict: already linked elsewhere
-    fi
-elif [ -e "$target" ]; then
-    # Conflict: file exists (not a symlink)
-fi
+# shellcheck source=lib/collisions.sh
+source "$EDEN_ROOT/lib/collisions.sh"
+
+# graft_all claims|link: the same walk twice. With "claims" it prints
+# one "target<TAB>branch" line per target; with "link" it writes.
+graft_all claims | eden_check_collisions || exit 1
+graft_all link
 ```
+
+A target is a path shown with `~` (`eden_home_path`) or, for a named entry
+in a merged output, a label such as `MCP server <name>` or
+`secret <id>`. `eden_check_collisions` reports a target listed by two
+branches, and a target inside another branch's target (a link into a
+linked directory would write into that branch), then returns 1. The
+grafter exits without writing anything; `eden graft` runs the others and
+names it. A collision is resolved in the branches: keep the entry in
+one, move it to a shared branch, or make it per repo.
+
+When linking, a link that already points elsewhere is replaced: the
+check has ruled out another branch, so an earlier graft left it. A real
+file or directory at the target is left alone and reported.
 
 ### Reporting
 ```bash
 echo "  → Grafting <thing> from branches"
 echo "  → Grafted <thing> from: $branch_name"
 echo "  → Grafted N <things> from M branch(es)"
-echo "  ⚠ Conflicts detected:"
+echo "  ⚠ Left alone (not a symlink):"
 ```
 
 ## Examples
@@ -374,7 +424,7 @@ done
 
 1. **Keep source in branches**: Prefer symlinks over copying
 2. **Clear ownership**: Make it obvious which branch owns what
-3. **Detect conflicts**: Warn users about duplicate names
+3. **Check collisions first**: List every target, check the list, then write
 4. **Idempotent**: Running twice should be safe
 5. **Report clearly**: Users should understand what happened
 6. **Exit gracefully**: No files to graft is not an error
