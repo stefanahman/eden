@@ -19,6 +19,8 @@ that doesn't require biometric auth.
 
 Validate changes with: `eden doctor`. Run the bats integration suite with `./test.sh` (requires `bats-core` — see Dev dependencies below).
 
+CI runners ignore SIGPIPE, and so does everything they start. A reader that stops early — `| head`, `| grep -q`, a `return` inside a `while … done < <(…)` loop — then leaves its writer a `write error: Broken pipe` on stderr, which a terminal never shows. Run the suite as CI does before pushing: `bash -c "trap '' PIPE; bats tests/bats"`. Read a list whole, then take what you need from it.
+
 ## Dev dependencies
 
 Maintainer-only toolchain — not installed by `eden install`. Install manually:
