@@ -51,9 +51,16 @@ latest code. Only `eden uninstall` removes the wrapper.
 Branches are separate git repos that extend Eden with private/contextual configs.
 Eden is the trunk (public); branches are extensions (private, context-specific).
 
-- Register: `eden branch add ~/branch-work`
+- Register: `eden branch add ~/branch-work`, or declare gardens (below)
 - Integrate: `eden graft` discovers branches and merges MCP configs, secrets, binaries
 - Structure mirrors `$HOME` for consistency
+
+**Gardens** group branches into areas of life (work, personal). The
+repo holding the branches declares them in `.eden-gardens`; each machine
+runs `eden init <repo>`, grows some of the gardens, and puts one in view
+(`eden garden use`). The branch list is then worked out on every graft —
+the shared branches, then the grown gardens' — and the branches file is
+not read. See docs/branches-and-secrets.md, "Gardens".
 
 ## Pluggable Grafter System
 
@@ -90,8 +97,10 @@ See [docs/grafters.md](docs/grafters.md) for strategies, patterns, and how to cr
 | `eden graft [name]` | Run all grafters, or a specific one (e.g., `eden graft git`) |
 | `eden graft --list` | Show available grafters |
 | `eden install [pkg]` | Install platform packages or specific package (e.g., gcloud) |
-| `eden update` | Pull from git and re-apply symlinks |
-| `eden branch` | Manage branch registration (add, list, remove, new) |
+| `eden init [<repo>]` | First-run setup; with a repo that has `.eden-gardens`, grows its gardens and grafts |
+| `eden update` | Pull from git and re-apply symlinks; fast-forwards the gardens' repo |
+| `eden branch` | Manage branches (add, list, remove, new; move with gardens) |
+| `eden garden` | Gardens grown here and the one in view (list, add, remove, use, new) |
 | `eden secrets` | Manage 1Password secrets across branches |
 | `eden doctor` | Validate installation health |
 | `eden status` | Show system overview |
