@@ -6,6 +6,7 @@ setup() {
     EDEN_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     export EDEN_ROOT
     export HOME="$BATS_TEST_TMPDIR/home"
+    export XDG_STATE_HOME="$HOME/.local/state"
     export XDG_CONFIG_HOME="$HOME/.config"
     mkdir -p "$XDG_CONFIG_HOME/eden"
     WORK="$BATS_TEST_TMPDIR/work"
