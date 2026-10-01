@@ -671,3 +671,17 @@ mcp_fixture() {
     [ ! -e "$XDG_CONFIG_HOME/mcp/servers.json" ]
     [ "$(cat "$XDG_STATE_HOME/eden/garden")" = work ]
 }
+
+# What a branch is ---------------------------------------------------------------
+# A folder with a .eden-graft; which branch holds a path comes from the list.
+
+@test "a path's garden is that of the listed branch around it, whatever its folders are called" {
+    printf '%s\n' '[school]' 'clubs/platforms/chess' >> "$REPO/.eden-gardens"
+    mkdir -p "$REPO/clubs/platforms/chess" && touch "$REPO/clubs/platforms/chess/.eden-graft"
+    run bash -c 'source "$EDEN_ROOT/lib/branches.sh"
+        eden_garden_of "$1"; eden_garden_of "$2"; eden_garden_of "$3"' _ \
+        "$REPO/clubs/platforms/chess" "$REPO/work/platforms/mac" "$REPO/hobby/projects/x"
+    [ "$output" = "school
+work
+personal" ]
+}

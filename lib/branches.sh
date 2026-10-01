@@ -38,8 +38,11 @@
 #   eden_gardens_declared       the gardens it declares, in order
 #   eden_gardens_grown          the gardens this machine grows
 #   eden_garden_in_view         the garden in view (exit 1 if none)
-#   eden_garden_of <root>       the section a graft root's branch is listed
-#                               in, shared included (exit 1 if none)
+#   eden_garden_of <path>       the section of the listed branch a path is
+#                               in, shared included: the longest listed
+#                               folder that is the path or holds it, so a
+#                               platform folder is its branch's (exit 1 if
+#                               none)
 #   eden_in_view <root>         whether what a root declares for its garden
 #                               applies now: always without gardens and for
 #                               shared branches, else while its garden is in
@@ -213,19 +216,17 @@ eden_garden_in_view() {
 }
 
 eden_garden_of() {
-    local root="${1%/}" entries section path
-    if [[ "$(basename "$(dirname "$root")")" == platforms ]]; then
-        root="$(dirname "$(dirname "$root")")"
-    fi
-    # Read whole before the loop returns early: see eden_branches_repo.
+    local path="${1%/}" entries section folder best="" best_section=""
     entries="$(eden_gardens_entries)"
-    while IFS=$'\t' read -r section path _; do
-        if [[ "$path" == "$root" ]]; then
-            printf '%s\n' "$section"
-            return 0
+    while IFS=$'\t' read -r section folder _; do
+        [[ -n "$folder" ]] || continue
+        if [[ "$path" == "$folder" || "$path" == "$folder"/* ]] && (( ${#folder} > ${#best} )); then
+            best="$folder"
+            best_section="$section"
         fi
     done <<< "$entries"
-    return 1
+    [[ -n "$best" ]] || return 1
+    printf '%s\n' "$best_section"
 }
 
 eden_in_view() {
