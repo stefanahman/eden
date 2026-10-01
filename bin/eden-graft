@@ -59,6 +59,10 @@ check_grafter_compat() {
 
 # Check if a branch list is set up
 if ! eden_branch_list_exists; then
+    if problem="$(eden_branches_repo_problem)"; then
+        warn "$problem"
+        exit 1
+    fi
     warn "No branches file found at $BRANCHES_FILE"
     echo "  Run ./install.sh first"
     exit 1
