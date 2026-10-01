@@ -18,9 +18,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # bats runs its tests with the first bash on PATH. macOS's own is
+      # 3.2, where a failing [[ ]] that is not a test's last line does not
+      # fail the test; Homebrew's is put first so every assertion counts.
+      # Scripts whose shebang is /bin/bash still run under 3.2, as on a Mac.
       - name: Install bats + stow (macOS)
         if: runner.os == 'macOS'
-        run: brew install bats-core stow
+        run: brew install bash bats-core stow
 
       - name: Install bats + stow (Linux)
         if: runner.os == 'Linux'
@@ -31,6 +35,7 @@ jobs:
       - name: Run bats tests with umask ${{ matrix.umask }}
         run: |
           umask ${{ matrix.umask }}
+          bash --version | head -n 1
           bats tests/bats/
 
       - name: Run the grafter scripts
