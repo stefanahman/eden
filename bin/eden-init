@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# eden-init — Interactive first-run setup.
+# eden-init — First-run setup.
 #
-# Walks through registering an existing private branches repo or scaffolding
-# a new one, then verifies the setup with eden doctor.
+# With a path to a repo that has a .eden-gardens, sets up gardens: records
+# the repo, grows the gardens named with --garden (or asked for), grafts,
+# and puts the first in view. A path without one is registered as a branch.
+# Without a path, walks through registering a branch or scaffolding one.
+# Then verifies the setup with eden doctor.
 #
-# Usage: eden init [--yes|--no-prompt]
+# Usage: eden init [<path>] [--garden <name>]... [--no-graft] [--yes|--no-prompt]
 #
 # Exit codes:
 #   0  Setup complete (or cleanly skipped)
+#   1  A garden could not be grown or grafting failed
 #   2  Preflight or unknown arg
 
 set -e
@@ -30,14 +34,25 @@ source "$EDEN_ROOT/lib/branches.sh"
 BRANCHES_FILE="$(eden_branches_file)"
 
 NO_PROMPT=false
+GRAFT=true
+INIT_PATH=""
+GARDENS=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --yes|--no-prompt|-y) NO_PROMPT=true; shift ;;
+        --no-graft) GRAFT=false; shift ;;
+        --garden)
+            [ -n "${2:-}" ] || { err "--garden needs a name"; exit 2; }
+            GARDENS+=("$2"); shift 2 ;;
+        --garden=*) GARDENS+=("${1#*=}"); shift ;;
         -h|--help)
-            sed -n '2,11p' "${BASH_SOURCE[0]}" | sed -E 's/^# ?//'
+            sed -n '2,15p' "${BASH_SOURCE[0]}" | sed -E 's/^# ?//'
             exit 0
             ;;
-        *) err "Unknown arg: $1"; exit 2 ;;
+        -*) err "Unknown arg: $1"; exit 2 ;;
+        *)
+            [ -z "$INIT_PATH" ] || { err "One path only: $1"; exit 2; }
+            INIT_PATH="$1"; shift ;;
     esac
 done
 
@@ -46,6 +61,102 @@ done
 
 log "Eden init — first-run setup"
 echo ""
+
+# init_path <path> — a path from the command line, from where eden was run.
+init_path() {
+    local p
+    p="$(eden_branch_expand "$1")"
+    [[ "$p" == /* ]] || p="${EDEN_CALLER_PWD:-$PWD}/$p"
+    [ -d "$p" ] && p="$(cd "$p" && pwd)"
+    printf '%s\n' "$p"
+}
+
+run_doctor() {
+    echo ""
+    log "Verifying setup with 'eden doctor'…"
+    set +e
+    "$EDEN_ROOT/bin/eden-doctor"
+    local status=$?
+    set -e
+    if [ $status -gt 0 ]; then
+        warn "Doctor reported issues; review the output above."
+    fi
+}
+
+# setup_gardens <repo> — the repo's gardens, as this machine grows them.
+setup_gardens() {
+    local repo="$1" declared garden reply here grown first failed=0
+    mkdir -p "$(dirname "$(eden_branches_repo_file)")"
+    printf '%s\n' "$repo" > "$(eden_branches_repo_file)"
+    declared="$(eden_gardens_declared | paste -sd' ' -)"
+    ok "Gardens from $repo/.eden-gardens: ${declared:-none declared yet}"
+
+    if [ ${#GARDENS[@]} -eq 0 ] && [ -n "$declared" ]; then
+        if $NO_PROMPT; then
+            err "Name the gardens to grow here: --garden <name> (declared: $declared)"
+            exit 2
+        fi
+        echo "Grow on this machine (space-separated, from: $declared):"
+        read -r reply
+        read -r -a GARDENS <<< "$reply"
+    fi
+    if [ ${#GARDENS[@]} -eq 0 ]; then
+        warn "No gardens grown here: only the shared branches graft. Add one with: eden garden add <name>"
+    fi
+    for garden in ${GARDENS[@]+"${GARDENS[@]}"}; do
+        "$EDEN_ROOT/bin/eden-garden" add "$garden" >/dev/null || exit 1
+        ok "Growing $garden"
+    done
+
+    if [ -s "$BRANCHES_FILE" ]; then
+        warn "$BRANCHES_FILE is no longer read while gardens are set up; delete it when you no longer need it"
+    fi
+
+    if $GRAFT; then
+        echo ""
+        log "Grafting…"
+        "$EDEN_ROOT/bin/eden-graft" || failed=1
+    fi
+
+    # Keep the garden in view when this machine grows it; otherwise put the
+    # first named one in view, or the first grown on a re-run.
+    here="$(eden_garden_in_view)" || here=""
+    grown="$(eden_gardens_grown)"
+    if [ -n "$here" ] && grep -qxF -- "$here" <<< "$grown"; then
+        ok "Garden in view: $here"
+    else
+        first="${GARDENS[0]:-${grown%%$'\n'*}}"
+        if [ -n "$first" ]; then
+            "$EDEN_ROOT/bin/eden-garden" use "$first" || failed=1
+        fi
+    fi
+
+    run_doctor
+    echo ""
+    if [ $failed -gt 0 ]; then
+        err "Init finished with errors; see above."
+        exit 1
+    fi
+    ok "Init complete!"
+    $GRAFT || echo "Next: eden graft"
+    exit 0
+}
+
+if [ -n "$INIT_PATH" ]; then
+    INIT_PATH="$(init_path "$INIT_PATH")"
+    [ -d "$INIT_PATH" ] || { err "Directory does not exist: $INIT_PATH"; exit 2; }
+    if [ -f "$INIT_PATH/.eden-gardens" ]; then
+        setup_gardens "$INIT_PATH"
+    fi
+    [ ${#GARDENS[@]} -eq 0 ] || { err "No .eden-gardens in $INIT_PATH, so no gardens to grow"; exit 2; }
+    log "No .eden-gardens in $INIT_PATH: registering it as a branch"
+    "$EDEN_ROOT/bin/eden-branch" add "$INIT_PATH"
+    run_doctor
+    echo ""
+    ok "Init complete!"
+    echo "Next: eden graft"
+    exit 0
+fi
 
 if [ ! -f "$BRANCHES_FILE" ]; then
     err "No branches file at $BRANCHES_FILE."
@@ -64,9 +175,13 @@ fi
 echo "Do you have an existing private branches repo? [y/N]"
 read -r reply
 if [[ "$reply" =~ ^[Yy]$ ]]; then
-    echo "Path to the branch (or a subdirectory inside it, e.g. ~/eden-branches/personal):"
+    echo "Path to the repo with your .eden-gardens, or to one branch (e.g. ~/eden-branches/personal):"
     read -r path
-    path="${path/#\~/$HOME}"
+    # From where eden was run, not EDEN_ROOT, where this script runs.
+    [ -z "$path" ] || path="$(init_path "$path")"
+    if [ -n "$path" ] && [ -f "$path/.eden-gardens" ]; then
+        setup_gardens "$path"
+    fi
     if [ -z "$path" ]; then
         warn "No path provided; skipping."
     elif [ ! -d "$path" ]; then

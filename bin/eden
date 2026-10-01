@@ -199,12 +199,16 @@ HELP
             echo "First-run interactive setup"
             [[ "$full" ]] && cat <<'HELP'
 
-Usage: eden init [--yes|--no-prompt]
+Usage: eden init [<path>] [--garden <name>]... [--no-graft] [--yes|--no-prompt]
 
-Walks through registering an existing private branches repo or scaffolding
-a new one, then verifies the setup with eden doctor.
+With the path to a repo that has a .eden-gardens: records the repo, grows
+the gardens you name (or asks), grafts, and puts the first in view. A path
+without one is registered as a branch. Without a path, walks through
+registering or scaffolding a branch. Then verifies with eden doctor.
 
 Options:
+  --garden <name>     Grow this garden here (repeatable)
+  --no-graft          Set up without grafting
   --yes, --no-prompt  Non-interactive: skip prompts (CI/Docker use)
 HELP
             ;;

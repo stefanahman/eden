@@ -345,3 +345,78 @@ mac-extra  mac" ]
     [ "$status" -eq 1 ]
     [[ "$output" == *"Not in $REPO/.eden-gardens: nowhere"* ]]
 }
+
+# eden init -------------------------------------------------------------------
+
+init() {
+    "$EDEN_ROOT/bin/eden-init" "$@"
+}
+
+@test "init with a repo sets up gardens, grows the named ones and puts the first in view" {
+    rm "$XDG_CONFIG_HOME/eden/branches-repo"
+    cd "$HOME"
+    run init branches-repo --garden personal --garden work --no-graft
+    [ "$status" -eq 0 ]
+    [ "$(cat "$XDG_CONFIG_HOME/eden/branches-repo")" = "$REPO" ]
+    [ "$(cat "$XDG_CONFIG_HOME/eden/gardens")" = "personal
+work" ]
+    [ "$(cat "$XDG_STATE_HOME/eden/garden")" = "personal" ]
+    [[ "$output" == *"Next: eden graft"* ]]
+}
+
+@test "init leaves the trunk's own ~/.config/eden/repo alone" {
+    rm "$XDG_CONFIG_HOME/eden/branches-repo"
+    echo "$EDEN_ROOT" > "$XDG_CONFIG_HOME/eden/repo"
+    run init "$REPO" --garden work --no-graft
+    [ "$status" -eq 0 ]
+    [ "$(cat "$XDG_CONFIG_HOME/eden/repo")" = "$EDEN_ROOT" ]
+    [ "$(cat "$XDG_CONFIG_HOME/eden/branches-repo")" = "$REPO" ]
+}
+
+@test "init puts a garden it grows in view when the one in view is not grown" {
+    mkdir -p "$XDG_STATE_HOME/eden" && echo work > "$XDG_STATE_HOME/eden/garden"
+    run init "$REPO" --garden personal --no-graft
+    [ "$status" -eq 0 ]
+    [ "$(cat "$XDG_STATE_HOME/eden/garden")" = personal ]
+}
+
+@test "init without a tty needs the gardens named" {
+    rm "$XDG_CONFIG_HOME/eden/branches-repo"
+    run init "$REPO" --no-graft
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"--garden <name> (declared: work personal)"* ]]
+}
+
+@test "init refuses a garden the repo does not declare" {
+    run init "$REPO" --garden school --no-graft
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"No garden school"* ]]
+}
+
+@test "init says the branches file is no longer read" {
+    echo "$HOME/elsewhere" > "$XDG_CONFIG_HOME/eden/branches"
+    run init "$REPO" --garden work --no-graft
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"branches is no longer read"* ]]
+}
+
+@test "init with a path without .eden-gardens registers it as a branch" {
+    rm "$XDG_CONFIG_HOME/eden/branches-repo"
+    run init "$REPO/work" --no-graft
+    [ "$status" -eq 0 ]
+    [ "$(cat "$XDG_CONFIG_HOME/eden/branches")" = "$REPO/work" ]
+    run init "$REPO/work" --garden work
+    [ "$status" -eq 2 ]
+}
+
+@test "init grafts the gardens it grows" {
+    rm "$XDG_CONFIG_HOME/eden/branches-repo"
+    mkdir -p "$REPO/work/.config/zsh/zshenv.d" "$REPO/personal/.config/zsh/zshenv.d"
+    echo 'export WORK=1' > "$REPO/work/.config/zsh/zshenv.d/work.zsh"
+    echo 'export PERSONAL=1' > "$REPO/personal/.config/zsh/zshenv.d/personal.zsh"
+    EDEN_CLAUDE_CLI=true run init "$REPO" --garden work
+    [ "$status" -eq 0 ]
+    [ -L "$XDG_CONFIG_HOME/zsh/zshenv.d/work.zsh" ]
+    [ ! -e "$XDG_CONFIG_HOME/zsh/zshenv.d/personal.zsh" ]
+    [ "$(cat "$XDG_STATE_HOME/eden/garden")" = "work" ]
+}
