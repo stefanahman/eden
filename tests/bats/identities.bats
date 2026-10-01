@@ -6,6 +6,7 @@ setup() {
     EDEN_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     export EDEN_ROOT
     export HOME="$BATS_TEST_TMPDIR/home"
+    export XDG_STATE_HOME="$HOME/.local/state"
     export XDG_CONFIG_HOME="$HOME/.config"
     export GIT_CONFIG_NOSYSTEM=1
     unset GIT_CONFIG_GLOBAL

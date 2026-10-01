@@ -126,8 +126,10 @@ setup_gardens() {
         ok "Garden in view: $here"
     else
         first="${GARDENS[0]:-${grown%%$'\n'*}}"
-        if [ -n "$first" ]; then
+        if [ -n "$first" ] && $GRAFT; then
             "$EDEN_ROOT/bin/eden-garden" use "$first" || failed=1
+        elif [ -n "$first" ]; then
+            "$EDEN_ROOT/bin/eden-garden" use --no-graft "$first" || failed=1
         fi
     fi
 

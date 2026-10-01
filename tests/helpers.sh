@@ -38,6 +38,7 @@ report() {
 SANDBOX=""
 _ORIG_HOME=""
 _ORIG_XDG=""
+_ORIG_XDG_STATE=""
 _ORIG_EDEN_ROOT=""
 
 sandbox_setup() {
@@ -46,11 +47,13 @@ sandbox_setup() {
     # Save originals
     _ORIG_HOME="$HOME"
     _ORIG_XDG="${XDG_CONFIG_HOME:-}"
+    _ORIG_XDG_STATE="${XDG_STATE_HOME:-}"
     _ORIG_EDEN_ROOT="${EDEN_ROOT:-}"
 
     # Redirect all grafter output to sandbox
     export HOME="$SANDBOX/home"
     export XDG_CONFIG_HOME="$HOME/.config"
+    export XDG_STATE_HOME="$HOME/.local/state"
     export EDEN_ROOT="$SANDBOX/eden-repo"
 
     mkdir -p "$HOME" "$XDG_CONFIG_HOME/eden" "$EDEN_ROOT"
@@ -69,6 +72,11 @@ sandbox_teardown() {
         export XDG_CONFIG_HOME="$_ORIG_XDG"
     else
         unset XDG_CONFIG_HOME
+    fi
+    if [[ -n "$_ORIG_XDG_STATE" ]]; then
+        export XDG_STATE_HOME="$_ORIG_XDG_STATE"
+    else
+        unset XDG_STATE_HOME
     fi
     if [[ -n "$_ORIG_EDEN_ROOT" ]]; then
         export EDEN_ROOT="$_ORIG_EDEN_ROOT"

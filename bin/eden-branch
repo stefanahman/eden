@@ -379,6 +379,15 @@ add_branch() {
         exit 1
     fi
     
+    # A .eden-graft is what makes a folder a branch.
+    if [[ ! -f "$branch_path/.eden-graft" ]]; then
+        if gardens_on; then
+            warn "$branch_path is not a branch: it has no .eden-graft (create one, even empty)"
+            exit 1
+        fi
+        warn "$branch_path has no .eden-graft, which marks a branch; create one, even empty"
+    fi
+
     if gardens_on; then
         local where
         where="$(listed "$branch_path" | cut -f1 | paste -sd' ' -)"
@@ -622,6 +631,7 @@ eden graft
 
 \`\`\`
 $branch_name/
+├── .eden-graft                # Marks the branch; what graft-configs links
 ├── .eden-secrets              # Secret definitions
 ├── .config/
 │   ├── mcp/
@@ -658,6 +668,17 @@ EOF
         info "Created .gitignore"
     fi
     
+    # The .eden-graft that makes the folder a branch, even with nothing in it
+    if [ ! -f "$branch_path/.eden-graft" ]; then
+        cat > "$branch_path/.eden-graft" << EOF
+# Eden Graft Allowlist — $branch_name
+# What this branch grafts into \$HOME, one path per line, with comments on
+# lines of their own (see the trunk's docs/grafters.md). The file is what
+# makes this folder a branch, so it stays even when it lists nothing.
+EOF
+        info "Created .eden-graft"
+    fi
+
     # Create sample .eden-secrets
     if [ ! -f "$branch_path/.eden-secrets" ]; then
         cat > "$branch_path/.eden-secrets" << EOF

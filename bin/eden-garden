@@ -6,8 +6,11 @@
 #   eden garden list            the gardens .eden-gardens declares, and their state here
 #   eden garden add <name>      grow a declared garden on this machine (then: eden graft)
 #   eden garden remove <name>   stop growing it (what it grafted stays until removed)
-#   eden garden use <name>      put a grown garden in view
+#   eden garden use <name>      put a grown garden in view (--no-graft: not
+#                               Claude Code's MCP servers)
 #   eden garden new <name>      declare a garden: an empty [<name>] section in .eden-gardens
+#   eden garden branches        every branch .eden-gardens lists, one per line, for
+#                               scripts: <garden or shared> TAB <path> TAB <platform>
 #
 # A garden is a named group of branches, declared in the .eden-gardens of
 # the repo `eden init <path>` pointed at. The gardens a machine grows are
@@ -15,7 +18,9 @@
 # ~/.local/state/eden/garden. `use` then runs every executable in
 # ~/.config/eden/garden.d/, in name order, with the garden as its
 # argument: branches graft their own hooks there for what a switch changes
-# beyond what reads the state itself.
+# beyond what reads the state itself. Last it re-runs the MCP grafter,
+# which puts the garden's servers outside a repo in Claude Code's user
+# scope and takes the previous garden's out.
 set -euo pipefail
 
 GREEN='\033[0;32m'
@@ -37,7 +42,7 @@ source "$EDEN_ROOT/lib/branches.sh"
 HOOKS="${XDG_CONFIG_HOME:-$HOME/.config}/eden/garden.d"
 
 usage() {
-    sed -n '4,10p' "${BASH_SOURCE[0]}" | sed -E 's/^# ?//'
+    sed -n '4,13p' "${BASH_SOURCE[0]}" | sed -E 's/^# ?//'
 }
 
 # in_list <name> <lines>: whether name is one of the lines.
@@ -142,7 +147,7 @@ remove() {
 }
 
 use() {
-    local name="$1" state hook failed=0
+    local name="$1" graft="${2:-true}" state hook failed=0
     require_gardens
     require_declared "$name"
     in_list "$name" "$(eden_gardens_grown)" || die "Not growing $name here: run eden garden add $name, then eden graft"
@@ -159,7 +164,16 @@ use() {
             fi
         done
     fi
+    if $graft && ! "$EDEN_ROOT/bin/eden-graft" mcp >/dev/null 2>&1; then
+        warn "MCP servers not switched: run 'eden graft mcp' to see why"
+        failed=1
+    fi
     return "$failed"
+}
+
+branches() {
+    require_gardens
+    eden_gardens_entries
 }
 
 new() {
@@ -179,7 +193,19 @@ new() {
 case "${1:-}" in
     "") current ;;
     list|ls) list ;;
-    add|remove|rm|use|new)
+    branches) branches ;;
+    use)
+        if [[ "${2:-}" == --no-graft ]]; then
+            [[ -n "${3:-}" ]] || { usage >&2; exit 64; }
+            use "$3" false
+        elif [[ "${3:-}" == --no-graft ]]; then
+            use "$2" false
+        else
+            [[ -n "${2:-}" ]] || { usage >&2; exit 64; }
+            use "$2"
+        fi
+        ;;
+    add|remove|rm|new)
         [[ -n "${2:-}" ]] || { usage >&2; exit 64; }
         cmd="$1"
         [[ "$cmd" == rm ]] && cmd=remove

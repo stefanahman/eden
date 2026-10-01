@@ -38,6 +38,15 @@
 #   eden_gardens_declared       the gardens it declares, in order
 #   eden_gardens_grown          the gardens this machine grows
 #   eden_garden_in_view         the garden in view (exit 1 if none)
+#   eden_garden_of <path>       the section of the listed branch a path is
+#                               in, shared included: the longest listed
+#                               folder that is the path or holds it, so a
+#                               platform folder is its branch's (exit 1 if
+#                               none)
+#   eden_in_view <root>         whether what a root declares for its garden
+#                               applies now: always without gardens and for
+#                               shared branches, else while its garden is in
+#                               view
 #
 # .eden-gardens is a [shared] section and one section per garden. Each
 # line is a branch folder relative to the file, optionally followed by
@@ -204,6 +213,28 @@ eden_garden_in_view() {
     name="${name%%$'\n'*}"
     [[ -n "$name" ]] || return 1
     printf '%s\n' "$name"
+}
+
+eden_garden_of() {
+    local path="${1%/}" entries section folder best="" best_section=""
+    entries="$(eden_gardens_entries)"
+    while IFS=$'\t' read -r section folder _; do
+        [[ -n "$folder" ]] || continue
+        if [[ "$path" == "$folder" || "$path" == "$folder"/* ]] && (( ${#folder} > ${#best} )); then
+            best="$folder"
+            best_section="$section"
+        fi
+    done <<< "$entries"
+    [[ -n "$best" ]] || return 1
+    printf '%s\n' "$best_section"
+}
+
+eden_in_view() {
+    local garden here
+    garden="$(eden_garden_of "$1")" || return 0
+    [[ "$garden" == shared ]] && return 0
+    here="$(eden_garden_in_view)" || return 1
+    [[ "$garden" == "$here" ]]
 }
 
 # The shared branches for this platform, then each grown garden's, in the

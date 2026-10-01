@@ -65,12 +65,19 @@ eden branch remove ~/eden-private-branches/work
 
 ## Branch Structure
 
+A branch is a folder with a `.eden-graft`, even an empty one: that file
+is what makes it a branch, for `eden branch add`, `eden doctor` and the
+gardens. Which branch holds a path is answered from the branch list
+(`.eden-gardens`, or `~/.config/eden/branches`): the longest listed folder
+that is the path or holds it, so a branch's `platforms/<platform>/` folder
+is its own, whatever the folders around it are called.
+
 Branches mirror `$HOME` for consistency. Place files where they would live under `$HOME`:
 
 ```
 my-branch/
 ├── .eden-secrets              # 1Password secret definitions
-├── .eden-graft                # Allowlist for graft-configs
+├── .eden-graft                # Marks the branch; allowlist for graft-configs
 ├── Brewfile                   # Branch-specific brew packages (macOS)
 ├── .config/
 │   ├── mcp/servers.json       # MCP servers (merged by graft-mcp)
@@ -249,6 +256,7 @@ eden garden add work       # grow it here, then: eden graft
 eden garden remove work    # stop growing it; what it grafted stays (eden doctor reports it)
 eden garden use work       # put it in view
 eden garden                # the garden in view
+eden garden branches       # for scripts: <garden or shared> TAB <path> TAB <platform>
 ```
 
 `eden garden use` records the garden and runs every executable in
@@ -257,6 +265,19 @@ argument. A branch grafts its own hook there for what a switch changes
 beyond what reads the state itself: a link to the garden's config for
 some tool, a window manager reload. A hook that fails is reported and
 the rest still run.
+
+Last, `use` re-runs the MCP grafter. MCP servers come in three layers:
+
+| Declared in | In Claude Code | Applies |
+|---|---|---|
+| a shared branch's `.config/mcp/servers.json` | user scope | always |
+| a garden branch's `.config/mcp/servers.json` | user scope | while its garden is in view |
+| `projects/<repo>/.mcp/servers.json` | that repo's local scope | in the repo, for every grown garden |
+
+A switch takes the previous garden's servers out of user scope and puts
+the new one's in. A Claude Code already running keeps the servers it
+started with. Two gardens may declare the same server name, since they
+are never in user scope together.
 
 `eden doctor` checks the file against the repo and the machine: a branch
 the file does not list, a listed folder that is missing or not a branch,

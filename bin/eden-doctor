@@ -247,8 +247,8 @@ if GARDENS_REPO="$(eden_branches_repo)"; then
         LISTED+="$g_path"$'\n'
         if [[ ! -d "$g_path" ]]; then
             gardens_warn ".eden-gardens lists $g_rel under [$g_section], which does not exist"
-        elif [[ ! -f "$g_path/.eden-graft" && ! -f "$g_path/.eden-secrets" ]]; then
-            gardens_warn ".eden-gardens lists $g_rel, which is not a branch (no .eden-graft or .eden-secrets)"
+        elif [[ ! -f "$g_path/.eden-graft" ]]; then
+            gardens_warn ".eden-gardens lists $g_rel, which is not a branch (no .eden-graft)"
         fi
         if [[ -n "$g_platform" && "$g_platform" != mac && "$g_platform" != arch ]]; then
             gardens_warn ".eden-gardens: $g_rel names platform '$g_platform'; it is grafted nowhere (mac or arch)"
@@ -267,7 +267,7 @@ if GARDENS_REPO="$(eden_branches_repo)"; then
         $inside && continue
         LISTED+="$g_dir"$'\n'
         gardens_warn "${g_dir#"$GARDENS_REPO"/} is a branch that .eden-gardens does not list, so it grafts nothing"
-    done < <(find -H "$GARDENS_REPO" -maxdepth 3 -name .git -prune -o \( -name .eden-graft -o -name .eden-secrets \) -print 2>/dev/null | sort)
+    done < <(find -H "$GARDENS_REPO" -maxdepth 3 -name .git -prune -o -name .eden-graft -print 2>/dev/null | sort)
 
     DECLARED="$(eden_gardens_declared)"
     GROWN="$(eden_gardens_grown)"
@@ -298,11 +298,11 @@ fi
 section "Symlinks:"
 
 # branch_root_of <path> — the nearest folder above path that carries a
-# branch marker (.eden-graft or .eden-secrets), if any.
+# branch's .eden-graft, if any.
 branch_root_of() {
     local d="$1"
     while [[ -n "$d" && "$d" != "/" ]]; do
-        if [[ -f "$d/.eden-graft" || -f "$d/.eden-secrets" ]]; then
+        if [[ -f "$d/.eden-graft" ]]; then
             printf '%s\n' "$d"
             return 0
         fi

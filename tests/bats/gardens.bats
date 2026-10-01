@@ -238,6 +238,17 @@ school" ]
     [ "$status" -eq 1 ]
 }
 
+@test "garden branches lists every branch with its garden, for scripts" {
+    run garden branches
+    [ "$status" -eq 0 ]
+    [ "$output" = "shared	$REPO/common	
+shared	$REPO/mac-desktop	mac
+shared	$REPO/linux-desktop	arch
+work	$REPO/work	
+personal	$REPO/personal	
+personal	$REPO/hobby	" ]
+}
+
 @test "garden commands need a repo with gardens" {
     rm "$XDG_CONFIG_HOME/eden/branches-repo"
     run garden list
@@ -294,7 +305,7 @@ personal	$REPO/games"* ]]
 }
 
 @test "branch add --shared --platform lists it under [shared] for one platform" {
-    mkdir -p "$REPO/mac-extra"
+    mkdir -p "$REPO/mac-extra" && touch "$REPO/mac-extra/.eden-graft"
     run branch add "$REPO/mac-extra" --shared --platform mac
     [ "$status" -eq 0 ]
     [ "$(sed -n '2,6p' "$REPO/.eden-gardens")" = "[shared]
@@ -546,4 +557,156 @@ gardens_report() {
     run branch move chess --shared
     [ "$status" -eq 1 ]
     [[ "$output" == *"More than one branch is called chess; give its path: branches/chess old/chess"* ]]
+}
+
+# A graft root's garden -----------------------------------------------------------
+
+garden_of() {
+    bash -c 'source "$EDEN_ROOT/lib/branches.sh"; eden_garden_of "$1"' _ "$1"
+}
+
+@test "a root's garden is its branch's section, platform folders included" {
+    run garden_of "$REPO/common"
+    [ "$output" = shared ]
+    run garden_of "$REPO/work/platforms/mac"
+    [ "$output" = work ]
+    run garden_of "$REPO/hobby"
+    [ "$output" = personal ]
+    run garden_of "$HOME/elsewhere"
+    [ "$status" -eq 1 ]
+}
+
+@test "a shared root is always in view, a garden's only while its garden is" {
+    in_view() {
+        bash -c 'source "$EDEN_ROOT/lib/branches.sh"; eden_in_view "$1"' _ "$1"
+    }
+    in_view "$REPO/common"
+    run in_view "$REPO/work"
+    [ "$status" -eq 1 ]
+    mkdir -p "$XDG_STATE_HOME/eden" && echo work > "$XDG_STATE_HOME/eden/garden"
+    in_view "$REPO/work"
+    run in_view "$REPO/personal"
+    [ "$status" -eq 1 ]
+    rm "$XDG_CONFIG_HOME/eden/branches-repo"
+    in_view "$REPO/personal"
+}
+
+# A garden's MCP servers outside a repo --------------------------------------------
+
+user_servers() {
+    jq -r '.mcpServers | keys | join(" ")' "$CLAUDE_CONFIG_DIR/.claude.json"
+}
+
+mcp_fixture() {
+    export CLAUDE_CONFIG_DIR="$HOME/claude"
+    mkdir -p "$CLAUDE_CONFIG_DIR" "$XDG_STATE_HOME/eden"
+    echo '{"mcpServers": {"mine": {"type": "http", "url": "https://mine"}}}' > "$CLAUDE_CONFIG_DIR/.claude.json"
+    for b in common work personal; do mkdir -p "$REPO/$b/.config/mcp"; done
+    echo '{"mcpServers": {"docs": {"type": "http", "url": "https://docs"}}}' > "$REPO/common/.config/mcp/servers.json"
+    echo '{"mcpServers": {"tracker": {"type": "http", "url": "https://work.tracker"}}}' > "$REPO/work/.config/mcp/servers.json"
+    echo '{"mcpServers": {"tracker": {"type": "http", "url": "https://home.tracker"}, "notes": {"type": "http", "url": "https://notes"}}}' > "$REPO/personal/.config/mcp/servers.json"
+    printf '%s\n' work personal > "$XDG_CONFIG_HOME/eden/gardens"
+}
+
+@test "a garden's global servers are in user scope only while it is in view" {
+    command -v jq >/dev/null || skip "jq not installed"
+    mcp_fixture
+    echo work > "$XDG_STATE_HOME/eden/garden"
+    run bash "$GRAFTERS/graft-mcp"
+    [ "$status" -eq 0 ]
+    [ "$(user_servers)" = "docs mine tracker" ]
+    [ "$(jq -r '.mcpServers.tracker.url' "$CLAUDE_CONFIG_DIR/.claude.json")" = "https://work.tracker" ]
+    [[ "$output" == *"personal: global servers wait for personal to be in view"* ]] || false
+
+    echo personal > "$XDG_STATE_HOME/eden/garden"
+    run bash "$GRAFTERS/graft-mcp"
+    [ "$status" -eq 0 ]
+    [ "$(user_servers)" = "docs mine notes tracker" ]
+    [ "$(jq -r '.mcpServers.tracker.url' "$CLAUDE_CONFIG_DIR/.claude.json")" = "https://home.tracker" ]
+
+    rm "$XDG_STATE_HOME/eden/garden"
+    run bash "$GRAFTERS/graft-mcp"
+    [ "$(user_servers)" = "docs mine" ]
+}
+
+@test "a garden's server may share a name with a shared branch's only by colliding" {
+    command -v jq >/dev/null || skip "jq not installed"
+    mcp_fixture
+    echo work > "$XDG_STATE_HOME/eden/garden"
+    echo '{"mcpServers": {"tracker": {"type": "http", "url": "https://shared"}}}' > "$REPO/common/.config/mcp/servers.json"
+    run bash "$GRAFTERS/graft-mcp"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"tracker"* ]] || false
+}
+
+@test "garden use switches the garden's MCP servers" {
+    command -v jq >/dev/null || skip "jq not installed"
+    mcp_fixture
+    run garden use work
+    [ "$status" -eq 0 ]
+    [ "$(user_servers)" = "docs mine tracker" ]
+    run garden use personal
+    [ "$status" -eq 0 ]
+    [ "$(user_servers)" = "docs mine notes tracker" ]
+    [ "$(jq -r '.mcpServers.tracker.url' "$CLAUDE_CONFIG_DIR/.claude.json")" = "https://home.tracker" ]
+}
+
+@test "garden use says when the MCP servers could not be switched" {
+    command -v jq >/dev/null || skip "jq not installed"
+    mcp_fixture
+    echo '{"mcpServers": {"tracker": {"type": "http", "url": "https://shared"}}}' > "$REPO/common/.config/mcp/servers.json"
+    run garden use work
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"MCP servers not switched: run 'eden graft mcp'"* ]] || false
+    [ "$(cat "$XDG_STATE_HOME/eden/garden")" = "work" ]
+}
+
+@test "init --no-graft leaves Claude Code's servers alone" {
+    command -v jq >/dev/null || skip "jq not installed"
+    mcp_fixture
+    rm "$XDG_CONFIG_HOME/eden/gardens"
+    run init "$REPO" --garden work --no-graft
+    [ "$status" -eq 0 ]
+    [ "$(user_servers)" = "mine" ]
+    [ ! -e "$XDG_CONFIG_HOME/mcp/servers.json" ]
+    [ "$(cat "$XDG_STATE_HOME/eden/garden")" = work ]
+}
+
+# What a branch is ---------------------------------------------------------------
+# A folder with a .eden-graft; which branch holds a path comes from the list.
+
+@test "a path's garden is that of the listed branch around it, whatever its folders are called" {
+    printf '%s\n' '[school]' 'clubs/platforms/chess' >> "$REPO/.eden-gardens"
+    mkdir -p "$REPO/clubs/platforms/chess" && touch "$REPO/clubs/platforms/chess/.eden-graft"
+    run bash -c 'source "$EDEN_ROOT/lib/branches.sh"
+        eden_garden_of "$1"; eden_garden_of "$2"; eden_garden_of "$3"' _ \
+        "$REPO/clubs/platforms/chess" "$REPO/work/platforms/mac" "$REPO/hobby/projects/x"
+    [ "$output" = "school
+work
+personal" ]
+}
+
+@test "doctor counts a folder as a branch by its .eden-graft alone" {
+    mkdir -p "$REPO/secrets-only" "$REPO/loose-secrets"
+    touch "$REPO/secrets-only/.eden-secrets" "$REPO/loose-secrets/.eden-secrets"
+    printf '%s\n' '[work]' 'secrets-only' >> "$REPO/.eden-gardens"
+    run gardens_report
+    [[ "$output" == *"warn|.eden-gardens lists secrets-only, which is not a branch (no .eden-graft)"* ]] || false
+    [[ "$output" != *"loose-secrets"* ]] || false
+}
+
+@test "branch new gives a branch its .eden-graft" {
+    cd "$REPO"
+    run branch new games --garden personal
+    [ "$status" -eq 0 ]
+    [ -f "$REPO/games/.eden-graft" ]
+}
+
+@test "branch add refuses a folder without a .eden-graft" {
+    mkdir -p "$REPO/plain"
+    run branch add "$REPO/plain" --garden personal
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"not a branch"*".eden-graft"* ]] || false
+    run grep -q plain "$REPO/.eden-gardens"
+    [ "$status" -eq 1 ]
 }

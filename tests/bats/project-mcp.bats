@@ -7,6 +7,7 @@ setup() {
     EDEN_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     export EDEN_ROOT
     export HOME="$BATS_TEST_TMPDIR/home"
+    export XDG_STATE_HOME="$HOME/.local/state"
     export XDG_CONFIG_HOME="$HOME/.config"
     export CLAUDE_CONFIG_DIR="$BATS_TEST_TMPDIR/claude"
     mkdir -p "$XDG_CONFIG_HOME/eden" "$CLAUDE_CONFIG_DIR"
@@ -101,4 +102,98 @@ local_server() {
     run "$GRAFTER"
     [ "$status" -eq 0 ]
     [ "$(jq -r '.mcpServers.docs.url' "$CLAUDE_CONFIG_DIR/.claude.json")" = https://docs.example.com ]
+}
+
+# A server graft-mcp added and no branch declares any more is taken out;
+# one added by hand stays.
+
+local_names() {
+    jq -r --arg k "$REPO" '.projects[$k].mcpServers // {} | keys | join(" ")' "$CLAUDE_CONFIG_DIR/.claude.json"
+}
+
+@test "a server dropped from a project leaves the repo's local scope" {
+    printf '{"mcpServers": {"tracker": {"type": "http", "url": "https://a"}, "docs": {"type": "http", "url": "https://d"}}}\n' \
+        > "$WORK/projects/app/.mcp/servers.json"
+    run "$GRAFTER"
+    [ "$(local_names)" = "docs tracker" ]
+    server '{"type": "http", "url": "https://a"}'
+    run "$GRAFTER"
+    [ "$status" -eq 0 ]
+    [ "$(local_names)" = "tracker" ]
+    [[ "$output" == *"− docs ("*"local scope: no branch declares it now)"* ]] || false
+}
+
+@test "a server added by hand to the repo's local scope stays" {
+    run "$GRAFTER"
+    (cd "$REPO" && claude mcp add-json -s local mine '{"type": "http", "url": "https://mine"}')
+    server '{"type": "http", "url": "https://b"}'
+    run "$GRAFTER"
+    rm -r "$WORK/projects/app"
+    run "$GRAFTER"
+    [ "$status" -eq 0 ]
+    [ "$(local_names)" = "mine" ]
+}
+
+@test "a repo that is not on this machine keeps its record until it is back" {
+    run "$GRAFTER"
+    mv "$REPO" "$REPO.away"
+    rm -r "$WORK/projects/app"
+    run "$GRAFTER"
+    [ "$status" -eq 0 ]
+    [ "$(jq -r --arg s "$CLAUDE_CONFIG_DIR/.claude.json" --arg k "$REPO" '.[$s].local[$k] | join(" ")' "$HOME/.local/state/eden/mcp-servers.json")" = "tracker" ]
+    mv "$REPO.away" "$REPO"
+    run "$GRAFTER"
+    [ "$(local_names)" = "" ]
+}
+
+@test "a global server dropped from a branch leaves user scope; one added by hand stays" {
+    echo '{"mcpServers": {"mine": {"type": "http", "url": "https://mine"}}}' > "$CLAUDE_CONFIG_DIR/.claude.json"
+    mkdir -p "$WORK/.config/mcp"
+    echo '{"mcpServers": {"docs": {"type": "http", "url": "https://docs"}}}' > "$WORK/.config/mcp/servers.json"
+    run "$GRAFTER"
+    [ "$(jq -r '.mcpServers | keys | join(" ")' "$CLAUDE_CONFIG_DIR/.claude.json")" = "docs mine" ]
+    echo '{"mcpServers": {}}' > "$WORK/.config/mcp/servers.json"
+    run "$GRAFTER"
+    [ "$status" -eq 0 ]
+    [ "$(jq -r '.mcpServers | keys | join(" ")' "$CLAUDE_CONFIG_DIR/.claude.json")" = "mine" ]
+    [[ "$output" == *"− docs (user scope: no branch declares it now)"* ]] || false
+}
+
+@test "without the claude CLI the local-scope record is kept as it was" {
+    run "$GRAFTER"
+    rm -r "$WORK/projects/app/.mcp"
+    mkdir -p "$WORK/projects/app/.mcp"
+    server '{"type": "http", "url": "https://c"}'
+    EDEN_CLAUDE_CLI=no-such-claude run "$GRAFTER"
+    [ "$(jq -r --arg s "$CLAUDE_CONFIG_DIR/.claude.json" --arg k "$REPO" '.[$s].local[$k] | join(" ")' "$HOME/.local/state/eden/mcp-servers.json")" = "tracker" ]
+}
+
+@test "without the claude CLI and no project left, the local-scope record is still kept" {
+    run "$GRAFTER"
+    rm -r "$WORK/projects/app"
+    EDEN_CLAUDE_CLI=no-such-claude run "$GRAFTER"
+    [ "$status" -eq 0 ]
+    [ "$(jq -r --arg s "$CLAUDE_CONFIG_DIR/.claude.json" --arg k "$REPO" '.[$s].local[$k] | join(" ")' "$HOME/.local/state/eden/mcp-servers.json")" = "tracker" ]
+    run "$GRAFTER"
+    [ "$(local_names)" = "" ]
+}
+
+@test "an unreadable record is replaced with a warning, not a silent failure" {
+    mkdir -p "$HOME/.local/state/eden"
+    echo 'not json' > "$HOME/.local/state/eden/mcp-servers.json"
+    run "$GRAFTER"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"mcp-servers.json was unreadable"* ]] || false
+    jq -e . "$HOME/.local/state/eden/mcp-servers.json" >/dev/null
+}
+
+@test "a server added by hand under a name a branch declares is Eden's from then on" {
+    echo '{"mcpServers": {"docs": {"type": "http", "url": "https://mine"}}}' > "$CLAUDE_CONFIG_DIR/.claude.json"
+    mkdir -p "$WORK/.config/mcp"
+    echo '{"mcpServers": {"docs": {"type": "http", "url": "https://eden"}}}' > "$WORK/.config/mcp/servers.json"
+    run "$GRAFTER"
+    [ "$(jq -r '.mcpServers.docs.url' "$CLAUDE_CONFIG_DIR/.claude.json")" = https://eden ]
+    echo '{"mcpServers": {}}' > "$WORK/.config/mcp/servers.json"
+    run "$GRAFTER"
+    [ "$(jq -r '.mcpServers.docs // "gone"' "$CLAUDE_CONFIG_DIR/.claude.json")" = gone ]
 }

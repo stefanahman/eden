@@ -106,6 +106,18 @@ exist is skipped with a warning.
   file. A server already in place is left alone; a changed one is replaced.
   An untracked `.mcp.json` from earlier grafts is named, not deleted.
 
+`graft-mcp` records what it puts in Claude Code — per state file, the
+user-scope names and each repo's local-scope names — in
+`~/.local/state/eden/mcp-servers.json`, and on the next graft takes out
+the recorded servers no branch declares any more: dropped from a branch,
+a project no longer listed, or a garden no longer grown. A server added
+by hand stays, unless a branch declares one with the same name: Eden's
+then takes its place and is later removed like any other of Eden's. A
+repo not on the machine keeps its record until
+it is back. With gardens, a garden branch's global servers are in user
+scope only while its garden is in view (see
+[Gardens](branches-and-secrets.md#gardens)).
+
 ### 1. Collection (Symlink)
 
 **When to use:** Multiple branches contribute individual items to a collection
