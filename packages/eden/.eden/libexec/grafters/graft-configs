@@ -24,10 +24,8 @@ fi
 # shellcheck source=lib/branches.sh
 source "$EDEN_ROOT/lib/branches.sh"
 
-BRANCHES_FILE="$(eden_branches_file)"
-
 # Exit if no branches configured
-if [ ! -f "$BRANCHES_FILE" ]; then
+if ! eden_branch_list_exists; then
     echo "  → No branches registered (skipping)"
     exit 0
 fi

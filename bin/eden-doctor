@@ -166,7 +166,7 @@ if [ -d "$HOME/.eden" ]; then
         check_warn "~/.eden/bin not found (no branch binaries grafted)"
     fi
     
-    if [ -f "$(eden_branches_file)" ]; then
+    if eden_branch_list_exists; then
         check_pass "Branch tracking file exists"
     else
         check_warn "No branch tracking file (run 'eden graft' to set up)"
@@ -354,8 +354,6 @@ fi
 # Branch coverage - detect ungrafted configs
 section "Branch Coverage:"
 
-BRANCHES_FILE="$(eden_branches_file)"
-
 # Discover covered paths dynamically from grafters (each supports --covers)
 GRAFTER_PATTERNS=()
 GRAFTERS_DIR="$EDEN_DIR/packages/eden/.eden/libexec/grafters"
@@ -393,7 +391,7 @@ is_metadata() {
     return 1
 }
 
-if [ -f "$BRANCHES_FILE" ]; then
+if eden_branch_list_exists; then
     while IFS= read -r branch_path; do
         branch_name=$(eden_branch_name "$branch_path")
 

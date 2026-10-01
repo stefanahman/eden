@@ -6,6 +6,7 @@
 #   source "$EDEN_ROOT/lib/branches.sh"
 #
 #   eden_branches_file          the list's path
+#   eden_branch_list_exists     whether a branch list is set up at all
 #   eden_branch_expand <entry>  an entry as an absolute path
 #   eden_branches               every entry, expanded, one per line, in order
 #   eden_platform               this machine's platform: mac or arch
@@ -42,6 +43,10 @@ eden_branch_expand() {
         p="${p%/}"
     fi
     printf '%s\n' "$p"
+}
+
+eden_branch_list_exists() {
+    [[ -f "$(eden_branches_file)" ]]
 }
 
 eden_branches() {

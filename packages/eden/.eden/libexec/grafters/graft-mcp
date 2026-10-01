@@ -46,8 +46,6 @@ CANONICAL_CONFIG="$HOME/.config/mcp/servers.json"
 CLAUDE_STATE="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
 CLAUDE_CLI="${EDEN_CLAUDE_CLI:-claude}"
 
-BRANCHES_FILE="$(eden_branches_file)"
-
 # branch_mcp_config <branch path>: the branch's global MCP file, if any.
 branch_mcp_config() {
     local file
@@ -59,7 +57,7 @@ branch_mcp_config() {
 # servers file, target directory) for every project MCP scope.
 for_each_project() {
     local branch_path projects_dir target_file project_dir local_name project_mcp project_target
-    [[ -f "$BRANCHES_FILE" ]] || return 0
+    eden_branch_list_exists || return 0
     while IFS= read -r branch_path; do
         projects_dir="$branch_path/projects"
         [[ -d "$projects_dir" ]] || continue
@@ -89,7 +87,7 @@ claim_project() {
 
 claims() {
     local branch_path config name
-    if [[ -f "$BRANCHES_FILE" ]]; then
+    if eden_branch_list_exists; then
         while IFS= read -r branch_path; do
             config="$(branch_mcp_config "$branch_path")" || continue
             while IFS= read -r name; do
@@ -107,7 +105,7 @@ MERGED_JSON='{"mcpServers": {}}'
 
 echo "  → Merging MCP servers from branches"
 
-if [[ -f "$BRANCHES_FILE" ]]; then
+if eden_branch_list_exists; then
     while IFS= read -r branch_path; do
         branch_config="$(branch_mcp_config "$branch_path")" || continue
         echo "  → Merging MCP servers from: $(eden_branch_name "$branch_path")"

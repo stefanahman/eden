@@ -30,7 +30,7 @@ source "$EDEN_ROOT/lib/branches.sh"
 # shellcheck source=lib/collisions.sh
 source "$EDEN_ROOT/lib/collisions.sh"
 
-if [[ ! -f "$(eden_branches_file)" ]]; then
+if ! eden_branch_list_exists; then
     echo "  → No branches registered (skipping)"
     exit 0
 fi
