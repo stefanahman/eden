@@ -31,6 +31,10 @@ Eden packages        Default Branch       Personal Branches
 
 ## Managing Branches
 
+These register branches one by one in `~/.config/eden/branches`. With
+[gardens](#gardens) set up, the same commands edit the repo's
+`.eden-gardens` instead.
+
 ### Register a Branch
 
 ```bash
@@ -170,15 +174,103 @@ eden secrets lookup slack-bot-token op_account   # Just the account domain
 
 MCP wrapper scripts in `.local/bin/` fetch secrets at runtime via 1Password CLI. See [1password-setup.md](1password-setup.md) for the wrapper pattern.
 
-## Context Switching
+## Gardens
 
-Branches enable clean context separation:
+A **garden** is a named group of one or more branches that make up one
+area of life — its accounts, git remotes and tools: `work` for Example
+Corp, `personal` for John Doe. A machine grows one or more gardens, and
+shows one at a time, the **garden in view**. A branch in no garden is
+**shared**: grafted in every garden.
 
-| Context | Setup | What it adds |
+### Declaring them
+
+The repo that holds your branches declares its gardens in one file at
+its root, `.eden-gardens`:
+
+```ini
+[shared]
+common
+mac-desktop    mac
+linux-desktop  arch
+
+[work]
+work
+
+[personal]
+personal
+```
+
+Each section is a garden, except `[shared]`. Each line is a branch
+folder relative to the file, optionally followed by the one platform it
+is grafted on (`mac` or `arch`). Blank lines and `#` lines are skipped;
+a line before any section is not read. A branch belongs to one section.
+
+The file is yours and tracked with your branches; the commands below
+edit it, or edit it by hand and commit it:
+
+```bash
+eden garden new school                        # an empty [school]
+eden branch new branches/chess --garden school  # create a branch, list it under [school]
+eden branch add branches/tools --shared --platform mac
+eden branch move chess --garden personal      # to another garden, platform kept
+eden branch remove chess                      # delist; the folder stays
+eden branch list                              # each garden's branches, ✓ where grafted here
+```
+
+### Setting up a machine
+
+```bash
+eden init ~/eden-branches --garden personal   # or: eden init ~/eden-branches, and pick
+```
+
+`eden init <repo>` records the repo in `~/.config/eden/branches-repo`, grows the
+gardens named with `--garden` (at a terminal it asks which), grafts, and
+puts the first in view; `--no-graft` stops before grafting. The machine
+keeps its own choices, untracked:
+
+| What | Where |
+|---|---|
+| Where the repo is | `~/.config/eden/branches-repo` |
+| The gardens this machine grows | `~/.config/eden/gardens` |
+| The garden in view | `~/.local/state/eden/garden` |
+
+From then on `eden graft` works out the branch list on every run: the
+shared branches for this platform, then each grown garden's branches,
+in the order `.eden-gardens` gives them. `~/.config/eden/branches` is not
+read while gardens are set up. A garden that gains a branch needs one
+edit to `.eden-gardens`, then `eden graft` on each machine — `eden
+update` fast-forwards the repo first.
+
+### Growing and switching
+
+```bash
+eden garden list           # what the file declares, and the state of each here
+eden garden add work       # grow it here, then: eden graft
+eden garden remove work    # stop growing it; what it grafted stays (eden doctor reports it)
+eden garden use work       # put it in view
+eden garden                # the garden in view
+```
+
+`eden garden use` records the garden and runs every executable in
+`~/.config/eden/garden.d/`, in name order, with the garden as its
+argument. A branch grafts its own hook there for what a switch changes
+beyond what reads the state itself: a link to the garden's config for
+some tool, a window manager reload. A hook that fails is reported and
+the rest still run.
+
+`eden doctor` checks the file against the repo and the machine: a branch
+the file does not list, a listed folder that is missing or not a branch,
+a branch listed twice, an unknown platform, and a machine that grows no
+garden, has none in view, or still has a branches file.
+
+## Without gardens
+
+A machine can register its branches one by one instead:
+
+| Machine | Setup | What it adds |
 |---------|-------|-------------|
 | Work laptop | Eden + branch-work | Company MCP servers, git identity, VPN, Slack, brew packages |
 | Personal laptop | Eden + branch-personal | Personal API keys, home server access |
-| Client machine | Eden + branch-client | Client-specific tokens and configs |
 
 The example branch deactivates automatically when you run `eden branch add` for any other branch. To remove it manually, comment out or delete the `$EDEN_ROOT/branches/example` line in `~/.config/eden/branches`.
 

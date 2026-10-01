@@ -166,7 +166,11 @@ if [ -d "$HOME/.eden" ]; then
         check_warn "~/.eden/bin not found (no branch binaries grafted)"
     fi
     
-    if [ -f "$(eden_branches_file)" ]; then
+    if GARDENS_REPO="$(eden_branches_repo)"; then
+        check_pass "Gardens set up from $GARDENS_REPO"
+    elif GARDENS_PROBLEM="$(eden_branches_repo_problem)"; then
+        check_fail "$GARDENS_PROBLEM"
+    elif eden_branch_list_exists; then
         check_pass "Branch tracking file exists"
     else
         check_warn "No branch tracking file (run 'eden graft' to set up)"
@@ -208,6 +212,85 @@ if [ "${SHELL##*/}" = "bash" ]; then
     else
         # shellcheck disable=SC2088  # the ~ is shown to the reader
         check_warn "~/.bashrc does not load Eden's env files; add: . ~/.config/bash/env"
+    fi
+fi
+
+# Gardens: what .eden-gardens declares against what the repo holds and
+# what this machine grows. A list read on every graft fails silently when
+# it is wrong, so its mistakes are named here.
+if GARDENS_REPO="$(eden_branches_repo)"; then
+    section "Gardens:"
+    GARDENS_FILE="$(eden_gardens_file)"
+    GARDENS_ISSUES=0
+    gardens_warn() {
+        check_warn "$1"
+        GARDENS_ISSUES=$((GARDENS_ISSUES + 1))
+    }
+
+    # Lines outside any section are never read.
+    in_section=false
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^\[[^]]+\]$ ]]; then
+            in_section=true
+        elif ! $in_section; then
+            gardens_warn ".eden-gardens: '$line' comes before any [section] and is not read"
+        fi
+    done < <(eden_gardens_lines "$GARDENS_FILE")
+
+    LISTED=$'\n'
+    while IFS=$'\t' read -r g_section g_path g_platform; do
+        g_rel="${g_path#"$GARDENS_REPO"/}"
+        if [[ "$LISTED" == *$'\n'"$g_path"$'\n'* ]]; then
+            check_fail ".eden-gardens lists $g_rel more than once; a branch belongs to one garden or to [shared]"
+            GARDENS_ISSUES=$((GARDENS_ISSUES + 1))
+        fi
+        LISTED+="$g_path"$'\n'
+        if [[ ! -d "$g_path" ]]; then
+            gardens_warn ".eden-gardens lists $g_rel under [$g_section], which does not exist"
+        elif [[ ! -f "$g_path/.eden-graft" && ! -f "$g_path/.eden-secrets" ]]; then
+            gardens_warn ".eden-gardens lists $g_rel, which is not a branch (no .eden-graft or .eden-secrets)"
+        fi
+        if [[ -n "$g_platform" && "$g_platform" != mac && "$g_platform" != arch ]]; then
+            gardens_warn ".eden-gardens: $g_rel names platform '$g_platform'; it is grafted nowhere (mac or arch)"
+        fi
+    done < <(eden_gardens_entries)
+
+    # A branch in the repo that no section lists grafts nothing.
+    while IFS= read -r marker; do
+        g_dir="$(dirname "$marker")"
+        [[ "$g_dir" == "$GARDENS_REPO" ]] && continue
+        [[ "$LISTED" == *$'\n'"$g_dir"$'\n'* ]] && continue
+        inside=false
+        while IFS= read -r g_path; do
+            [[ -n "$g_path" && "$g_dir" == "$g_path"/* ]] && inside=true
+        done <<< "$LISTED"
+        $inside && continue
+        LISTED+="$g_dir"$'\n'
+        gardens_warn "${g_dir#"$GARDENS_REPO"/} is a branch that .eden-gardens does not list, so it grafts nothing"
+    done < <(find -H "$GARDENS_REPO" -maxdepth 3 -name .git -prune -o \( -name .eden-graft -o -name .eden-secrets \) -print 2>/dev/null | sort)
+
+    DECLARED="$(eden_gardens_declared)"
+    GROWN="$(eden_gardens_grown)"
+    while IFS= read -r g_name; do
+        [[ -n "$g_name" ]] || continue
+        if [[ $'\n'"$DECLARED"$'\n' != *$'\n'"$g_name"$'\n'* ]]; then
+            gardens_warn "This machine grows $g_name, which .eden-gardens does not declare: eden garden remove $g_name"
+        fi
+    done <<< "$GROWN"
+    if [[ -z "$GROWN" ]]; then
+        gardens_warn "This machine grows no garden, so only the shared branches graft: eden garden add <name>"
+    elif ! IN_VIEW="$(eden_garden_in_view)"; then
+        gardens_warn "No garden in view: eden garden use <name>"
+    elif [[ $'\n'"$GROWN"$'\n' != *$'\n'"$IN_VIEW"$'\n'* ]]; then
+        gardens_warn "$IN_VIEW is in view but not grown here: eden garden use <name>"
+    fi
+    if [[ -s "$(eden_branches_file)" ]]; then
+        # shellcheck disable=SC2088  # the ~ is shown to the reader
+        gardens_warn "~/.config/eden/branches is not read while gardens are set up; delete it"
+    fi
+
+    if (( GARDENS_ISSUES == 0 )); then
+        check_pass "$(printf '%s' "$GROWN" | paste -sd' ' -) grown, $(eden_garden_in_view) in view; .eden-gardens matches the repo"
     fi
 fi
 
@@ -354,8 +437,6 @@ fi
 # Branch coverage - detect ungrafted configs
 section "Branch Coverage:"
 
-BRANCHES_FILE="$(eden_branches_file)"
-
 # Discover covered paths dynamically from grafters (each supports --covers)
 GRAFTER_PATTERNS=()
 GRAFTERS_DIR="$EDEN_DIR/packages/eden/.eden/libexec/grafters"
@@ -393,7 +474,7 @@ is_metadata() {
     return 1
 }
 
-if [ -f "$BRANCHES_FILE" ]; then
+if eden_branch_list_exists; then
     while IFS= read -r branch_path; do
         branch_name=$(eden_branch_name "$branch_path")
 

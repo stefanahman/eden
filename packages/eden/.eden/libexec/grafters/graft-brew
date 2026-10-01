@@ -35,8 +35,7 @@ fi
 # shellcheck source=lib/branches.sh
 source "$EDEN_ROOT/lib/branches.sh"
 
-BRANCHES_FILE="$(eden_branches_file)"
-if [[ ! -f "$BRANCHES_FILE" ]]; then
+if ! eden_branch_list_exists; then
     exit 0
 fi
 

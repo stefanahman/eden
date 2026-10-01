@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+# eden-garden — which gardens this machine grows, and which one is in view.
+#
+# Usage:
+#   eden garden                 the garden in view
+#   eden garden list            the gardens .eden-gardens declares, and their state here
+#   eden garden add <name>      grow a declared garden on this machine (then: eden graft)
+#   eden garden remove <name>   stop growing it (what it grafted stays until removed)
+#   eden garden use <name>      put a grown garden in view
+#   eden garden new <name>      declare a garden: an empty [<name>] section in .eden-gardens
+#
+# A garden is a named group of branches, declared in the .eden-gardens of
+# the repo `eden init <path>` pointed at. The gardens a machine grows are
+# kept in ~/.config/eden/gardens, the one in view in
+# ~/.local/state/eden/garden. `use` then runs every executable in
+# ~/.config/eden/garden.d/, in name order, with the garden as its
+# argument: branches graft their own hooks there for what a switch changes
+# beyond what reads the state itself.
+set -euo pipefail
+
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+RESET='\033[0m'
+
+log()  { echo -e "${GREEN}▸${RESET} $1"; }
+info() { echo -e "${BLUE}→${RESET} $1"; }
+warn() { echo -e "${YELLOW}⚠${RESET} $1" >&2; }
+die()  { echo -e "${RED}✗${RESET} $1" >&2; exit 1; }
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EDEN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=lib/branches.sh
+source "$EDEN_ROOT/lib/branches.sh"
+
+HOOKS="${XDG_CONFIG_HOME:-$HOME/.config}/eden/garden.d"
+
+usage() {
+    sed -n '4,10p' "${BASH_SOURCE[0]}" | sed -E 's/^# ?//'
+}
+
+# in_list <name> <lines>: whether name is one of the lines.
+in_list() {
+    [[ $'\n'"$2"$'\n' == *$'\n'"$1"$'\n'* ]]
+}
+
+require_gardens() {
+    local problem
+    eden_branches_repo >/dev/null && return 0
+    if problem="$(eden_branches_repo_problem)"; then
+        die "$problem"
+    fi
+    die "No gardens set up: run eden init <path to the repo with your .eden-gardens>"
+}
+
+require_declared() {
+    in_list "$1" "$(eden_gardens_declared)" && return 0
+    die "No garden $1 in $(eden_gardens_file) (declared: $(eden_gardens_declared | paste -sd' ' -))"
+}
+
+valid_name() {
+    [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && "$1" != shared ]]
+}
+
+current() {
+    local name
+    if ! name="$(eden_garden_in_view)"; then
+        die "No garden in view: run eden garden use <name> ($(eden_gardens_grown | paste -sd' ' -))"
+    fi
+    printf '%s\n' "$name"
+}
+
+list() {
+    require_gardens
+    local declared grown here name state
+    declared="$(eden_gardens_declared)"
+    grown="$(eden_gardens_grown)"
+    here="$(eden_garden_in_view)" || here=""
+    while IFS= read -r name; do
+        [[ -n "$name" ]] || continue
+        if [[ "$name" == "$here" ]]; then
+            state="in view"
+        elif in_list "$name" "$grown"; then
+            state="grown"
+        else
+            state="not grown"
+        fi
+        printf '%-16s %s\n' "$name" "$state"
+    done <<< "$declared"
+    while IFS= read -r name; do
+        [[ -n "$name" ]] || continue
+        in_list "$name" "$declared" || printf '%-16s %s\n' "$name" "grown, but not declared"
+    done <<< "$grown"
+}
+
+add() {
+    local name="$1" file
+    require_gardens
+    require_declared "$name"
+    file="$(eden_grown_file)"
+    if in_list "$name" "$(eden_gardens_grown)"; then
+        info "Already growing $name"
+        return 0
+    fi
+    mkdir -p "$(dirname "$file")"
+    if [[ -s "$file" && -n "$(tail -c 1 "$file")" ]]; then
+        echo >> "$file"
+    fi
+    echo "$name" >> "$file"
+    log "Growing $name here"
+    info "Run 'eden graft' to graft its branches"
+}
+
+remove() {
+    local name="$1" file line entry here removed=0
+    local -a kept=()
+    file="$(eden_grown_file)"
+    [[ -f "$file" ]] || die "Not growing $name here"
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        entry="${line#"${line%%[![:space:]]*}"}"
+        if [[ "${entry%"${entry##*[![:space:]]}"}" == "$name" ]]; then
+            removed=1
+            continue
+        fi
+        kept+=("$line")
+    done < "$file"
+    (( removed )) || die "Not growing $name here"
+    if (( ${#kept[@]} > 0 )); then
+        printf '%s\n' "${kept[@]}" > "$file.tmp"
+    else
+        : > "$file.tmp"
+    fi
+    mv "$file.tmp" "$file"
+    log "No longer growing $name here"
+    here="$(eden_garden_in_view)" || here=""
+    if [[ "$here" == "$name" ]]; then
+        rm -f "$(eden_garden_state_file)"
+        warn "$name was in view; pick another with eden garden use <name>"
+    fi
+    info "What its branches grafted stays until removed by hand; eden doctor reports it"
+}
+
+use() {
+    local name="$1" state hook failed=0
+    require_gardens
+    require_declared "$name"
+    in_list "$name" "$(eden_gardens_grown)" || die "Not growing $name here: run eden garden add $name, then eden graft"
+    state="$(eden_garden_state_file)"
+    mkdir -p "$(dirname "$state")"
+    printf '%s\n' "$name" > "$state"
+    log "Garden in view: $name"
+    if [[ -d "$HOOKS" ]]; then
+        for hook in "$HOOKS"/*; do
+            [[ -f "$hook" && -x "$hook" ]] || continue
+            if ! "$hook" "$name"; then
+                warn "garden.d/$(basename "$hook") failed"
+                failed=1
+            fi
+        done
+    fi
+    return "$failed"
+}
+
+new() {
+    local name="$1" file
+    require_gardens
+    valid_name "$name" || die "Not a garden name: $name (letters, digits, . _ -; not 'shared')"
+    in_list "$name" "$(eden_gardens_declared)" && die "Garden $name is already declared"
+    file="$(eden_gardens_file)"
+    if [[ -s "$file" && -n "$(tail -c 1 "$file")" ]]; then
+        echo >> "$file"
+    fi
+    printf '\n[%s]\n' "$name" >> "$file"
+    log "Declared $name in $file"
+    info "Add branches with: eden branch new <path> --garden $name"
+}
+
+case "${1:-}" in
+    "") current ;;
+    list|ls) list ;;
+    add|remove|rm|use|new)
+        [[ -n "${2:-}" ]] || { usage >&2; exit 64; }
+        cmd="$1"
+        [[ "$cmd" == rm ]] && cmd=remove
+        "$cmd" "$2"
+        ;;
+    -h|--help|help) usage ;;
+    *) usage >&2; exit 64 ;;
+esac

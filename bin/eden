@@ -19,6 +19,11 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 # bin/eden is one level deep from repo root
 EDEN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Subcommands run from EDEN_ROOT; a path given on the command line is
+# relative to where eden was run.
+EDEN_CALLER_PWD="${EDEN_CALLER_PWD:-$PWD}"
+export EDEN_CALLER_PWD
+
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -103,6 +108,9 @@ HELP
             [[ "$full" ]] && cat <<'HELP'
 
 Usage: eden update
+
+Updates the trunk to its track, re-plants its packages, and fast-forwards
+the repo with your .eden-gardens when eden init set one up.
 HELP
             ;;
         uninstall)
@@ -128,7 +136,7 @@ Examples:
 HELP
             ;;
         branch)
-            echo "Manage Eden branches (add, list, remove, new)"
+            echo "Manage Eden branches (add, list, remove, new, move)"
             [[ "$full" ]] && cat <<'HELP'
 
 Usage: eden branch <subcommand>
@@ -138,6 +146,28 @@ Subcommands:
   list              List registered branches
   remove <path>     Unregister a branch
   new <path>        Create and register a new branch
+  move <branch>     Move a branch to another garden (gardens only)
+
+With gardens (eden init <repo>), add, new, move and remove edit the repo's
+.eden-gardens instead, and take where the branch goes:
+  --garden <name>   in that garden
+  --shared          in every garden
+  --platform <p>    on mac or arch only
+HELP
+            ;;
+        garden)
+            echo "Gardens: which this machine grows, which is in view"
+            [[ "$full" ]] && cat <<'HELP'
+
+Usage: eden garden [subcommand]
+
+Subcommands:
+  (none)            The garden in view
+  list              The gardens .eden-gardens declares, and their state here
+  add <name>        Grow a declared garden on this machine (then: eden graft)
+  remove <name>     Stop growing it
+  use <name>        Put a grown garden in view, then run ~/.config/eden/garden.d/*
+  new <name>        Declare a garden in .eden-gardens
 HELP
             ;;
         secrets)
@@ -172,12 +202,16 @@ HELP
             echo "First-run interactive setup"
             [[ "$full" ]] && cat <<'HELP'
 
-Usage: eden init [--yes|--no-prompt]
+Usage: eden init [<path>] [--garden <name>]... [--no-graft] [--yes|--no-prompt]
 
-Walks through registering an existing private branches repo or scaffolding
-a new one, then verifies the setup with eden doctor.
+With the path to a repo that has a .eden-gardens: records the repo, grows
+the gardens you name (or asks), grafts, and puts the first in view. A path
+without one is registered as a branch. Without a path, walks through
+registering or scaffolding a branch. Then verifies with eden doctor.
 
 Options:
+  --garden <name>     Grow this garden here (repeatable)
+  --no-graft          Set up without grafting
   --yes, --no-prompt  Non-interactive: skip prompts (CI/Docker use)
 HELP
             ;;
@@ -240,7 +274,7 @@ show_help() {
 
     _section "Getting Started"    grow install doctor
     _section "Config Management"  plant unplant graft update uninstall
-    _section "Branches & Secrets" branch secrets
+    _section "Branches & Secrets" branch garden secrets
     _section "Inspect & Debug"    status diff-file check-package list-packages os
 
     echo -e "${BOLD}Environment:${RESET}"
@@ -970,6 +1004,9 @@ main() {
             ;;
         branch)
             run_script "eden-branch" "$@"
+            ;;
+        garden)
+            run_script "eden-garden" "$@"
             ;;
         doctor)
             run_script "eden-doctor" "$@"
