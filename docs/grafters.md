@@ -15,6 +15,7 @@ Grafters are pluggable scripts that intelligently merge configurations from mult
 | `graft-env` | Collection | Symlinks POSIX sh env files into `~/.config/eden/env.d/`, loaded by bash and zsh | `.config/eden/env.d/*.sh` |
 | `graft-git` | Generate | Creates `includeIf` directives for branch git identities | `.config/git/identities/*` |
 | `graft-mcp` | Merge | Merges MCP server JSON from all branches (global + project) | `.config/mcp/servers.json` |
+| `graft-mise` | Install | Runs `mise install` from `$HOME`, after `graft-configs` has linked the branches' mise configs; `eden doctor` names a declared tool still missing | a mise config listed in `.eden-graft`, e.g. `.config/mise/conf.d/<name>.toml` |
 | `graft-secrets` | Aggregate | Collects 1Password secret definitions for `eden secrets` | `.eden-secrets` |
 | `graft-zsh` | Collection | Symlinks zsh-only env files into `~/.config/zsh/zshenv.d/` | `.config/zsh/zshenv.d/*.zsh` |
 
