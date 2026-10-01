@@ -54,6 +54,8 @@ sandbox_setup() {
     export EDEN_ROOT="$SANDBOX/eden-repo"
 
     mkdir -p "$HOME" "$XDG_CONFIG_HOME/eden" "$EDEN_ROOT"
+    # Grafters load their shell libraries from $EDEN_ROOT/lib.
+    ln -s "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib" "$EDEN_ROOT/lib"
 }
 
 sandbox_teardown() {

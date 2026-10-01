@@ -96,17 +96,16 @@ keep the middle level large and the last one small.
 2. **Platform-only entries are gated.** A branch can mark entries for
    one platform. Today only `graft-brew` checks the platform;
    `graft-configs` links every entry on every OS.
-3. **Secrets name their account.** `op_account` in `.eden-secrets` is
-   passed to the fetch; today it is only shown in hints.
+3. **Secrets name their account.** *Built:* docs/branches-and-secrets.md,
+   `op_account`.
 4. **The environment is shell-neutral.** Env files in POSIX `sh` syntax,
    sourced by zsh and bash alike, instead of zsh-only `zshenv.d`.
 5. **Shared config directories tolerate several contexts.** A tool that
    reads every file in a directory (`*.d/*.yaml`) sees both contexts'
    files at once; if it rejects duplicate names or keys, it must either
    select by garden or the contexts must not share names.
-6. **Grafting reports failure.** Every grafter runs; the run exits
-   non-zero if any failed. Today `eden graft` reports success as long as
-   one grafter succeeded.
+6. **Grafting reports failure.** *Built:* docs/grafters.md, "Error
+   Handling".
 
 ## Switching gardens
 

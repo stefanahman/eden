@@ -1,0 +1,48 @@
+# shellcheck shell=bash
+# branches.sh — the one reader of Eden's branch list.
+#
+# Source it after EDEN_ROOT is set:
+#
+#   source "$EDEN_ROOT/lib/branches.sh"
+#
+#   eden_branches_file          the list's path
+#   eden_branch_expand <entry>  an entry as an absolute path
+#   eden_branches               every entry, expanded, one per line, in order
+#
+# An entry is one line. Blank lines and lines whose first non-blank
+# character is `#` are skipped. Surrounding whitespace is ignored, a
+# trailing slash is dropped, and three forms are expanded: a leading `~`,
+# `$EDEN_ROOT` and `$HOME` (with or without braces). Nothing else is
+# evaluated. A last line without a newline is read like any other.
+
+eden_branches_file() {
+    printf '%s\n' "${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+}
+
+eden_branch_expand() {
+    local p="$1"
+    p="${p#"${p%%[![:space:]]*}"}"
+    p="${p%"${p##*[![:space:]]}"}"
+    p="${p//\$\{EDEN_ROOT\}/$EDEN_ROOT}"
+    p="${p//\$EDEN_ROOT/$EDEN_ROOT}"
+    p="${p//\$\{HOME\}/$HOME}"
+    p="${p//\$HOME/$HOME}"
+    # shellcheck disable=SC2088  # a literal ~ is what is being matched
+    if [[ "$p" == "~" || "$p" == "~/"* ]]; then
+        p="$HOME${p:1}"
+    fi
+    if [[ "$p" != "/" ]]; then
+        p="${p%/}"
+    fi
+    printf '%s\n' "$p"
+}
+
+eden_branches() {
+    local file line
+    file="$(eden_branches_file)"
+    [[ -f "$file" ]] || return 0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ "$line" =~ ^[[:space:]]*(#|$) ]] && continue
+        eden_branch_expand "$line"
+    done < "$file"
+}

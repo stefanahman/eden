@@ -33,6 +33,11 @@ jobs:
           umask ${{ matrix.umask }}
           bats tests/bats/
 
+      - name: Run the grafter scripts
+        run: |
+          set -e
+          for t in tests/grafter/test-*.sh; do bash "$t"; done
+
   shellcheck:
     name: Shellcheck
     runs-on: ubuntu-latest
@@ -43,5 +48,5 @@ jobs:
           # Lint scripts but don't fail on warnings (yet); just report.
           shopt -s globstar nullglob
           shellcheck --severity=error \
-            bin/eden bin/eden-* install.sh get-eden.sh \
+            bin/eden bin/eden-* install.sh get-eden.sh lib/*.sh \
             packages/eden/.eden/libexec/grafters/graft-*

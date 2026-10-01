@@ -28,8 +28,11 @@ err() {
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EDEN_ROOT="${EDEN_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
-BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+# shellcheck source=lib/branches.sh
+source "$EDEN_ROOT/lib/branches.sh"
+BRANCHES_FILE="$(eden_branches_file)"
 
 # Grafter contract version. Bump when changing how grafters are invoked,
 # discovered, or what env vars they may rely on — not for optional additions.
@@ -129,31 +132,42 @@ run_all_grafters() {
     log "Running pluggable grafters..."
     echo ""
 
-    local grafter_count=0
+    # Every grafter runs even when one fails, so the report is complete;
+    # the run fails if any of them did.
+    local ran=0 rc grafter_name
+    local -a failed=()
     for grafter in "$grafters_dir"/graft-*; do
         [ -e "$grafter" ] || continue
         [ -x "$grafter" ] || continue
 
-        local grafter_name
         grafter_name=$(basename "$grafter")
 
         if ! check_grafter_compat "$grafter"; then
+            failed+=("$grafter_name (incompatible API)")
             echo ""
             continue
         fi
 
         log "Running: $grafter_name"
 
-        if bash "$grafter"; then
-            grafter_count=$((grafter_count + 1))
+        rc=0
+        bash "$grafter" || rc=$?
+        if [ "$rc" -eq 0 ]; then
+            ran=$((ran + 1))
         else
-            warn "$grafter_name failed (exit code: $?)"
+            warn "$grafter_name failed (exit code: $rc)"
+            failed+=("$grafter_name")
         fi
         echo ""
     done
 
-    if [ $grafter_count -eq 0 ]; then
+    if [ "$ran" -eq 0 ] && [ "${#failed[@]}" -eq 0 ]; then
         warn "No grafters found in $grafters_dir"
+        return 1
+    fi
+
+    if [ "${#failed[@]}" -gt 0 ]; then
+        err "Failed: ${failed[*]}"
         return 1
     fi
 
@@ -164,16 +178,31 @@ run_all_grafters() {
 # MAIN
 # =============================================================================
 main() {
+    # --force reaches every grafter as EDEN_GRAFT_FORCE=true: apply
+    # without prompting (for non-interactive runs). It may come before or
+    # after a grafter name.
+    local -a args=()
+    local arg
+    for arg in "$@"; do
+        if [[ "$arg" == "--force" ]]; then
+            export EDEN_GRAFT_FORCE=true
+        else
+            args+=("$arg")
+        fi
+    done
+    set -- "${args[@]}"
+
     case "${1:-}" in
         --list|-l)
             list_grafters
             ;;
         --help|-h)
-            echo "Usage: eden graft [name] [--list]"
+            echo "Usage: eden graft [name] [--list] [--force]"
             echo ""
             echo "  eden graft          Run all grafters"
             echo "  eden graft git      Run only graft-git"
             echo "  eden graft --list   List available grafters"
+            echo "  eden graft --force  Apply without prompting"
             ;;
         "")
             log "Grafting branch configs into Eden..."

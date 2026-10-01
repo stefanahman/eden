@@ -21,7 +21,10 @@ if [[ -z "$EDEN_ROOT" ]]; then
     EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
 fi
 
-BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+# shellcheck source=lib/branches.sh
+source "$EDEN_ROOT/lib/branches.sh"
+
+BRANCHES_FILE="$(eden_branches_file)"
 
 # Check if branches file exists
 if [ ! -f "$BRANCHES_FILE" ]; then
@@ -29,15 +32,6 @@ if [ ! -f "$BRANCHES_FILE" ]; then
     exit 0
 fi
 
-# Expand variables in branch path
-expand_branch_path() {
-    local path="$1"
-    # Expand $EDEN_ROOT
-    path="${path//\$EDEN_ROOT/$EDEN_ROOT}"
-    # Expand tilde
-    path="${path/#\~/$HOME}"
-    echo "$path"
-}
 
 eden_bin="$HOME/.eden/bin"
 added=0
@@ -51,7 +45,7 @@ mkdir -p "$eden_bin"
 for link in "$eden_bin"/*; do
     [ -L "$link" ] && [ ! -e "$link" ] && {
         name=$(basename "$link")
-        if [[ "$FORCE" == "true" ]]; then
+        if [[ "${EDEN_GRAFT_FORCE:-${FORCE:-}}" == "true" ]]; then
             echo "  × $name [removing broken link]"
             rm "$link"
         elif [[ -t 0 ]]; then
@@ -78,13 +72,7 @@ _get_owner() {
 }
 
 # Read each branch repo path
-while IFS= read -r branch_path || [ -n "$branch_path" ]; do
-    # Skip empty lines and comments
-    [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
-
-    # Expand variables and tilde
-    branch_path=$(expand_branch_path "$branch_path")
-
+while IFS= read -r branch_path; do
     if [ ! -d "$branch_path" ]; then
         continue
     fi
@@ -126,7 +114,7 @@ while IFS= read -r branch_path || [ -n "$branch_path" ]; do
             script_owners="${script_owners}${script_name}=${branch_name}"$'\n'
         done
     fi
-done < "$BRANCHES_FILE"
+done < <(eden_branches)
 
 # Report results
 if [ $added -gt 0 ]; then

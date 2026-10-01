@@ -23,7 +23,7 @@ fi
 
 # --force: apply without prompting (for non-interactive / agent use)
 FORCE=false
-if [[ "${1:-}" == "--force" ]]; then
+if [[ "${1:-}" == "--force" || "${EDEN_GRAFT_FORCE:-}" == "true" ]]; then
     FORCE=true
 fi
 
@@ -39,15 +39,8 @@ if [[ -z "$EDEN_ROOT" ]]; then
     EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
 fi
 
-# Expand variables in branch path
-expand_branch_path() {
-    local path="$1"
-    # Expand $EDEN_ROOT
-    path="${path//\$EDEN_ROOT/$EDEN_ROOT}"
-    # Expand tilde
-    path="${path/#\~/$HOME}"
-    echo "$path"
-}
+# shellcheck source=lib/branches.sh
+source "$EDEN_ROOT/lib/branches.sh"
 
 CANONICAL_CONFIG="$HOME/.config/mcp/servers.json"
 
@@ -57,15 +50,9 @@ MERGED_JSON='{"mcpServers": {}}'
 echo "  → Merging MCP servers from branches"
 
 # Merge branch configs if branches file exists
-BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+BRANCHES_FILE="$(eden_branches_file)"
 if [[ -f "$BRANCHES_FILE" ]]; then
     while IFS= read -r branch_path; do
-        [[ -z "$branch_path" ]] && continue
-        [[ "$branch_path" =~ ^[[:space:]]*# ]] && continue
-        
-        # Expand variables and tilde
-        branch_path=$(expand_branch_path "$branch_path")
-        
         branch_name=$(basename "$branch_path")
         
         # Canonical path (mirrors HOME directory)
@@ -86,7 +73,7 @@ if [[ -f "$BRANCHES_FILE" ]]; then
             MERGED_JSON=$(echo "$MERGED_JSON" | jq --slurpfile branch "$branch_config" \
                 '.mcpServers += $branch[0].mcpServers')
         fi
-    done < "$BRANCHES_FILE"
+    done < <(eden_branches)
 fi
 
 # Ensure canonical directory exists
@@ -248,8 +235,6 @@ sync_project_mcp() {
 project_count=0
 if [[ -f "$BRANCHES_FILE" ]]; then
     while IFS= read -r branch_path; do
-        [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
-        branch_path=$(expand_branch_path "$branch_path")
         [[ -d "$branch_path" ]] || continue
 
         projects_dir="$branch_path/projects"
@@ -262,7 +247,7 @@ if [[ -f "$BRANCHES_FILE" ]]; then
 
             [[ -f "$project_mcp" ]] || continue
 
-            project_target=$(expand_branch_path "$(head -1 "$target_file" | tr -d '[:space:]')")
+            project_target=$(eden_branch_expand "$(head -1 "$target_file" | tr -d '[:space:]')")
             if [[ ! -d "$project_target" ]]; then
                 echo "  ⚠ projects/$local_name: target $project_target not found (skipping MCP)"
                 continue
@@ -271,7 +256,7 @@ if [[ -f "$BRANCHES_FILE" ]]; then
             sync_project_mcp "$(cat "$project_mcp")" "$project_target" "$local_name"
             project_count=$((project_count + 1))
         done < <(find "$projects_dir" -name .eden-target -type f || true)
-    done < "$BRANCHES_FILE"
+    done < <(eden_branches)
 fi
 
 # Show summary

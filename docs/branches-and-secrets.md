@@ -112,7 +112,7 @@ setup_command=echo "Create app at https://api.slack.com/apps"
 | `path` | Required | 1Password `op://` reference |
 | `description` | Required | What this secret is for |
 | `required_by` | Optional | What uses this secret |
-| `op_account` | Optional | 1Password account domain (defaults to primary) |
+| `op_account` | Optional | 1Password account the secret lives in; passed to the fetch as `op read --account`, or to another provider as `EDEN_SECRET_ACCOUNT` (without it, `op` picks its default account) |
 | `setup_command` | Optional | Command to help set up the secret |
 
 ### Commands

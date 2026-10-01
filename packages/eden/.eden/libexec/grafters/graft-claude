@@ -29,15 +29,10 @@ if [[ -z "$EDEN_ROOT" ]]; then
     EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
 fi
 
-# Expand variables in branch path
-expand_path() {
-    local path="$1"
-    path="${path//\$EDEN_ROOT/$EDEN_ROOT}"
-    path="${path/#\~/$HOME}"
-    echo "$path"
-}
+# shellcheck source=lib/branches.sh
+source "$EDEN_ROOT/lib/branches.sh"
 
-BRANCHES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/eden/branches"
+BRANCHES_FILE="$(eden_branches_file)"
 
 if [[ ! -f "$BRANCHES_FILE" ]]; then
     echo "  → No branches registered (skipping)"
@@ -195,10 +190,7 @@ _graft_claude_dir() {
     done
 }
 
-while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do
-    [[ -z "$branch_path" || "$branch_path" =~ ^[[:space:]]*# ]] && continue
-
-    branch_path=$(expand_path "$branch_path")
+while IFS= read -r branch_path; do
     [[ -d "$branch_path" ]] || continue
 
     branch_name=$(basename "$branch_path")
@@ -213,7 +205,7 @@ while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do
             project_dir=$(dirname "$target_file")
             local_name="${project_dir#"$projects_dir"/}"
 
-            project_target=$(expand_path "$(head -1 "$target_file" | tr -d '[:space:]')")
+            project_target=$(eden_branch_expand "$(head -1 "$target_file" | tr -d '[:space:]')")
 
             if [[ ! -d "$project_target" ]]; then
                 echo "  ⚠ projects/$local_name: target $project_target not found (skipping)"
@@ -223,7 +215,7 @@ while IFS= read -r branch_path || [[ -n "$branch_path" ]]; do
             _graft_claude_dir "$project_dir/.claude" "$project_target/.claude" "$branch_name:$local_name"
         done < <(find "$projects_dir" -name .eden-target -type f || true)
     fi
-done < "$BRANCHES_FILE"
+done < <(eden_branches)
 
 # Report results
 if [[ $added -gt 0 ]]; then
