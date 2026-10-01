@@ -9,6 +9,8 @@
 #   eden garden use <name>      put a grown garden in view (--no-graft: not
 #                               Claude Code's MCP servers)
 #   eden garden new <name>      declare a garden: an empty [<name>] section in .eden-gardens
+#   eden garden branches        every branch .eden-gardens lists, one per line, for
+#                               scripts: <garden or shared> TAB <path> TAB <platform>
 #
 # A garden is a named group of branches, declared in the .eden-gardens of
 # the repo `eden init <path>` pointed at. The gardens a machine grows are
@@ -40,7 +42,7 @@ source "$EDEN_ROOT/lib/branches.sh"
 HOOKS="${XDG_CONFIG_HOME:-$HOME/.config}/eden/garden.d"
 
 usage() {
-    sed -n '4,11p' "${BASH_SOURCE[0]}" | sed -E 's/^# ?//'
+    sed -n '4,13p' "${BASH_SOURCE[0]}" | sed -E 's/^# ?//'
 }
 
 # in_list <name> <lines>: whether name is one of the lines.
@@ -169,6 +171,11 @@ use() {
     return "$failed"
 }
 
+branches() {
+    require_gardens
+    eden_gardens_entries
+}
+
 new() {
     local name="$1" file
     require_gardens
@@ -186,6 +193,7 @@ new() {
 case "${1:-}" in
     "") current ;;
     list|ls) list ;;
+    branches) branches ;;
     use)
         if [[ "${2:-}" == --no-graft ]]; then
             [[ -n "${3:-}" ]] || { usage >&2; exit 64; }

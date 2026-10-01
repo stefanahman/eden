@@ -169,6 +169,7 @@ Subcommands:
   use <name>        Put a grown garden in view, then run ~/.config/eden/garden.d/*
                     and switch its MCP servers (--no-graft: not those)
   new <name>        Declare a garden in .eden-gardens
+  branches          Every listed branch, for scripts: garden, path, platform
 HELP
             ;;
         secrets)

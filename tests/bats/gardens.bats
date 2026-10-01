@@ -238,6 +238,17 @@ school" ]
     [ "$status" -eq 1 ]
 }
 
+@test "garden branches lists every branch with its garden, for scripts" {
+    run garden branches
+    [ "$status" -eq 0 ]
+    [ "$output" = "shared	$REPO/common	
+shared	$REPO/mac-desktop	mac
+shared	$REPO/linux-desktop	arch
+work	$REPO/work	
+personal	$REPO/personal	
+personal	$REPO/hobby	" ]
+}
+
 @test "garden commands need a repo with gardens" {
     rm "$XDG_CONFIG_HOME/eden/branches-repo"
     run garden list

@@ -249,6 +249,7 @@ eden garden add work       # grow it here, then: eden graft
 eden garden remove work    # stop growing it; what it grafted stays (eden doctor reports it)
 eden garden use work       # put it in view
 eden garden                # the garden in view
+eden garden branches       # for scripts: <garden or shared> TAB <path> TAB <platform>
 ```
 
 `eden garden use` records the garden and runs every executable in
