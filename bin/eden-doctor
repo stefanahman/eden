@@ -99,6 +99,19 @@ else
     check_fail "git not found"
 fi
 
+# Tools a mise config declares (a branch's, linked by graft-configs) are
+# installed by graft-mise; one still missing is named here.
+MISE="${EDEN_MISE:-mise}"
+if command -v "$MISE" >/dev/null 2>&1; then
+    MISE_MISSING="$(cd "$HOME" && "$MISE" ls --missing 2>/dev/null)" || MISE_MISSING=""
+    MISE_MISSING="$(printf '%s\n' "$MISE_MISSING" | awk 'NF { print $1 "@" $2 }' | paste -sd' ' -)"
+    if [[ -n "$MISE_MISSING" ]]; then
+        check_warn "mise tools declared but not installed: $MISE_MISSING (run eden graft)"
+    else
+        check_pass "mise tools installed"
+    fi
+fi
+
 if command -v stow >/dev/null 2>&1; then
     STOW_VER=$(stow --version | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
     if awk -v ver="$STOW_VER" 'BEGIN { exit (ver < 2.3) }'; then

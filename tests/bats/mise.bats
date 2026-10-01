@@ -59,3 +59,11 @@ EOF
     [[ "$output" == *"mise install failed"* ]] || false
 }
 
+@test "doctor names the mise tools that are declared but missing" {
+    echo 'typst  0.15 (missing)  ~/.config/mise/conf.d/eden.toml  0.15' > "$MISSING"
+    run "$EDEN_ROOT/bin/eden-doctor" --format=plain
+    [[ "$output" == *"warn|mise tools declared but not installed: typst@0.15"* ]] || false
+    : > "$MISSING"
+    run "$EDEN_ROOT/bin/eden-doctor" --format=plain
+    [[ "$output" == *"ok|mise tools installed"* ]] || false
+}
