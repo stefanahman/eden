@@ -88,6 +88,19 @@ $REPO/linux-desktop" ]
     [ "$status" -eq 1 ]
 }
 
+@test "a moved branches repo is named by graft, doctor and eden garden" {
+    mv "$REPO" "$REPO.moved"
+    run "$EDEN_ROOT/bin/eden-graft"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"branches-repo names $REPO, which has no .eden-gardens"*"eden init"* ]] || false
+    run "$EDEN_ROOT/bin/eden-garden" list
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"branches-repo names $REPO, which has no .eden-gardens"* ]] || false
+    mkdir -p "$HOME/.eden"
+    run "$EDEN_ROOT/bin/eden-doctor" --format=plain
+    [[ "$output" == *"error|~/.config/eden/branches-repo names $REPO, which has no .eden-gardens"* ]] || false
+}
+
 @test "a long state file's first line is read without a broken pipe, also with SIGPIPE ignored" {
     mkdir -p "$XDG_STATE_HOME/eden"
     { echo work; for i in $(seq 3000); do echo "line $i"; done; } > "$XDG_STATE_HOME/eden/garden"
@@ -470,4 +483,53 @@ clone_repo() {
     run pull
     [ "$status" -eq 1 ]
     [[ "$output" == "Could not fast-forward $HOME/clone"* ]]
+}
+
+# eden doctor -------------------------------------------------------------------
+
+gardens_report() {
+    "$EDEN_ROOT/bin/eden-doctor" --format=plain 2>/dev/null | grep -E 'Gardens set up|gardens|garden |\.eden-gardens|grafts nothing|grows|in view' | sort -u
+}
+
+@test "doctor passes gardens that match the repo" {
+    mkdir -p "$HOME/.eden"
+    echo work > "$XDG_CONFIG_HOME/eden/gardens"
+    mkdir -p "$XDG_STATE_HOME/eden" && echo work > "$XDG_STATE_HOME/eden/garden"
+    run gardens_report
+    [[ "$output" == *"ok|Gardens set up from $REPO"* ]]
+    [[ "$output" == *"ok|work grown, work in view; .eden-gardens matches the repo"* ]]
+    [[ "$output" != *"warn|"* ]]
+}
+
+@test "doctor names what .eden-gardens gets wrong" {
+    mkdir -p "$REPO/stray" "$REPO/notes" "$REPO/work/platforms/mac"
+    touch "$REPO/stray/.eden-graft" "$REPO/work/platforms/mac/.eden-graft"
+    { echo 'orphan'; cat "$REPO/.eden-gardens"; printf '%s\n' '[work]' 'personal' 'notes' 'gone' 'common  windows'; } > "$REPO/.eden-gardens.new"
+    mv "$REPO/.eden-gardens.new" "$REPO/.eden-gardens"
+    printf '%s\n' work retired > "$XDG_CONFIG_HOME/eden/gardens"
+    echo "$HOME/elsewhere" > "$XDG_CONFIG_HOME/eden/branches"
+    run gardens_report
+    [[ "$output" == *"warn|.eden-gardens: 'orphan' comes before any [section] and is not read"* ]]
+    [[ "$output" == *"error|.eden-gardens lists personal more than once"* ]]
+    [[ "$output" == *"warn|.eden-gardens lists notes, which is not a branch"* ]]
+    [[ "$output" == *"warn|.eden-gardens lists gone under [work], which does not exist"* ]]
+    [[ "$output" == *"warn|.eden-gardens: common names platform 'windows'"* ]]
+    [[ "$output" == *"warn|stray is a branch that .eden-gardens does not list, so it grafts nothing"* ]]
+    [[ "$output" != *"platforms/mac is a branch"* ]]
+    [[ "$output" == *"warn|This machine grows retired, which .eden-gardens does not declare"* ]]
+    [[ "$output" == *"warn|No garden in view"* ]]
+    [[ "$output" == *"branches is not read while gardens are set up"* ]]
+}
+
+@test "doctor finds an unlisted branch when the repo is reached through a symlink" {
+    mkdir -p "$REPO/stray" && touch "$REPO/stray/.eden-graft"
+    ln -s "$REPO" "$HOME/repo-link"
+    echo "$HOME/repo-link" > "$XDG_CONFIG_HOME/eden/branches-repo"
+    run gardens_report
+    [[ "$output" == *"warn|stray is a branch that .eden-gardens does not list"* ]] || false
+}
+
+@test "doctor says when no garden is grown" {
+    run gardens_report
+    [[ "$output" == *"warn|This machine grows no garden"* ]]
 }
