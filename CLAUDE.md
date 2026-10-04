@@ -35,6 +35,6 @@ Arch:  `sudo pacman -S bats shellcheck github-cli`
 ## Versioning
 
 - Semver in `VERSION` at repo root; `eden --version` prints it.
-- Cut releases via `bin/eden-publish [--major|--minor|--patch]` (maintainer-only). Defaults to `--patch`. Generates `CHANGELOG.md` entries from conventional commits (`feat:`, `fix:`, `perf:`, `refactor:`) since the last tag; tags, pushes, and creates a GitHub release.
+- Cut releases via `bin/eden-publish [--major|--minor|--patch] [--since REF]` (maintainer-only). Defaults to `--patch`. Generates `CHANGELOG.md` entries from conventional commits (`feat:`, `fix:`, `perf:`, `refactor:`) since the last tag in main's history, or since `REF`; tags, pushes, and creates a GitHub release. A release tag outside main's history (its commit amended after tagging) is refused, with main's own commit of that release named for `--since`.
 - Use conventional commits (`type(scope): description`) so the changelog generates cleanly.
 - Grafter contract version (`EDEN_GRAFTER_API` in `bin/eden-graft`) is **separate** from the CLI version. Bump it on breaking changes to how grafters are invoked, discovered, or what env vars they may rely on — not on optional additions.

@@ -6,11 +6,15 @@
 # release.
 #
 # Usage:
-#   bin/eden-publish [--major|--minor|--patch|--set X.Y.Z] [--dry-run] [--yes]
+#   bin/eden-publish [--major|--minor|--patch|--set X.Y.Z] [--since REF]
+#                    [--dry-run] [--yes]
 #
 # Defaults to --patch. Refuses to run on a dirty tree, a non-main branch,
 # a non-canonical remote, or a local main that doesn't match origin/main
-# (push your work first, then publish from what's shared).
+# (push your work first, then publish from what's shared). The changelog
+# lists the commits since the last tag in main's history, or since REF; a
+# release tag that main's history does not hold — its commit amended
+# after tagging — is refused rather than taken for a first release.
 #
 # Exit codes:
 #   0  Success
@@ -38,6 +42,7 @@ CANONICAL_REMOTE_PATTERN='stefanahman/eden(\.git)?$'
 
 BUMP="patch"
 SET_VERSION=""
+SINCE=""
 DRY_RUN=false
 ASSUME_YES=false
 
@@ -47,10 +52,11 @@ while [[ $# -gt 0 ]]; do
         --minor)   BUMP="minor"; shift ;;
         --patch)   BUMP="patch"; shift ;;
         --set)     SET_VERSION="${2:-}"; shift 2 ;;
+        --since)   SINCE="${2:-}"; shift 2 ;;
         --dry-run) DRY_RUN=true; shift ;;
         --yes|-y)  ASSUME_YES=true; shift ;;
         -h|--help)
-            sed -n '2,18p' "${BASH_SOURCE[0]}" | sed -E 's/^# ?//'
+            sed -n '2,22p' "${BASH_SOURCE[0]}" | sed -E 's/^# ?//'
             exit 0
             ;;
         *) err "Unknown arg: $1"; exit 2 ;;
@@ -129,7 +135,37 @@ else
 fi
 log "New version: v$NEW"
 
-LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+# Where the changelog starts: --since, else the last tag in main's history.
+# A release tag outside that history means the release commit was amended
+# after tagging; calling what followed a first release would be wrong, so
+# say so and name main's own commit of that release when there is one.
+if [[ -n "$SINCE" ]]; then
+    if ! git rev-parse --verify --quiet "$SINCE^{commit}" >/dev/null; then
+        err "--since $SINCE: no such commit"
+        exit 2
+    fi
+    if ! git merge-base --is-ancestor "$SINCE" HEAD; then
+        err "--since $SINCE is not in main's history"
+        exit 2
+    fi
+    LAST_TAG="$SINCE"
+else
+    LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+    if [[ -z "$LAST_TAG" ]]; then
+        TAGS=$(git tag -l 'v*' --sort=-version:refname)
+        LATEST="${TAGS%%$'\n'*}"
+        if [[ -n "$LATEST" ]]; then
+            err "$LATEST exists but is not in main's history (its commit was amended after tagging?)."
+            RELEASE_COMMIT=$(git log -n 1 --format=%h --grep="^chore(release): $LATEST\$" HEAD)
+            if [[ -n "$RELEASE_COMMIT" ]]; then
+                err "main has its own commit of that release: pass --since $RELEASE_COMMIT"
+            else
+                err "Pass --since <commit on main> to say where the changes start."
+            fi
+            exit 2
+        fi
+    fi
+fi
 if [[ -z "$LAST_TAG" ]]; then
     log "No prior tag — first release"
     NOTES="Initial release."
