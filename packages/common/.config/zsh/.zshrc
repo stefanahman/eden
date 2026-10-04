@@ -58,8 +58,8 @@ if [[ -n "$HOMEBREW_PREFIX" ]]; then
 fi
 
 # Aliases
-alias ls='eza -lah --git --icons'
-alias lt='eza -T -L 2 --git --icons'
+alias ls='eza -lah --git --icons=auto'
+alias lt='eza -T -L 2 --git --icons=auto'
 alias cat='bat --paging=never'
 alias ff='fzf'
 alias ..='cd ..'; alias ...='cd ../..'
