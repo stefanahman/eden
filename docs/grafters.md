@@ -115,7 +115,13 @@ a project no longer listed, or a garden no longer grown. A server added
 by hand stays, unless a branch declares one with the same name: Eden's
 then takes its place and is later removed like any other of Eden's. A
 repo not on the machine keeps its record until
-it is back. With gardens, a garden branch's global servers are in user
+it is back. A server from before the record, or one whose wrapper a
+branch stopped shipping, is never taken out this way; `eden doctor`
+names any user- or local-scope stdio server whose command is gone — an
+absolute path that is not there, or a bare name not on `PATH` — with
+the `claude mcp remove` line that removes it, and says so when it
+cannot read Claude Code's state file. With gardens, a garden
+branch's global servers are in user
 scope only while its garden is in view (see
 [Gardens](branches-and-secrets.md#gardens)).
 
