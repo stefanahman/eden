@@ -4,7 +4,8 @@
 # Two scopes:
 #   1. Global: branch/.config/mcp/servers.json → merged into ~/.config/mcp/servers.json,
 #      a garden's branch only while its garden is in view
-#   2. Project: branch/projects/<path>/.mcp/servers.json → <target>/.mcp.json (+ client variants)
+#   2. Project: branch/projects/<path>/.mcp/servers.json → Claude Code's local scope
+#      for the repo at <target> (its subdirectories and linked worktrees too),
 #      where <target> is read from projects/<path>/.eden-target
 #
 # Part of Eden's pluggable grafter system

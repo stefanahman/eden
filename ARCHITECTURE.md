@@ -35,7 +35,7 @@ eden/
 │   ├── eden/               # Stows to $HOME — internal utilities (~/.eden/libexec/)
 │   ├── arch/               # Stows to $HOME — Arch Linux overlays
 │   └── mac/                # Stows to $HOME — macOS overlays
-├── branches/               # Local branch experiments (git-ignored)
+├── branches/               # example/: a starter branch; your own live in a repo of their own
 ├── Brewfile                # macOS packages (brew bundle)
 └── pacman.txt              # Arch packages (one per line)
 ```
