@@ -39,10 +39,15 @@ BRANCHES_FILE="$(eden_branches_file)"
 # See CLAUDE.md "Versioning" section.
 EDEN_GRAFTER_API_CURRENT=1
 
-# Get the API version a grafter declares (defaults to 1 if no --api-version handler).
+# Get the API version a grafter declares (defaults to 1 if no --api-version
+# handler). A grafter is asked only when it mentions the flag, as eden
+# doctor asks for --covers: one without the handler would run its whole
+# body for the question, and its output would read as the version.
 get_grafter_api() {
-    local declared
-    declared=$(bash "$1" --api-version 2>/dev/null || echo 1)
+    local declared=1
+    if grep -q -- '--api-version' "$1" 2>/dev/null; then
+        declared=$(bash "$1" --api-version 2>/dev/null || echo 1)
+    fi
     echo "${declared:-1}"
 }
 
