@@ -114,7 +114,7 @@ outside a repo.
 |---|---|
 | Removing what an unregistered branch grafted (link scan, record of merged entries) | a branch stops being grafted on a machine — rare, since gardens stay grafted. `eden doctor` reports leftovers meanwhile. The MCP grafter already keeps its own record and removes what it added. |
 | Branch kinds and precedence | a branch must override another's output. None does today: no branch grafts a path the trunk plants. |
-| Check before apply (grafter API v2, plan mode) | collisions can't be caught inside each grafter. The runner accepts exactly one API version (bin/eden-graft:50), so a v2 must either move all grafters in one change or first teach the runner to accept both. |
+| Check before apply (grafter API v2, plan mode) | collisions can't be caught inside each grafter. The runner accepts exactly one API version (`check_grafter_compat` in bin/eden-graft), so a v2 must either move all grafters in one change or first teach the runner to accept both. |
 | A Claude configuration folder per garden (`CLAUDE_CONFIG_DIR`) | two gardens need separate Claude accounts. Claude Code documents the variable for running accounts side by side. |
 
 ## Interfaces across platforms

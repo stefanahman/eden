@@ -80,3 +80,30 @@ EOF
     [ "$status" -eq 1 ]
     [[ "$output" =~ "Unknown flag" ]]
 }
+
+@test "a grafter without an --api-version handler runs once, as API 1" {
+    # The contract makes the handler optional. Probing such a grafter by
+    # running it with --api-version runs its whole body — and its output
+    # then read as the version it declares.
+    cat > "$GRAFTERS/graft-plain" <<EOF2
+#!/bin/bash
+echo run >> "$MARKS/plain"
+echo "planting things"
+EOF2
+    chmod +x "$GRAFTERS/graft-plain"
+    run "$EDEN_ROOT/bin/eden-graft"
+    [ "$status" -eq 0 ]
+    [ "$(wc -l < "$MARKS/plain" | tr -d ' ')" = "1" ]
+    [[ ! "$output" =~ "declares API" ]]
+}
+
+@test "a silent grafter without the handler is not run a second time to ask" {
+    cat > "$GRAFTERS/graft-quiet" <<EOF2
+#!/bin/bash
+echo run >> "$MARKS/quiet"
+EOF2
+    chmod +x "$GRAFTERS/graft-quiet"
+    run "$EDEN_ROOT/bin/eden-graft"
+    [ "$status" -eq 0 ]
+    [ "$(wc -l < "$MARKS/quiet" | tr -d ' ')" = "1" ]
+}

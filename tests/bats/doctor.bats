@@ -41,3 +41,55 @@ setup() {
     [ "$status" -eq 2 ]
     [[ "$output" =~ "Unknown option" ]]
 }
+
+@test "doctor names an MCP server whose command is gone, and how to remove it" {
+    export HOME="$BATS_TEST_TMPDIR/home"
+    export CLAUDE_CONFIG_DIR="$BATS_TEST_TMPDIR/claude"
+    mkdir -p "$HOME" "$CLAUDE_CONFIG_DIR"
+    cat > "$CLAUDE_CONFIG_DIR/.claude.json" <<EOF2
+{
+  "mcpServers": {
+    "gone": {"command": "$HOME/.eden/bin/mcp-gone"},
+    "here": {"command": "/bin/sh"},
+    "bare": {"command": "npx"},
+    "web": {"type": "http", "url": "https://example.test/mcp"}
+  },
+  "projects": {
+    "$HOME/src/app": {"mcpServers": {"stale": {"command": "/nonexistent/mcp-stale"}}}
+  }
+}
+EOF2
+    run "$EDEN_ROOT/bin/eden-doctor" --format=plain
+    [[ "$output" =~ "warn|MCP server gone (user scope): ~/.eden/bin/mcp-gone is missing — claude mcp remove gone -s user" ]]
+    [[ "$output" =~ "warn|MCP server stale (~/src/app, local scope): /nonexistent/mcp-stale is missing — in ~/src/app: claude mcp remove stale -s local" ]]
+    [[ ! "$output" =~ "MCP server here" ]]
+    [[ ! "$output" =~ "MCP server bare" ]]
+    [[ ! "$output" =~ "MCP server web" ]]
+}
+
+@test "doctor says when it cannot read Claude Code's state, rather than passing" {
+    export HOME="$BATS_TEST_TMPDIR/home"
+    export CLAUDE_CONFIG_DIR="$BATS_TEST_TMPDIR/claude"
+    mkdir -p "$HOME" "$CLAUDE_CONFIG_DIR"
+    printf '{"mcpServers":{"gone":{"command":"/nonexistent/x"}}' > "$CLAUDE_CONFIG_DIR/.claude.json"
+    run "$EDEN_ROOT/bin/eden-doctor" --format=plain
+    [[ "$output" =~ "warn|MCP servers: could not read" ]]
+    [[ ! "$output" =~ "Every MCP server's command is there" ]]
+}
+
+@test "doctor checks a bare command on PATH, and leaves HTTP servers and odd paths alone" {
+    export HOME="$BATS_TEST_TMPDIR/home"
+    export CLAUDE_CONFIG_DIR="$BATS_TEST_TMPDIR/claude"
+    mkdir -p "$HOME" "$CLAUDE_CONFIG_DIR" "$BATS_TEST_TMPDIR/bin dir"
+    cp /bin/sh "$BATS_TEST_TMPDIR/bin dir/a\\b"
+    jq -n --arg bs "$BATS_TEST_TMPDIR/bin dir/a\\b" '{mcpServers: {
+        nope: {command: "mcp-nope-not-on-path"},
+        sh: {command: "sh"},
+        web: {type: "http", url: "https://example.test/mcp", command: "/nonexistent/q"},
+        odd: {command: $bs}}}' > "$CLAUDE_CONFIG_DIR/.claude.json"
+    run "$EDEN_ROOT/bin/eden-doctor" --format=plain
+    [[ "$output" =~ "warn|MCP server nope (user scope): mcp-nope-not-on-path is not on PATH — claude mcp remove nope -s user" ]]
+    [[ ! "$output" =~ "MCP server sh " ]]
+    [[ ! "$output" =~ "MCP server web" ]]
+    [[ ! "$output" =~ "MCP server odd" ]]
+}

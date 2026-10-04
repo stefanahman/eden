@@ -85,6 +85,8 @@ EDEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EDEN_ROOT="${EDEN_ROOT:-$EDEN_DIR}"
 # shellcheck source=lib/branches.sh
 source "$EDEN_ROOT/lib/branches.sh"
+# shellcheck source=lib/collisions.sh
+source "$EDEN_ROOT/lib/collisions.sh"
 
 section "Eden Health Check"
 section "=================="
@@ -585,6 +587,52 @@ if eden_branch_list_exists; then
     done < <(eden_graft_roots)
 else
     info_line "No branches registered (skipping)"
+fi
+
+section "MCP servers:"
+
+# Claude Code starts each stdio server with the command recorded for it,
+# and graft-mcp records an absolute path where it can resolve one. One
+# whose command is gone fails at the start of every session: a wrapper a
+# branch stopped shipping, left in user scope by a graft that never
+# recorded it, say. A bare command is checked on this shell's PATH (a
+# client started from the desktop may have less); an HTTP server has
+# none to check.
+CLAUDE_STATE_FILE="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
+if ! command -v jq >/dev/null 2>&1; then
+    info_line "jq not installed (skipping)"
+elif [ ! -f "$CLAUDE_STATE_FILE" ]; then
+    info_line "No Claude Code state file (skipping)"
+elif ! MCP_ROWS="$(jq -r '
+        def stdio($scope; $where):
+            to_entries[] | select(.value | type == "object")
+            | select((.value.type // "stdio") == "stdio")
+            | [$scope, $where, .key, (.value.command // "" | tostring)] | join("\u001f");
+        (.mcpServers | objects // {} | stdio("user"; "-")),
+        (.projects | objects // {} | to_entries[] | .key as $p
+            | .value | objects | .mcpServers | objects // {} | stdio("local"; $p))
+    ' "$CLAUDE_STATE_FILE" 2>/dev/null)"; then
+    check_warn "MCP servers: could not read $(eden_home_path "$CLAUDE_STATE_FILE")"
+else
+    MCP_MISSING=0
+    while IFS=$'\x1f' read -r scope project name cmd; do
+        [[ -n "$name" && -n "$cmd" ]] || continue
+        if [[ "$cmd" == /* ]]; then
+            [ -x "$cmd" ] && continue
+            problem="$(eden_home_path "$cmd") is missing"
+        else
+            command -v "$cmd" >/dev/null 2>&1 && continue
+            problem="$cmd is not on PATH"
+        fi
+        MCP_MISSING=$((MCP_MISSING + 1))
+        if [ "$scope" = user ]; then
+            check_warn "MCP server $name (user scope): $problem — claude mcp remove $name -s user"
+        else
+            where="$(eden_home_path "$project")"
+            check_warn "MCP server $name ($where, local scope): $problem — in $where: claude mcp remove $name -s local"
+        fi
+    done <<< "$MCP_ROWS"
+    [ "$MCP_MISSING" -eq 0 ] && check_pass "Every MCP server's command is there"
 fi
 
 # Final result
