@@ -1,76 +1,75 @@
-# Eden
+# eden
 
-Eden is a personal computing environment that travels across machines.
+Dotfiles across machines: a public engine, your private configs on top.
 
-It holds configurations, small tools, and organizational patterns that enable coherent work on Arch Linux and macOS. The structure is simple: shared foundations in `common`, platform-specific adaptations in `arch` and `mac`, and symlink-based deployment using GNU Stow (wrapped in Eden's `plant` command for ease of use).
+[![test](https://github.com/stefanahman/eden/actions/workflows/test.yml/badge.svg)](https://github.com/stefanahman/eden/actions/workflows/test.yml)
+[![release](https://img.shields.io/github/v/release/stefanahman/eden)](https://github.com/stefanahman/eden/releases)
+[![license](https://img.shields.io/github/license/stefanahman/eden)](LICENSE)
 
-## Purpose
+eden keeps one environment on macOS and Arch Linux. This repo holds the
+engine and a small shared base: zsh, bash and git config, and macOS
+defaults. `eden plant` links the base into `$HOME` with GNU Stow.
 
-Computing should feel continuous. Eden reduces the friction of switching between machines by maintaining a single source of truth for configurations while respecting platform differences where they matter.
+Your own configs live in branches: private git repos laid out like
+`$HOME`. `eden graft` merges them in: config files, scripts,
+environment files, git identities, MCP servers, Claude Code settings
+and Brewfiles. Secrets come from 1Password at runtime and are never
+committed.
 
-This is not a framework or a distribution. It is a working environment, shaped by daily use and refined over time.
+Gardens group branches by area of life, such as work and personal. A
+machine grows the gardens it needs and shows one at a time; `eden
+garden use` switches between them.
 
-## Installation
+## Install
 
-```bash
-# Clone Eden
-git clone <your-eden-repo> ~/eden
-cd ~/eden
+```sh
+curl -fsSL https://raw.githubusercontent.com/stefanahman/eden/main/get-eden.sh | bash
+eden install    # platform packages, GNU Stow among them
+eden plant      # link the shared base into $HOME
+```
 
-# Bootstrap: Install eden wrapper (no dependencies required)
-./install.sh
+The script clones eden into `~/eden` and puts the `eden` command in
+`~/.local/bin`, pinned to the latest release. It needs only git. To do
+it by hand: `git clone https://github.com/stefanahman/eden ~/eden`,
+then `~/eden/install.sh`; `install.sh --help` lists the other tracks,
+a pinned release or main.
 
-# Install platform packages (includes stow)
-eden install
+## Quick start
 
-# Plant configurations into your system
-eden plant
+Graft the example branch to see each grafter at work:
 
-# Graft branch configurations (after plant)
+```sh
+eden branch add ~/eden/branches/example
 eden graft
-
-# Validate installation
 eden doctor
 ```
 
-Eden grows in stages: first the command wrapper, then tools and packages, then configuration planting, then branch integration. This sequence requires only git at the start.
+Then make a branch of your own with `eden branch new <path>`. To group
+branches into gardens, run `eden init <repo> --garden <name>` on each
+machine: [docs/branches-and-secrets.md](docs/branches-and-secrets.md).
 
-## Structure
+Day to day, `eden grow` plants and grafts in one step, and `eden update`
+pulls the latest eden and your branches repo.
 
-Eden has three layers:
+## Docs
 
-1. **Packages** (`common`, `arch`, `mac`) - Minimal, cross-platform core (deployed via `eden plant`)
-2. **Branches** - Private, context-specific extensions you supply (composed via `eden graft`)
+- [Architecture](ARCHITECTURE.md): layout, layers, grafters, commands
+- [Branches and secrets](docs/branches-and-secrets.md): branch layout,
+  secrets, gardens
+- [Grafters](docs/grafters.md): what each grafter does, and how to
+  write one
+- [1Password setup](docs/1password-setup.md): the CLI, and MCP servers
+  that need secrets
 
-A functional starter template lives in `branches/example` — fork it into your own private branches repo to get going.
+The base is one person's setup, opinionated by design: fork it and make
+it yours.
 
-### Two Deployment Methods
-
-**Planting** (`eden plant` - runs first):
-- Uses GNU Stow to symlink Eden packages into `$HOME`
-- One-to-one file mapping: each file has one source
-- Installs the base configurations everyone needs
-- Example: `~/.zshrc` → `eden/packages/common/.zshrc`
-
-**Grafting** (`eden graft` - runs after plant):
-- Intelligently merges configurations from multiple branches
-- Multiple sources contribute to shared configs
-- Enables composable, context-specific extensions
-- Example: Work and personal branches both add MCP servers → merged into one `~/.config/mcp/servers.json`
-
-The commands work together: `eden plant` installs the base system and grafter tools, then `eden graft` uses those tools to merge branch configurations. Personal branches can add binaries, environment variables, and configs without conflicts.
-
-Local machine overrides live in `~/.config/eden/` (XDG-compliant), while Eden binaries are managed in `~/.eden/bin/` (like cargo, volta, fnm).
-
-## Philosophy
-
-Eden favors simplicity over control, portability over perfection, and transparency over automation. Secrets are fetched at runtime via 1Password CLI, never committed to version control.
-
-This repository is public to share structure and philosophy. It reflects personal preferences, not universal best practices.
-
-## Growth
-
-Eden adapts. Configurations are added as needs arise, refined through use, and occasionally pruned. The goal is not completeness but coherence.
+See also: [owl](https://github.com/stefanahman/owl) ·
+[spaces](https://github.com/stefanahman/spaces) ·
+[mux](https://github.com/stefanahman/mux) ·
+[mcp-defer](https://github.com/stefanahman/mcp-defer) ·
+[claude-status](https://github.com/stefanahman/claude-status) ·
+[mindoro](https://github.com/stefanahman/mindoro)
 
 ## License
 

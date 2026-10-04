@@ -16,8 +16,8 @@ This is a personal environment, not a framework. Opinionated by design.
 
 Eden deploys configs via GNU Stow symlinks in three layers:
 
-1. **common** — OS-agnostic dotfiles (git, zsh, neovim, scripts)
-2. **platform** (`arch`/`mac`) — OS-specific overlays (window managers, credential helpers)
+1. **common** — OS-agnostic dotfiles (zsh, bash, git)
+2. **platform** (`arch`/`mac`) — OS-specific overlays (shell and git settings, credential helpers, macOS defaults)
 3. **local** — per-machine overrides via include directives (`~/.config/eden/local/`)
 
 Common is stowed first, then platform overlays. Stow merges directories naturally.
@@ -140,10 +140,10 @@ Provider: 1Password CLI (`op`). Secrets are fetched at runtime, never stored in 
 
 | Package | Contents |
 |---------|----------|
-| `common` | zsh/bash config, git config, starship prompt, editor settings, Claude Code rules |
-| `mac` | Ghostty terminal, macOS defaults system, platform shell/git overrides |
+| `common` | zsh/bash config (mise, fzf, zoxide and Starship when installed), git config |
+| `mac` | macOS defaults system (`eden os`), platform shell/git overrides |
 | `arch` | Platform shell/git overrides |
-| `eden` | Grafters, setup helpers (`node-setup`, `gcloud-setup`) |
+| `eden` | Grafters, setup helpers (`node-setup`, `gcloud-setup`, `claude-code-setup`) |
 
 **Example branch (`branches/example`)** -- starter template, not auto-loaded:
 
