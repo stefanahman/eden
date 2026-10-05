@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- releases -->
 
+## [v0.2.1] - 2026-10-05
+
+- fix(zsh): ls and lt take a path again — eza's --icons wants its value attached
+
 ## [v0.2.0] - 2026-10-04
 
 - fix(publish): a tag outside main's history is refused, and --since names the base
