@@ -28,6 +28,8 @@ echo "  → Grafting zsh configs from branches"
 source "$EDEN_ROOT/lib/branches.sh"
 # shellcheck source=lib/collisions.sh
 source "$EDEN_ROOT/lib/collisions.sh"
+# shellcheck source=lib/links.sh
+source "$EDEN_ROOT/lib/links.sh"
 
 if ! eden_branch_list_exists; then
     echo "  ⚠ No branches file found"
@@ -65,6 +67,7 @@ graft_all() {
 }
 
 graft_all claims | eden_check_collisions || exit 1
+eden_links_clean "$ZSHENV_D"
 graft_all link
 
 if [[ $GRAFTED_COUNT -eq 0 ]]; then
