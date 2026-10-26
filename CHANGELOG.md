@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- releases -->
 
+## [v0.3.0] - 2026-10-26
+
+- feat(graft): remove broken links a branch left behind
+- fix(graft-bin): the broken-link sweep runs after the collision check
+- refactor(graft-claude): one list of the markdown folders a .claude holds
+
 ## [v0.2.1] - 2026-10-05
 
 - fix(zsh): ls and lt take a path again — eza's --icons wants its value attached
