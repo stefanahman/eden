@@ -25,6 +25,8 @@ fi
 source "$EDEN_ROOT/lib/branches.sh"
 # shellcheck source=lib/collisions.sh
 source "$EDEN_ROOT/lib/collisions.sh"
+# shellcheck source=lib/links.sh
+source "$EDEN_ROOT/lib/links.sh"
 
 # Check if branches file exists
 if ! eden_branch_list_exists; then
@@ -80,8 +82,10 @@ graft_all() {
 }
 
 graft_all claims | eden_check_collisions || exit 1
-# Clean up broken symlinks (e.g. scripts moved between branches or removed),
-# once the collision check has passed, so a collision takes nothing out.
+eden_links_clean "$eden_bin"
+# Any broken symlink the cleanup left — one that points outside the
+# branches, or into a branch not here — is asked about, or with --force
+# removed, as before.
 for link in "$eden_bin"/*; do
     [ -L "$link" ] && [ ! -e "$link" ] && {
         name=$(basename "$link")

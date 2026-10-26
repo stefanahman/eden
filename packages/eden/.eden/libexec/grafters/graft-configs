@@ -32,6 +32,8 @@ fi
 
 # shellcheck source=lib/collisions.sh
 source "$EDEN_ROOT/lib/collisions.sh"
+# shellcheck source=lib/links.sh
+source "$EDEN_ROOT/lib/links.sh"
 
 echo "  → Symlinking configs from branches"
 
@@ -57,6 +59,17 @@ graft_all() {
 
             source_path="$branch_path/$config_path"
             target_path="$HOME/$config_path"
+
+            # The folder this entry sits in, whether or not the branch still
+            # has it, so what it left behind there is found. Only a folder
+            # in $HOME: an entry that is blank, only slashes, or climbs out
+            # with .., names none ($HOME/ before a leading slash keeps it in).
+            if [[ "$mode" == folders ]]; then
+                if [[ -n "${config_path//\//}" && "/$config_path/" != */../* ]]; then
+                    dirname "$target_path"
+                fi
+                continue
+            fi
 
             # Skip if source doesn't exist
             if [[ ! -e "$source_path" ]]; then
@@ -103,6 +116,11 @@ graft_all() {
 }
 
 graft_all claims | eden_check_collisions || exit 1
+folders=()
+while IFS= read -r folder; do
+    folders+=("$folder")
+done <<< "$(graft_all folders)"
+eden_links_clean ${folders[@]+"${folders[@]}"}
 graft_all link
 
 # Create HOME symlinks for tools that don't support XDG
