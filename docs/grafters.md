@@ -158,6 +158,9 @@ at the target is left alone and reported. Keep source in branch (editable).
 **Cons:**
 - Can break if branches move
 
+When a file leaves its branch, its link is broken; the next graft takes
+it out (see [Broken links a branch left behind](#broken-links-a-branch-left-behind)).
+
 ### 2. Merge (JSON/Data)
 
 **When to use:** Multiple branches contribute keys/values that combine into one file
@@ -405,6 +408,65 @@ one, move it to a shared branch, or make it per repo.
 When linking, a link that already points elsewhere is replaced: the
 check has ruled out another branch, so an earlier graft left it. A real
 file or directory at the target is left alone and reported.
+
+### Broken links a branch left behind
+
+When a file leaves a branch — a skill retired, a script deleted — its
+link is left pointing at nothing. Between the collision check and the
+linking, a linking grafter hands the folders it fills to
+`eden_links_clean` in `lib/links.sh`:
+
+```bash
+# shellcheck source=lib/links.sh
+source "$EDEN_ROOT/lib/links.sh"
+
+graft_all claims | eden_check_collisions || exit 1
+eden_links_clean "$HOME/.config/shell/aliases.d"
+graft_all link
+```
+
+In each folder, and not below it, it takes out a link whose own target
+is not there and which points into a branch grafted here and on disk,
+and says so. A broken link carries nothing, so this cannot lose
+anything. Where a link points is worked out as the system resolves it:
+links on the way are followed, and a `..` in a path that does not exist,
+or a link on the way that does not resolve, says nothing — the link is
+left. Left alone:
+
+- a working link, and a real file;
+- a link to a branch entry that is itself a link, broken further on —
+  the entry is there, and is the branch's;
+- a broken link that points anywhere else, or into a branch whose folder
+  is not here (renamed, or on a volume not mounted): the branch may come
+  back, and its link holds the path until it does;
+- a link a folder below, and anything in a folder that resolves into a
+  branch, grafted here or not: what is in a branch's own folder is the
+  branch's.
+
+| Grafter | Folders it cleans |
+|---|---|
+| `graft-bin` | `~/.eden/bin` |
+| `graft-claude` | `~/.claude` and its `rules`, `agents`, `commands`, `output-styles`, `skills`; the same in each project whose repo is here, whether or not the branch still has its `.claude` |
+| `graft-configs` | the folder each `.eden-graft` entry sits in, whether or not the branch still has the file, and only in `$HOME` |
+| `graft-env` | `~/.config/eden/env.d` |
+| `graft-git` | `~/.config/git/identities` |
+| `graft-zsh` | `~/.config/zsh/zshenv.d` |
+
+`graft-claude` and `graft-configs` list their folders from the same walk
+that links, so a folder they fill is a folder they clean. `graft-bin`
+still asks about any broken link the cleanup left in `~/.eden/bin`, and
+removes it with `--force` — a link into a branch that is not here
+included, as before; it does so after the collision check, so a
+collision takes nothing out.
+
+This is dotbot's `clean`, which removes the dead links that point into
+the dotfiles directory from the folders it is given. It keeps no record,
+so a link left by any earlier graft goes the same way. What it cannot
+see is a folder no grafter names any more — a project gone from its
+branch, an `.eden-graft` entry gone with no other entry in its folder —
+and a working link no branch declares any more, which is not broken:
+an entry taken out of `.eden-graft` while its file stays, a branch
+unregistered but still on disk. `eden doctor` reports the last.
 
 ### Reporting
 ```bash

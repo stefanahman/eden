@@ -28,7 +28,7 @@ Common is stowed first, then platform overlays. Stow merges directories naturall
 eden/
 ├── eden                    # Root wrapper (copies to ~/.local/bin/eden)
 ├── bin/                    # Core scripts: eden, eden-doctor, eden-graft, eden-update, ...
-├── lib/                    # Shell libraries sourced by bin/ and grafters (branches.sh, collisions.sh)
+├── lib/                    # Shell libraries sourced by bin/ and grafters (branches.sh, collisions.sh, links.sh)
 ├── install.sh              # Bootstrap installer (only requires git + stow)
 ├── packages/
 │   ├── common/             # Stows to $HOME — shared dotfiles + scripts
@@ -125,7 +125,7 @@ Provider: 1Password CLI (`op`). Secrets are fetched at runtime, never stored in 
 
 - No credentials or secrets in VCS
 - User-space overrides only (no modifying system defaults like `~/.local/share/omarchy`)
-- Planting is reversible (`eden unplant`, via stow); grafting does not yet remove what a branch left behind when it is unregistered
+- Planting is reversible (`eden unplant`, via stow); grafting takes out the broken links a branch left behind in the folders it fills, but not the working links of a branch that was unregistered
 - Portable paths: use `$HOME` and XDG locations, no machine-specific absolute paths
 - Respect XDG environment variables (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, etc.)
 
