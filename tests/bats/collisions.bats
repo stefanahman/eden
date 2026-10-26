@@ -82,6 +82,15 @@ in_both() {
     [ "$(readlink "$HOME/.eden/bin/tool")" = "$A/.local/bin/tool" ]
 }
 
+@test "graft-bin: a collision takes nothing out, not even with --force" {
+    in_both .local/bin/tool 'x'
+    mkdir -p "$HOME/.eden/bin"
+    ln -s "$BATS_TEST_TMPDIR/elsewhere/stray" "$HOME/.eden/bin/stray"
+    EDEN_GRAFT_FORCE=true run "$GRAFTERS/graft-bin" < /dev/null
+    [ "$status" -eq 1 ]
+    [ -L "$HOME/.eden/bin/stray" ]
+}
+
 @test "graft-claude: one rule in two branches writes nothing" {
     in_both .claude/rules/style.md 'rule'
     run "$GRAFTERS/graft-claude"

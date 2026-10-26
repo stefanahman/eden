@@ -41,26 +41,6 @@ conflicts=()
 # Ensure ~/.eden/bin exists
 mkdir -p "$eden_bin"
 
-# Clean up broken symlinks (e.g. scripts moved between branches or removed)
-for link in "$eden_bin"/*; do
-    [ -L "$link" ] && [ ! -e "$link" ] && {
-        name=$(basename "$link")
-        if [[ "${EDEN_GRAFT_FORCE:-${FORCE:-}}" == "true" ]]; then
-            echo "  × $name [removing broken link]"
-            rm "$link"
-        elif [[ -t 0 ]]; then
-            echo -n "  ⚠ $name is a broken link → [r]emove, [s]kip? "
-            read -r choice
-            case "$choice" in
-                r|R) rm "$link"; echo "  × $name removed" ;;
-                *)   echo "  → $name skipped" ;;
-            esac
-        else
-            echo "  ⚠ $name is a broken link (run interactively to resolve)"
-        fi
-    }
-done
-
 # graft_all claims|link: walk every branch's .local/bin. With "claims" it
 # only lists each target and its branch; with "link" it links. A link
 # that points elsewhere was left by an earlier graft (the claims have
@@ -100,6 +80,26 @@ graft_all() {
 }
 
 graft_all claims | eden_check_collisions || exit 1
+# Clean up broken symlinks (e.g. scripts moved between branches or removed),
+# once the collision check has passed, so a collision takes nothing out.
+for link in "$eden_bin"/*; do
+    [ -L "$link" ] && [ ! -e "$link" ] && {
+        name=$(basename "$link")
+        if [[ "${EDEN_GRAFT_FORCE:-${FORCE:-}}" == "true" ]]; then
+            echo "  × $name [removing broken link]"
+            rm "$link"
+        elif [[ -t 0 ]]; then
+            echo -n "  ⚠ $name is a broken link → [r]emove, [s]kip? "
+            read -r choice
+            case "$choice" in
+                r|R) rm "$link"; echo "  × $name removed" ;;
+                *)   echo "  → $name skipped" ;;
+            esac
+        else
+            echo "  ⚠ $name is a broken link (run interactively to resolve)"
+        fi
+    }
+done
 graft_all link
 
 # Report results
