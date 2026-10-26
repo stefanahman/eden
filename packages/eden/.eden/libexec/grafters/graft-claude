@@ -106,13 +106,16 @@ _graft_top_file() {
     _graft_link "$source_file" "$target_file" "$owner" "$name"
 }
 
+# The folders of flat markdown files a .claude holds; skills/ is the other.
+CLAUDE_FLAT_KINDS="rules agents commands output-styles"
+
 # Graft all Claude configs from a source .claude/ dir into a target .claude/ dir
 _graft_claude_dir() {
     local source_claude="${1%/}" target_claude="${2%/}" owner="$3" kind local_md
 
     [[ -d "$source_claude" ]] || return 0
 
-    for kind in rules agents commands output-styles; do
+    for kind in $CLAUDE_FLAT_KINDS; do
         _graft_flat_dir "$source_claude/$kind" "$target_claude/$kind" "$kind" "$owner"
     done
     _graft_skills_dir "$source_claude/skills" "$target_claude/skills" "$owner"
