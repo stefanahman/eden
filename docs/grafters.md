@@ -234,6 +234,11 @@ naming no remotes applies by directory instead,
 `[includeIf "gitdir:~/Development/<name>/"]`. An identity file must not set
 a remote URL: git refuses one in a file included this way.
 
+The trunk's git config includes `~/.config/git/machine` after all of
+these, for settings that belong to one machine, such as a signing key only
+it holds. Nothing grafts that file: a machine writes its own, and git
+skips the include where there is none.
+
 **Collisions:** each identity routes on its own; two branches providing an
 identity of the same name collide.
 

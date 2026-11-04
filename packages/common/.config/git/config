@@ -68,3 +68,9 @@
 [include]
 	path = ~/.config/eden/local/gitconfig
 
+# Include settings that belong to this machine alone, such as a signing
+# key only it holds. Last, so they win over every identity; git skips the
+# file where there is none, and no branch writes it.
+[include]
+	path = ~/.config/git/machine
+
