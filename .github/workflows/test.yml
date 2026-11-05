@@ -6,17 +6,34 @@ on:
   # Every pull request, so one stacked on another's branch is tested too.
   pull_request:
 
+# A newer push to a pull request makes the older run pointless. Other runs
+# get a group of their own: a shared one would make them wait in turn, and
+# a newer waiting run would cancel an older one, leaving a push without a
+# result.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+# Read-only token: the checks only read the code.
+permissions:
+  contents: read
+
 jobs:
   bats:
     name: Bats (${{ matrix.os }}, umask ${{ matrix.umask }})
     runs-on: ${{ matrix.os }}
+    # macOS's brew install can update Homebrew first, which takes minutes.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest]
         umask: ['022', '002']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          # No step needs git credentials; don't leave the token on disk.
+          persist-credentials: false
 
       # bats runs its tests with the first bash on PATH. macOS's own is
       # 3.2, where a failing [[ ]] that is not a test's last line does not
@@ -46,8 +63,12 @@ jobs:
   shellcheck:
     name: Shellcheck
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          # No step needs git credentials; don't leave the token on disk.
+          persist-credentials: false
       - name: Run shellcheck on shell scripts
         run: |
           # Lint scripts but don't fail on warnings (yet); just report.
