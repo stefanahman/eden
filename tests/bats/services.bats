@@ -1,5 +1,7 @@
 #!/usr/bin/env bats
-# Whether Karabiner-Elements runs is one check, its core service.
+# eden grow and eden doctor ask one check whether Karabiner-Elements
+# runs, and neither opens an app: one opened from a shell keeps that
+# shell's environment, a Claude Code session's included.
 
 setup() {
     EDEN_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
@@ -41,5 +43,23 @@ GRABBER='/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_
     printf '%s\n' "$DRIVER" "$HID_DAEMON" "$USER_SERVER" "$SETTINGS" \
         '/usr/bin/vim /Users/me/.config/karabiner/karabiner.json' > "$PROCS"
     run eden_karabiner_running
+    [ "$status" -eq 1 ]
+}
+
+@test "grow and doctor ask the same check whether Karabiner runs" {
+    # Two copies drifted once: grow went on looking for 15's names after
+    # the doctor learned 16's.
+    run grep -nE 'pgrep.*[kK]arabiner' "$EDEN_ROOT/bin/eden" "$EDEN_ROOT/bin/eden-doctor"
+    [ "$status" -eq 1 ]
+    grep -q 'eden_karabiner_running' "$EDEN_ROOT/bin/eden"
+    grep -q 'eden_karabiner_running' "$EDEN_ROOT/bin/eden-doctor"
+}
+
+@test "eden opens no app: it would keep the environment of the shell that ran eden" {
+    # open as a command: at the start of a line, or after ; & | $( then
+    # do else. Not inside a string or a comment.
+    run grep -rnE '(^|[;&|]|\$\(|\b(then|do|else))[[:space:]]*open[[:space:]]' \
+        "$EDEN_ROOT/bin" "$EDEN_ROOT/lib" "$EDEN_ROOT/packages/eden"
+    echo "$output"
     [ "$status" -eq 1 ]
 }

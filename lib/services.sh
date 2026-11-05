@@ -3,6 +3,9 @@
 #
 #   eden_karabiner_running   exit 0 when Karabiner-Elements' core service
 #                            runs, which is what does the remapping.
+#
+# eden grow and eden doctor both ask here, so they cannot disagree about
+# whether Karabiner runs.
 
 # 16 renamed karabiner_grabber to Karabiner-Core-Service. Its DriverKit
 # extension, its user server and its Settings app carry "Karabiner" in
