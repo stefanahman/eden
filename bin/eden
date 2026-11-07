@@ -18,6 +18,8 @@ done
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 # bin/eden is one level deep from repo root
 EDEN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=lib/services.sh
+source "$EDEN_ROOT/lib/services.sh"
 
 # Subcommands run from EDEN_ROOT; a path given on the command line is
 # relative to where eden was run.
@@ -861,12 +863,12 @@ main() {
                     fi
                 done
 
-                # Start Karabiner background daemon
-                if [ -d "/Applications/Karabiner-Elements.app" ] && ! pgrep -f "karabiner_" > /dev/null 2>&1; then
-                    print_info "Starting Karabiner..."
-                    launchctl kickstart -k gui/$(id -u)/org.pqrs.service.agent.karabiner_console_user_server 2>/dev/null \
-                        || open -gj -a "Karabiner-Elements" 2>/dev/null \
-                        || print_warning "Karabiner failed to start"
+                # Karabiner's services are launchd jobs that launchd restarts
+                # whenever they stop (KeepAlive), so eden starts none of them.
+                # Nor does it open the app: an app opened from a shell keeps
+                # that shell's environment.
+                if [ -d "/Applications/Karabiner-Elements.app" ] && ! eden_karabiner_running; then
+                    print_warning "Karabiner is installed but its core service is not running: open Karabiner-Elements to enable it"
                     needs_permissions=1
                 fi
 

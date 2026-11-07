@@ -87,6 +87,8 @@ EDEN_ROOT="${EDEN_ROOT:-$EDEN_DIR}"
 source "$EDEN_ROOT/lib/branches.sh"
 # shellcheck source=lib/collisions.sh
 source "$EDEN_ROOT/lib/collisions.sh"
+# shellcheck source=lib/services.sh
+source "$EDEN_ROOT/lib/services.sh"
 
 section "Eden Health Check"
 section "=================="
@@ -406,11 +408,7 @@ if [ "$(uname -s)" = "Darwin" ]; then
     done
 
     if [ -d "/Applications/Karabiner-Elements.app" ]; then
-        # Both namings: 15 and earlier ran karabiner_console_user_server
-        # and karabiner_grabber, 16 renamed them Karabiner-Core-Service
-        # and Karabiner-Console-User-Server. Matching only the first
-        # warned that a running Karabiner was not running.
-        if pgrep -f "[kK]arabiner[_-]" >/dev/null 2>&1; then
+        if eden_karabiner_running; then
             check_pass "Karabiner running"
         else
             check_warn "Karabiner installed but not running"
