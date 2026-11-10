@@ -9,11 +9,12 @@ Read `ARCHITECTURE.md` for full project context (layout, principles, CLI, branch
 - Respect XDG env vars (`XDG_CONFIG_HOME`, etc.) with standard fallbacks
 - All paths must be portable (`$HOME`-relative, no machine-specific absolutes)
 
-## 1Password / AFK Mode
+## Commit signing
 
-If a git command fails with `1Password: agent returned an error` (exit code 128),
-run `claude-afk` and retry the command. This switches to a standalone SSH key
-that doesn't require biometric auth.
+If a git command fails to sign or to authenticate (a `1Password: …` error,
+exit code 128), do not work around it: no `--no-gpg-sign`, no
+`commit.gpgsign=false`, no other key. Say what failed and stop. How a
+machine signs and pushes is set up in its branches, not in the trunk.
 
 ## Testing
 
