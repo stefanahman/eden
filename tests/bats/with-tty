@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""with-tty <answer> <command> [args...]
+
+Runs a command on a pseudo-terminal, so a grafter that asks only on a
+terminal asks, and types <answer> and Enter at the first "[y/N]". Prints
+what the command wrote and exits with its status. Python's pty works on
+Linux and macOS alike, where script(1) takes different arguments."""
+
+import os
+import pty
+import sys
+
+answer = sys.argv[1].encode()
+pid, fd = pty.fork()
+if pid == 0:
+    os.execvp(sys.argv[2], sys.argv[2:])
+
+out = b""
+answered = False
+while True:
+    try:
+        data = os.read(fd, 1024)
+    except OSError:  # Linux: EIO once the command has exited
+        break
+    if not data:
+        break
+    out += data
+    if not answered and b"[y/N]" in out:
+        os.write(fd, answer + b"\n")
+        answered = True
+
+sys.stdout.write(out.decode(errors="replace").replace("\r\n", "\n"))
+_, status = os.waitpid(pid, 0)
+sys.exit(os.waitstatus_to_exitcode(status))
