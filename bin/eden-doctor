@@ -633,6 +633,27 @@ else
     [ "$MCP_MISSING" -eq 0 ] && check_pass "Every MCP server's command is there"
 fi
 
+section "System files:"
+
+# graft-system installs only after a yes at a terminal, never with --force,
+# so a change to a branch's .eden-system can wait unseen; this names it.
+SYSTEM_GRAFTER="$GRAFTERS_DIR/graft-system"
+if [ ! -x "$SYSTEM_GRAFTER" ] || ! eden_branch_list_exists; then
+    info_line "No system files to check (skipping)"
+elif ! SYSTEM_ROWS="$(bash "$SYSTEM_GRAFTER" --pending 2>&1)"; then
+    check_warn "System files: graft-system cannot install them as they stand — run: eden graft system"
+elif [ -z "$SYSTEM_ROWS" ]; then
+    check_pass "No system file waits to be installed"
+else
+    while IFS=$'\t' read -r kind target branch; do
+        case "$kind" in
+            install) check_warn "System file $target ($branch) is not as its branch has it — run: eden graft system" ;;
+            remove) check_warn "System file $target: no branch has it any more — run: eden graft system" ;;
+            left) check_warn "System file $target" ;;
+        esac
+    done <<< "$SYSTEM_ROWS"
+fi
+
 # Final result
 section ""
 if [ $ERRORS -gt 0 ]; then

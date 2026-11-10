@@ -93,3 +93,14 @@ EOF2
     [[ ! "$output" =~ "MCP server web" ]]
     [[ ! "$output" =~ "MCP server odd" ]]
 }
+
+@test "doctor names a system file that waits to be installed" {
+    export HOME="$BATS_TEST_TMPDIR/home"
+    export XDG_CONFIG_HOME="$HOME/.config" XDG_STATE_HOME="$HOME/.local/state"
+    export EDEN_SYSTEM_DIR="$BATS_TEST_TMPDIR/sys" EDEN_SYSTEM_SUDO=""
+    mkdir -p "$XDG_CONFIG_HOME/eden" "$BATS_TEST_TMPDIR/work/.eden-system/etc" "$EDEN_SYSTEM_DIR"
+    printf 'x\n' > "$BATS_TEST_TMPDIR/work/.eden-system/etc/app.conf"
+    printf '%s\n' "$BATS_TEST_TMPDIR/work" > "$XDG_CONFIG_HOME/eden/branches"
+    run "$EDEN_ROOT/bin/eden-doctor" --format=plain
+    [[ "$output" =~ "warn|System file /etc/app.conf (work) is not as its branch has it — run: eden graft system" ]]
+}
