@@ -17,6 +17,7 @@ Grafters are pluggable scripts that intelligently merge configurations from mult
 | `graft-mcp` | Merge | Merges MCP server JSON from all branches (global + project) | `.config/mcp/servers.json` |
 | `graft-mise` | Install | Runs `mise install` from `$HOME`, after `graft-configs` has linked the branches' mise configs; `eden doctor` names a declared tool still missing | a mise config listed in `.eden-graft`, e.g. `.config/mise/conf.d/<name>.toml` |
 | `graft-secrets` | Aggregate | Collects 1Password secret definitions for `eden secrets` | `.eden-secrets` |
+| `graft-system` | Install as root | Copies files into `/` as root, after showing them and a yes at a terminal; never with `--force` | `.eden-system/` (mirrors `/`) |
 | `graft-zsh` | Collection | Symlinks zsh-only env files into `~/.config/zsh/zshenv.d/` | `.config/zsh/zshenv.d/*.zsh` |
 
 ## Config Deployment: `.eden-graft` vs Dedicated Grafters
@@ -280,6 +281,45 @@ reuse an id from the trunk's own `.eden-secrets` to override it.
 **Cons:**
 - Limited to metadata/validation use cases
 
+### 5. Install as root (System files)
+
+**When to use:** a file that belongs outside `$HOME` and to root, such as a
+system-wide policy in `/etc`. Only `graft-system` does this.
+
+**How it works:** a branch's `.eden-system/` mirrors `/`:
+`.eden-system/etc/app/policy.json` is `/etc/app/policy.json`, and
+`platforms/<platform>/.eden-system/` reaches that platform only. The file
+is **copied**, never linked. A root-owned file linked into a branch could
+be rewritten by anything that runs as the user, which is what root
+ownership is there to stop; for the same reason chezmoi stays inside
+`$HOME`, and the tools that manage `/etc` from a dotfiles repo copy with
+sudo and show a diff first.
+
+1. Every target is listed and checked for collisions, as in any grafter.
+2. A link in `.eden-system/` is refused, and so is a `.json` file that
+   does not parse: a broken policy file can stop the program that reads
+   it from starting. Nothing is written then.
+3. What differs is shown: a new file whole, a changed one as a diff, a
+   file a branch dropped by name.
+4. On a yes typed at a terminal, each file is written with sudo as owner
+   and group 0, mode 644, or 755 when its source is executable. It goes
+   through a hidden temporary file in the same directory and a rename,
+   so nothing reads half a file, and a link at the target is replaced
+   rather than written through.
+
+**Left alone, and named:** a file Eden did not install, one changed since
+it did, anything at the target but a regular file, and a file that only
+looked absent because the user cannot search its directory (`/etc/sudoers.d`).
+Eden records what it installed, with each file's checksum, in
+`~/.local/state/eden/system-files`; that is how it tells its own files
+from others and offers to remove one a branch dropped.
+
+**Never unattended:** with `--force`, or without a terminal, `graft-system`
+writes nothing and says what is pending; `eden graft system` installs it,
+and `eden doctor` names it until then. This is the one grafter that does
+not apply under `--force`, because applying would install unreviewed
+content as root whenever sudo still had a password cached.
+
 ## Decision Tree
 
 ```
@@ -316,6 +356,7 @@ packages/eden/.eden/libexec/grafters/
 ├── graft-git          # Generate strategy
 ├── graft-mcp          # Merge strategy
 ├── graft-secrets      # Aggregate strategy
+├── graft-system       # Install-as-root strategy
 └── graft-zsh          # Collection strategy
 ```
 
@@ -512,7 +553,8 @@ done
 
 ## Best Practices
 
-1. **Keep source in branches**: Prefer symlinks over copying
+1. **Keep source in branches**: Prefer symlinks over copying, except for a
+   file root owns, which is copied (see [Install as root](#5-install-as-root-system-files))
 2. **Clear ownership**: Make it obvious which branch owns what
 3. **Check collisions first**: List every target, check the list, then write
 4. **Idempotent**: Running twice should be safe

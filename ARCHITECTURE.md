@@ -78,6 +78,7 @@ integrate branch content. Each grafter handles one concern independently.
 | `graft-mcp` | Merges MCP server JSON from all branches |
 | `graft-mise` | Installs the tools branches' mise configs declare (`mise install`) |
 | `graft-secrets` | Collects 1Password secret definitions |
+| `graft-system` | Copies a branch's `.eden-system/` files into `/` as root, after a yes at a terminal |
 | `graft-zsh` | Symlinks zsh env files into `zshenv.d/` |
 
 Grafters support two scopes:

@@ -91,6 +91,8 @@ my-branch/
 ├── .claude/
 │   ├── rules/                 # Claude rules (collected by graft-claude)
 │   └── skills/                # Claude skills
+├── .eden-system/              # Mirrors /: copied in as root by graft-system, after a yes
+│   └── etc/app/policy.json    # → /etc/app/policy.json
 ├── projects/                  # Project-scoped configs
 │   └── my-app/
 │       ├── .eden-target       # Contains: ~/Development/my-app
