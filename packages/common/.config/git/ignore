@@ -20,6 +20,7 @@ yarn.lock          # if using pnpm, don't commit yarn locks
 
 # Claude Code
 **/.claude/settings.local.json
+**/.claude/.cc-writes/
 
 # Editor directories
 .vscode/
