@@ -1,0 +1,321 @@
+#!/bin/bash
+# graft-system - Install files from branches' .eden-system/ as root
+# Part of Eden's pluggable grafter system
+#
+# A branch's .eden-system/ mirrors / : .eden-system/etc/foo.conf is
+# /etc/foo.conf. Unlike every other grafter's, these files are copied, never
+# linked: a root-owned file linked into a branch could be rewritten by
+# anything that runs as the user, which is what root ownership is there to
+# stop. So each change is shown first, and written only on a yes typed at a
+# terminal. --force never writes as root: it reports what is pending.
+#
+# A file is written as root:0 (root:wheel on macOS), mode 644, or 755 when
+# its source is executable, through a hidden temporary file in the same
+# directory and a rename, so nothing ever reads half of it and a link at the
+# target is replaced, not written through. What it installed is recorded in
+# $XDG_STATE_HOME/eden/system-files, with each file's checksum: a file Eden
+# did not install, or one changed since it did, is left alone and named,
+# and one a branch dropped is offered for removal. JSON that does not parse
+# is refused before anything is written.
+#
+#   graft-system            install what differs, after a yes on a terminal
+#   graft-system --pending  list what differs, one tab-separated line each
+#
+# Tests install under EDEN_SYSTEM_DIR instead of /, and EDEN_SYSTEM_SUDO=""
+# runs the writes without sudo.
+set -e
+trap 'echo "  !! graft-system failed at line $LINENO" >&2' ERR
+
+if [[ "${1:-}" == "--api-version" ]]; then
+    echo 1
+    exit 0
+fi
+
+# Report covered paths for eden doctor
+if [[ "${1:-}" == "--covers" ]]; then
+    echo ".eden-system"
+    exit 0
+fi
+
+pending_only=false
+[[ "${1:-}" == "--pending" ]] && pending_only=true
+
+# Detect Eden root from script location
+if [[ -z "$EDEN_ROOT" ]]; then
+    SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+    EDEN_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../../../.." && pwd)"
+fi
+
+# shellcheck source=lib/branches.sh
+source "$EDEN_ROOT/lib/branches.sh"
+# shellcheck source=lib/collisions.sh
+source "$EDEN_ROOT/lib/collisions.sh"
+
+if ! eden_branch_list_exists; then
+    $pending_only || echo "  → No branches registered (skipping)"
+    exit 0
+fi
+
+system_dir="${EDEN_SYSTEM_DIR:-}"
+sudo_cmd="${EDEN_SYSTEM_SUDO-sudo}"
+record="${XDG_STATE_HOME:-$HOME/.local/state}/eden/system-files"
+tab=$'\t'
+
+checksum() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum < "$1" | cut -d' ' -f1
+    else
+        shasum -a 256 < "$1" | cut -d' ' -f1
+    fi
+}
+
+file_mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
+
+# recorded <target>: the checksum Eden recorded when it installed <target>.
+recorded() {
+    [ -f "$record" ] || return 0
+    awk -F '\t' -v t="$1" '$1 == t { print $2; exit }' "$record"
+}
+
+# in_branches <target>: whether a branch has a file for <target>.
+in_branches() {
+    awk -F '\t' -v t="$1" '$1 == t { found = 1 } END { exit !found }' <<< "$files"
+}
+
+# walk: one "target<TAB>source<TAB>branch" line per file in every graft
+# root's .eden-system, target as an absolute path on the system.
+walk() {
+    local root name rel
+    while IFS= read -r root; do
+        [ -d "$root/.eden-system" ] || continue
+        name=$(eden_branch_name "$root")
+        while IFS= read -r rel; do
+            rel="${rel#.}"
+            printf '%s\t%s\t%s\n' "$rel" "$root/.eden-system$rel" "$name"
+        done < <(cd "$root/.eden-system" && find . \( -type f -o -type l \) -print | LC_ALL=C sort)
+    done < <(eden_graft_roots)
+}
+
+files="$(walk)"
+[ -z "$files" ] && [ ! -s "$record" ] && {
+    $pending_only || echo "  → No system files in branches"
+    exit 0
+}
+
+if [ -n "$files" ]; then
+    cut -f1,3 <<< "$files" | eden_check_collisions || exit 1
+fi
+
+# Refuse what could not be installed as it stands, before writing anything.
+refused=()
+while IFS="$tab" read -r target src branch; do
+    [ -n "$target" ] || continue
+    if [ -L "$src" ]; then
+        refused+=("$target is a link ($branch): .eden-system takes files, copied as they are")
+    elif [[ "$target" == *.json ]]; then
+        if ! command -v jq >/dev/null 2>&1; then
+            refused+=("$target ($branch): jq is needed to check JSON before it is installed")
+        elif ! jq empty < "$src" >/dev/null 2>&1; then
+            refused+=("$target is not valid JSON ($branch)")
+        fi
+    fi
+done <<< "$files"
+if [ ${#refused[@]} -gt 0 ]; then
+    echo "  ✗ Nothing was installed:" >&2
+    for line in "${refused[@]}"; do
+        echo "    • $line" >&2
+    done
+    exit 1
+fi
+
+# The plan: what to install and what to remove; what is left alone and why.
+plan=()       # "install|remove<TAB>target<TAB>source or -<TAB>mode or -<TAB>branch"
+left=()
+current=0
+while IFS="$tab" read -r target src branch; do
+    [ -n "$target" ] || continue
+    path="$system_dir$target"
+    mode=644
+    [ -x "$src" ] && mode=755
+    if [ -L "$path" ] || { [ -e "$path" ] && [ ! -f "$path" ]; }; then
+        left+=("$target: not a regular file")
+    elif [ ! -e "$path" ]; then
+        plan+=("install$tab$target$tab$src$tab$mode$tab$branch")
+    elif [ ! -r "$path" ]; then
+        left+=("$target: not readable, so Eden cannot compare it")
+    elif cmp -s "$path" "$src" && [ "$(file_mode "$path")" = "$mode" ]; then
+        current=$((current + 1))
+    else
+        was="$(recorded "$target")"
+        if [ -z "$was" ]; then
+            left+=("$target: there already, and Eden did not install it")
+        elif [ "$was" != "$(checksum "$path")" ]; then
+            left+=("$target: changed since Eden installed it")
+        else
+            plan+=("install$tab$target$tab$src$tab$mode$tab$branch")
+        fi
+    fi
+done <<< "$files"
+
+if [ -f "$record" ]; then
+    while IFS="$tab" read -r target was; do
+        [ -n "$target" ] || continue
+        in_branches "$target" && continue
+        path="$system_dir$target"
+        if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+            continue
+        elif [ -f "$path" ] && [ ! -L "$path" ] && [ -r "$path" ] && [ "$(checksum "$path")" = "$was" ]; then
+            plan+=("remove$tab$target$tab-$tab-$tab-")
+        else
+            left+=("$target: no branch has it any more, and it changed since Eden installed it")
+        fi
+    done < "$record"
+fi
+
+if $pending_only; then
+    for line in ${plan[@]+"${plan[@]}"}; do
+        IFS="$tab" read -r kind target _ _ branch <<< "$line"
+        printf '%s\t%s\t%s\n' "$kind" "$target" "$branch"
+    done
+    for line in ${left[@]+"${left[@]}"}; do
+        printf 'left\t%s\t-\n' "$line"
+    done
+    exit 0
+fi
+
+report_left() {
+    local line
+    [ ${#left[@]} -gt 0 ] || return 0
+    echo "  ⚠ Left alone:"
+    for line in "${left[@]}"; do
+        echo "    • $line"
+    done
+}
+
+# write_record: what Eden installed, as the branches now have it. A file
+# Eden installed once and left alone this time keeps its entry, and so does
+# one a branch dropped while it is still on the system, so a later run still
+# knows it as Eden's.
+write_record() {
+    local tmp target src was
+    mkdir -p "$(dirname "$record")"
+    tmp="$record.tmp"
+    : > "$tmp"
+    while IFS="$tab" read -r target src _; do
+        [ -n "$target" ] || continue
+        if [ -f "$system_dir$target" ] && cmp -s "$system_dir$target" "$src"; then
+            printf '%s\t%s\n' "$target" "$(checksum "$src")" >> "$tmp"
+        elif was="$(recorded "$target")" && [ -n "$was" ]; then
+            printf '%s\t%s\n' "$target" "$was" >> "$tmp"
+        fi
+    done <<< "$files"
+    if [ -f "$record" ]; then
+        while IFS="$tab" read -r target was; do
+            [ -n "$target" ] || continue
+            in_branches "$target" && continue
+            if [ -e "$system_dir$target" ] || [ -L "$system_dir$target" ]; then
+                printf '%s\t%s\n' "$target" "$was" >> "$tmp"
+            fi
+        done < "$record"
+    fi
+    mv -f "$tmp" "$record"
+}
+
+if [ ${#plan[@]} -eq 0 ]; then
+    [ $current -gt 0 ] && echo "  → $current system file(s) up to date"
+    report_left
+    # A file installed by hand that matches its branch counts as Eden's.
+    [ -n "$files" ] && write_record
+    exit 0
+fi
+
+# Show the plan.
+for line in "${plan[@]}"; do
+    IFS="$tab" read -r kind target src mode branch <<< "$line"
+    path="$system_dir$target"
+    if [ "$kind" = remove ]; then
+        echo "  - $target (no branch has it any more)"
+    elif [ ! -e "$path" ]; then
+        echo "  + $target ($branch), mode $mode"
+        sed 's/^/      /' "$src"
+    else
+        echo "  ~ $target ($branch)"
+        [ "$(file_mode "$path")" = "$mode" ] || echo "      mode $(file_mode "$path") → $mode"
+        diff -u "$path" "$src" | tail -n +3 | sed 's/^/      /' || true
+    fi
+done
+report_left
+
+n=${#plan[@]}
+if [[ "${EDEN_GRAFT_FORCE:-}" == "true" ]]; then
+    echo "  ⚠ $n system file(s) pending: --force never writes as root"
+    echo "    Review and install them with: eden graft system"
+    exit 0
+elif [[ ! -t 0 ]]; then
+    echo "  ⚠ $n system file(s) pending: run eden graft system in a terminal"
+    exit 0
+fi
+
+printf '  Write %s system file(s) as root? [y/N] ' "$n"
+read -r answer
+case "$answer" in
+    y|Y|yes|Yes) ;;
+    *)
+        echo "  → Left as they were"
+        exit 0
+        ;;
+esac
+
+as_root() {
+    if [ -n "$sudo_cmd" ]; then
+        "$sudo_cmd" "$@"
+    else
+        "$@"
+    fi
+}
+
+# Root ownership needs root: without sudo, as in the tests, files keep
+# the user's.
+owner=(-o 0 -g 0)
+if [ -z "$sudo_cmd" ] && [ "$(id -u)" != 0 ]; then
+    owner=()
+fi
+
+installed=0 removed=0 failed=0
+for line in "${plan[@]}"; do
+    IFS="$tab" read -r kind target src mode branch <<< "$line"
+    path="$system_dir$target"
+    if [ "$kind" = remove ]; then
+        if as_root rm -f "$path"; then
+            removed=$((removed + 1))
+        else
+            echo "  ✗ Could not remove $target" >&2
+            failed=$((failed + 1))
+        fi
+        continue
+    fi
+    # A file planned as new may only have looked absent: in a directory the
+    # user cannot search, such as /etc/sudoers.d, nothing shows. Root sees.
+    if [ ! -e "$path" ] && [ ! -L "$path" ] &&
+        { as_root test -e "$path" || as_root test -L "$path"; }; then
+        echo "  ⚠ $target is there already (seen as root), and Eden did not install it: left alone" >&2
+        continue
+    fi
+    dir="$(dirname "$path")"
+    tmp=""
+    if as_root mkdir -p "$dir" &&
+        tmp="$(as_root mktemp "$dir/.eden-system.XXXXXX")" &&
+        as_root install -m "$mode" ${owner[@]+"${owner[@]}"} "$src" "$tmp" &&
+        as_root mv -f "$tmp" "$path"; then
+        installed=$((installed + 1))
+    else
+        [ -n "$tmp" ] && as_root rm -f "$tmp"
+        echo "  ✗ Could not install $target" >&2
+        failed=$((failed + 1))
+    fi
+done
+
+write_record
+echo "  → Installed $installed, removed $removed system file(s)"
+[ $failed -eq 0 ] || exit 1
+exit 0
